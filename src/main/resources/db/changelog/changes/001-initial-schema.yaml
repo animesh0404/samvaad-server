@@ -1,7 +1,0 @@
-databaseChangeLog:
-  - changeSet:
-      id: 001-baseline
-      author: samvaad
-      changes:
-        - sql:
-            sql: SELECT 1;
