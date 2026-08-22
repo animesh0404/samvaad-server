@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: samvaad-postgres
+    environment:
+      POSTGRES_DB: samvaad
+      POSTGRES_USER: samvaad
+      POSTGRES_PASSWORD: samvaad
+    ports:
+      - "5432:5432"
+    volumes:
+      - samvaad-postgres-data:/var/lib/postgresql
+
+volumes:
+  samvaad-postgres-data:
