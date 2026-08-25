@@ -1,12 +1,13 @@
 package com.samvaad.samvaad_server.user;
 
+import com.samvaad.samvaad_server.audit.AuditableEntity;
 import jakarta.persistence.*;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class User extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

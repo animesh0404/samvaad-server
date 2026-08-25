@@ -1,10 +1,10 @@
 databaseChangeLog:
   - changeSet:
-      id: 001-create-user
+      id: 002-create-user-profiles
       author: Animesh Kahara
       changes:
         - createTable:
-            tableName: users
+            tableName: user_profiles
             columns:
               - column:
                   name: user_id
@@ -13,11 +13,20 @@ databaseChangeLog:
                     nullable: false
                     primaryKey: true
               - column:
-                  name: username
-                  type: VARCHAR(32)
+                  name: display_name
+                  type: VARCHAR(255)
                   constraints:
-                    nullable: false
-                    unique: true
+                    nullable: true
+              - column:
+                  name: bio
+                  type: TEXT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: avatar_url
+                  type: VARCHAR(2048)
+                  constraints:
+                    nullable: true
               - column:
                   name: created_at
                   type: TIMESTAMP
@@ -38,3 +47,9 @@ databaseChangeLog:
                   type: VARCHAR(255)
                   constraints:
                     nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_profiles
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_user_profiles_user
