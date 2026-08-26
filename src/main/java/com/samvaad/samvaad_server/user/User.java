@@ -17,6 +17,8 @@ public class User extends AuditableEntity {
     @Column(name = "username", nullable = false, unique = true, length = 32)
     private String username;
 
+    @Column(name = "email", length = 320)
+    private String email;
 
     User() {}
 
@@ -38,5 +40,13 @@ public class User extends AuditableEntity {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

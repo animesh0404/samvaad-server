@@ -15,6 +15,8 @@ public class UserDto {
     @Pattern(regexp = "[a-zA-Z0-9_]+")
     private String username;
 
+    private String email;
+
     public UserDto() { }
 
     public UserDto(UUID userId, String username) {
@@ -38,4 +40,7 @@ public class UserDto {
         this.username = username;
     }
 
+    public String getEmail() { return email; }
+
+    public void setEmail(String email) { this.email = email; }
 }

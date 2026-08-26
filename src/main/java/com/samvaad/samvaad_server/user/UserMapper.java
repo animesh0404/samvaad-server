@@ -10,6 +10,7 @@ public final class UserMapper {
     public static User toEntity(UserDto dto) {
         User user = new User();
         user.setUsername(dto.getUsername());
+        user.setEmail(dto.getEmail());
         return user;
     }
 
@@ -17,6 +18,7 @@ public final class UserMapper {
         UserDto dto = new UserDto();
         dto.setUserId(user.getUserId());
         dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
         return dto;
     }
 
