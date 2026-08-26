@@ -28,6 +28,26 @@ databaseChangeLog:
                   constraints:
                     nullable: true
               - column:
+                  name: first_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: middle_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: last_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: status_message
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+              - column:
                   name: created_at
                   type: TIMESTAMP
                   constraints:
