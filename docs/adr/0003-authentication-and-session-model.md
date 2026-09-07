@@ -17,6 +17,11 @@ have multiple active sessions across devices or clients; there is no primary
 device concept in V1. Samvaad permits at most five active client sessions per
 user.
 
+The five-session limit is enforced transactionally. Login session allocation
+serializes on the user whose session capacity is being checked, so concurrent
+login attempts cannot both observe an available slot and exceed the five-session
+limit. Expired or revoked sessions do not count toward the active-session limit.
+
 When the five-session limit is already reached, a new login attempt fails without
 revealing the session-capacity state to the unauthenticated client. Existing
 authenticated sessions receive a real-time security notification that a login
@@ -30,7 +35,9 @@ operation in V1.
 
 Refresh tokens are bound to their session and rotated on successful refresh;
 an already consumed or revoked refresh token is rejected. The refresh expiry is
-sliding, so a successful refresh establishes a new 30-day expiry window.
+sliding, so a successful refresh establishes a new 30-day expiry window. Only
+the current refresh-token hash is persisted for a session; refresh-token history
+or token-family persistence is not required in V1.
 
 Session records retain client/session metadata useful for session management
 and security analysis, including an installation identifier, client type/name,
@@ -52,6 +59,11 @@ must bind authenticated connections to session-derived identity. The realtime
 transport must be able to deliver security events to authenticated sessions,
 including the blocked-login notification. JWT signing, claims, key storage, and
 key rotation remain deferred implementation decisions.
+
+The session-capacity check must use a transaction and a database-level lock on
+the user's row (or an equivalent serialization mechanism) around counting active
+sessions and creating a new session. This is preferred over an application-only
+synchronized block because multiple application instances may handle logins.
 
 ## Source material
 
