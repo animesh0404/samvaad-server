@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-create-user.yaml
   - include:
       file: db/changelog/changes/002-create-user-profiles.yaml
+  - include:
+      file: db/changelog/changes/003-create-sessions.yaml
