@@ -1,0 +1,37 @@
+@startuml
+title Current implemented User and UserProfile persistence model
+
+entity users {
+  * user_id : UUID <<PK>>
+  --
+  username : VARCHAR(32) <<unique, not null>>
+  email : VARCHAR(320) <<nullable>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  created_by : VARCHAR(255)
+  updated_by : VARCHAR(255)
+}
+
+entity user_profiles {
+  * user_id : UUID <<PK, FK>>
+  --
+  display_name : VARCHAR(255)
+  bio : TEXT
+  avatar_url : VARCHAR(2048)
+  first_name : VARCHAR(100)
+  middle_name : VARCHAR(100)
+  last_name : VARCHAR(100)
+  status_message : VARCHAR(255)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  created_by : VARCHAR(255)
+  updated_by : VARCHAR(255)
+}
+
+users ||--o| user_profiles : shared user_id
+note right of user_profiles
+Current persisted model only.
+Authentication, sessions, conversations,
+and messages are not implemented.
+end note
+@enduml
