@@ -20,9 +20,12 @@ public class User extends AuditableEntity {
     @Column(name = "email", length = 320)
     private String email;
 
-    User() {}
+    @Column(name = "password_hash", length = 72)
+    private String passwordHash;
 
-    User(UUID userId) {
+    public User() {}
+
+    public User(UUID userId) {
         this.userId = userId;
     }
 
@@ -48,5 +51,13 @@ public class User extends AuditableEntity {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 }

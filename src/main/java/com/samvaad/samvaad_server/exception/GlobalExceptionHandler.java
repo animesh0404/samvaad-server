@@ -43,6 +43,24 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(ex.getMessage());
     }
 
+    @ExceptionHandler(com.samvaad.samvaad_server.auth.exception.BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleBadCredentials(com.samvaad.samvaad_server.auth.exception.BadCredentialsException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleIncorrectPassword(com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(com.samvaad.samvaad_server.auth.exception.SessionLimitExceededException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleSessionLimitExceeded(com.samvaad.samvaad_server.auth.exception.SessionLimitExceededException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
     public record ErrorResponse(String message) {
     }
 }

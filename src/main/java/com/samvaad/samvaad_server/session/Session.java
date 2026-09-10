@@ -55,7 +55,7 @@ public class Session extends AuditableEntity {
     @Column(name = "revocation_reason", length = 32)
     private RevocationReason revocationReason;
 
-    Session() {}
+    public Session() {}
 
     public UUID getSessionId() {
         return sessionId;

@@ -7,3 +7,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+samvaad:
+  auth:
+    jwt-secret: ${SAMVAAD_JWT_SECRET}

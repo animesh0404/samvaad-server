@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/changes/002-create-user-profiles.yaml
   - include:
       file: db/changelog/changes/003-create-sessions.yaml
+  - include:
+      file: db/changelog/changes/004-add-user-password-hash.yaml
