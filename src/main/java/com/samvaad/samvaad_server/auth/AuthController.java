@@ -2,6 +2,7 @@ package com.samvaad.samvaad_server.auth;
 
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
+import com.samvaad.samvaad_server.auth.dto.RefreshTokenRequestDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,9 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthenticationService authenticationService;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthController(AuthenticationService authenticationService) {
+    public AuthController(
+            AuthenticationService authenticationService,
+            RefreshTokenService refreshTokenService) {
         this.authenticationService = authenticationService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @PostMapping("/login")
@@ -28,6 +33,11 @@ public class AuthController {
         String userAgent = request.getHeader("User-Agent");
 
         return authenticationService.login(loginRequest, ipAddress, userAgent);
+    }
+
+    @PostMapping("/refresh")
+    public LoginResponseDto refresh(@Valid @RequestBody RefreshTokenRequestDto refreshRequest) {
+        return refreshTokenService.refresh(refreshRequest.getRefreshToken());
     }
 
     private String resolveClientIp(HttpServletRequest request) {

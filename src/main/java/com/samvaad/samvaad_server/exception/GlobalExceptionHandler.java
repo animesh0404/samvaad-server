@@ -61,6 +61,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(ex.getMessage());
     }
 
+    @ExceptionHandler(com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidRefreshToken(com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
     public record ErrorResponse(String message) {
     }
 }

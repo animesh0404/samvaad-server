@@ -4,6 +4,7 @@ import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
 import com.samvaad.samvaad_server.auth.exception.BadCredentialsException;
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
+import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.exception.SessionLimitExceededException;
 import com.samvaad.samvaad_server.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,9 +32,12 @@ class AuthControllerTest {
     @Mock
     private AuthenticationService authenticationService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @BeforeEach
     void setUp() {
-        mockMvc = standaloneSetup(new AuthController(authenticationService))
+        mockMvc = standaloneSetup(new AuthController(authenticationService, refreshTokenService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -138,5 +142,59 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Invalid credentials"));
+    }
+
+    @Test
+    void refreshesSuccessfullyWithValidToken() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        LoginResponseDto response = new LoginResponseDto(
+                "new-access-token",
+                "new-refresh-token",
+                86400L,
+                sessionId
+        );
+
+        given(refreshTokenService.refresh("old-refresh-token")).willReturn(response);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "old-refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
+                .andExpect(jsonPath("$.expiresIn").value(86400))
+                .andExpect(jsonPath("$.sessionId").value(sessionId.toString()));
+    }
+
+    @Test
+    void rejectsRefreshWithBlankToken() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsUnauthorizedOnInvalidRefreshToken() throws Exception {
+        given(refreshTokenService.refresh("bad-token"))
+                .willThrow(new InvalidRefreshTokenException());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "bad-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid refresh token"));
     }
 }
