@@ -4,6 +4,7 @@ import com.samvaad.samvaad_server.TestcontainersConfiguration;
 import com.samvaad.samvaad_server.auth.AuthenticationService;
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
+import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.session.ClientPlatform;
@@ -600,5 +601,209 @@ class SecurityIntegrationTest {
         second.setRole(UserRole.USER);
 
         assertThrows(DataIntegrityViolationException.class, () -> userRepo.saveAndFlush(second));
+    }
+
+    @Test
+    void unauthenticatedPasswordChangeReturns401() throws Exception {
+        mockMvc.perform(patch("/api/users/{userId}/password", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void userCanChangeOwnPassword() throws Exception {
+        User user = createUser("pwd_self", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
+                .andExpect(jsonPath("$.username").value("pwd_self"));
+
+        User reloaded = userRepo.findById(user.getUserId()).orElseThrow();
+        assertTrue(passwordEncoder.matches("new-secret", reloaded.getPasswordHash()));
+        assertTrue(!reloaded.getPasswordHash().contains("new-secret"));
+    }
+
+    @Test
+    void adminCanChangeOwnPassword() throws Exception {
+        User admin = createUser("pwd_adminself", UserRole.ADMIN);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", admin.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"admin-new-secret"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void userCannotChangeAnotherUsersPassword() throws Exception {
+        User caller = createUser("pwd_caller", UserRole.USER);
+        User target = createUser("pwd_target", UserRole.USER);
+        String token = loginAs(caller).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", target.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"hijacked"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCannotChangeAnotherUsersPassword() throws Exception {
+        User admin = createUser("pwd_admin", UserRole.ADMIN);
+        User target = createUser("pwd_admintarget", UserRole.USER);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", target.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"hijacked"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void wrongCurrentPasswordReturns401() throws Exception {
+        User user = createUser("pwd_wrong", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"wrong-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        User reloaded = userRepo.findById(user.getUserId()).orElseThrow();
+        assertTrue(passwordEncoder.matches("secret123", reloaded.getPasswordHash()));
+    }
+
+    @Test
+    void blankCurrentPasswordReturns400() throws Exception {
+        User user = createUser("pwd_blankcurrent", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void blankNewPasswordReturns400() throws Exception {
+        User user = createUser("pwd_blanknew", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":""}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void missingPasswordFieldsReturn400() throws Exception {
+        User user = createUser("pwd_missing", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void oldPasswordStopsWorkingAndNewPasswordWorksAfterChange() throws Exception {
+        User user = createUser("pwd_rotation", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"rotated-secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("pwd_rotation"))
+                .andExpect(jsonPath("$.email").value("pwd_rotation@example.com"));
+
+        assertThrows(IncorrectPasswordException.class, () -> authenticationService.login(
+                new LoginRequestDto(
+                        "pwd_rotation",
+                        "secret123",
+                        "inst-pwd-rotation",
+                        ClientPlatform.WEB,
+                        "Test Client",
+                        "1.0.0"),
+                "127.0.0.1",
+                "UserAgent"));
+
+        LoginResponseDto login = authenticationService.login(
+                new LoginRequestDto(
+                        "pwd_rotation",
+                        "rotated-secret",
+                        "inst-pwd-rotation",
+                        ClientPlatform.WEB,
+                        "Test Client",
+                        "1.0.0"),
+                "127.0.0.1",
+                "UserAgent");
+
+        assertTrue(login.accessToken() != null && !login.accessToken().isBlank());
+
+        User reloaded = userRepo.findById(user.getUserId()).orElseThrow();
+        assertTrue(reloaded.getUsername().equals("pwd_rotation"));
+        assertTrue(reloaded.getEmail().equals("pwd_rotation@example.com"));
+        assertTrue(reloaded.getRole() == UserRole.USER);
+    }
+
+    @Test
+    void existingSessionRemainsValidAfterPasswordChange() throws Exception {
+        User user = createUser("pwd_session", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+        String refreshToken = login.refreshToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/password", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret123","newPassword":"session-secret"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists());
     }
 }

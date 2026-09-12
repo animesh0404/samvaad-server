@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.user;
 
+import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.exception.GlobalExceptionHandler;
 import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.user.UserRole;
@@ -325,5 +326,191 @@ class UserControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("same@example.com"));
+    }
+
+    @Test
+    void userCanChangeOwnPassword() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        UserDto updated = new UserDto();
+        updated.setUserId(userId);
+        updated.setUsername("user1");
+        updated.setEmail("user1@example.com");
+        updated.setRole(UserRole.USER);
+
+        given(userService.changePassword(eq(userId), eq("old-secret"), eq("new-secret")))
+                .willReturn(updated);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.username").value("user1"));
+
+        then(userService).should().changePassword(eq(userId), eq("old-secret"), eq("new-secret"));
+    }
+
+    @Test
+    void adminCanChangeOwnPassword() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        authenticateAs(UserRole.ADMIN, adminId);
+
+        UserDto updated = new UserDto();
+        updated.setUserId(adminId);
+        updated.setUsername("admin1");
+        updated.setRole(UserRole.ADMIN);
+
+        given(userService.changePassword(eq(adminId), eq("old-secret"), eq("new-secret")))
+                .willReturn(updated);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", adminId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void userCannotChangeAnotherUsersPassword() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        mockMvc.perform(patch("/api/users/{userId}/password", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void adminCannotChangeAnotherUsersPassword() throws Exception {
+        authenticateAs(UserRole.ADMIN, UUID.randomUUID());
+
+        mockMvc.perform(patch("/api/users/{userId}/password", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void wrongCurrentPasswordReturns401() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+        given(userService.changePassword(eq(userId), eq("wrong-secret"), eq("new-secret")))
+                .willThrow(new IncorrectPasswordException("Incorrect password"));
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"wrong-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void blankCurrentPasswordReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void missingCurrentPasswordReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void blankNewPasswordReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":""}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void missingNewPasswordReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void changePasswordNonexistentUserReturns404() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+        given(userService.changePassword(eq(userId), eq("old-secret"), eq("new-secret")))
+                .willThrow(new UserNotFoundException(userId));
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"old-secret","newPassword":"new-secret"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void samePasswordReturns200() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        UserDto updated = new UserDto();
+        updated.setUserId(userId);
+        updated.setUsername("user1");
+        updated.setRole(UserRole.USER);
+
+        given(userService.changePassword(eq(userId), eq("same-secret"), eq("same-secret")))
+                .willReturn(updated);
+
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"same-secret","newPassword":"same-secret"}
+                                """))
+                .andExpect(status().isOk());
     }
 }

@@ -64,4 +64,15 @@ public class UserController {
         }
         return userService.changeEmail(userId, request.getEmail());
     }
+
+    @PatchMapping("/{userId}/password")
+    public UserDto changePassword(
+            @PathVariable UUID userId,
+            @Valid @RequestBody PasswordUpdateDto request) {
+        AuthenticatedUser caller = CurrentUser.require();
+        if (!caller.userId().equals(userId)) {
+            throw new ForbiddenOperationException();
+        }
+        return userService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword());
+    }
 }

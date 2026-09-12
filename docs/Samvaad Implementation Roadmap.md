@@ -83,7 +83,7 @@ Remaining alignment work:
 - **[DONE]** implement `DELETE /api/users/{userId}` for admin deletion
 - do not add a generic admin edit-user endpoint
 - **[DONE]** implement self-service email change
-- implement self-service password change
+- **[DONE]** implement self-service password change
 - enforce immutable username
 - enforce self-only profile updates
 - implement `POST /api/auth/logout`

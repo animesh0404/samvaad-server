@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.user;
 
+import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -274,5 +275,80 @@ class UserServiceTest {
 
         assertThrows(EmailAlreadyExistsException.class,
                 () -> userService.changeEmail(userId, "race@example.com"));
+    }
+
+    @Test
+    void changesPasswordSuccessfully() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("user1@example.com");
+        user.setPasswordHash("$2a$10$oldhash");
+        user.setRole(UserRole.USER);
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("old-secret", "$2a$10$oldhash")).willReturn(true);
+        given(passwordEncoder.encode("new-secret")).willReturn("$2a$10$newhash");
+        given(userRepo.save(user)).willReturn(user);
+
+        UserDto result = userService.changePassword(userId, "old-secret", "new-secret");
+
+        assertEquals("$2a$10$newhash", user.getPasswordHash());
+        assertNotEquals("new-secret", user.getPasswordHash());
+        assertEquals("user1", result.getUsername());
+        assertEquals("user1@example.com", result.getEmail());
+        assertEquals(UserRole.USER, result.getRole());
+        assertEquals(userId, result.getUserId());
+        then(userRepo).should().save(user);
+    }
+
+    @Test
+    void changePasswordNonexistentUserThrows() {
+        UUID userId = UUID.randomUUID();
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class,
+                () -> userService.changePassword(userId, "old-secret", "new-secret"));
+
+        then(passwordEncoder).shouldHaveNoInteractions();
+        then(userRepo).should(never()).save(any());
+    }
+
+    @Test
+    void changePasswordWrongCurrentPasswordThrowsWithoutWriting() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setPasswordHash("$2a$10$oldhash");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("wrong-secret", "$2a$10$oldhash")).willReturn(false);
+
+        assertThrows(IncorrectPasswordException.class,
+                () -> userService.changePassword(userId, "wrong-secret", "new-secret"));
+
+        assertEquals("$2a$10$oldhash", user.getPasswordHash());
+        then(passwordEncoder).should(never()).encode(any());
+        then(userRepo).should(never()).save(any());
+    }
+
+    @Test
+    void changePasswordEqualToCurrentIsAllowed() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setPasswordHash("$2a$10$oldhash");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("same-secret", "$2a$10$oldhash")).willReturn(true);
+        given(passwordEncoder.encode("same-secret")).willReturn("$2a$10$samehash");
+        given(userRepo.save(user)).willReturn(user);
+
+        UserDto result = userService.changePassword(userId, "same-secret", "same-secret");
+
+        assertEquals("$2a$10$samehash", user.getPasswordHash());
+        assertEquals(userId, result.getUserId());
+        then(userRepo).should().save(user);
     }
 }

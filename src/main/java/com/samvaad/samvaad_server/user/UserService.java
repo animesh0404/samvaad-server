@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.user;
 
+import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -96,5 +97,19 @@ public class UserService {
         } catch (DataIntegrityViolationException e) {
             throw new EmailAlreadyExistsException(email);
         }
+    }
+
+    @Transactional
+    public UserDto changePassword(UUID userId, String currentPassword, String newPassword) {
+        User user = userRepo.findByIdWithLock(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new IncorrectPasswordException("Incorrect password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        User savedUser = userRepo.save(user);
+        return UserMapper.toDto(savedUser);
     }
 }
