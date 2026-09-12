@@ -2,22 +2,28 @@
 
 ## Status
 
-Accepted; partially implemented.
-
-The core HTTP authentication/session foundation described below is implemented:
-BCrypt password verification, persisted client sessions, one-day JWT access
-tokens, session-scoped rotating refresh tokens, five-session capacity
-serialization, and blocked-login event publication. The remaining lifecycle and
-transport behaviors are explicitly tracked as implementation gaps rather than
-being treated as implemented merely because the design is accepted.
+Accepted.
 
 ## Decision
 
-Passwords use BCrypt with generated salt and plaintext passwords are neither
-persisted nor logged. Samvaad uses one-day JWT access tokens and rotating,
-session-scoped refresh tokens with a 30-day sliding expiry. Refresh is reactive;
-an already consumed refresh token is rejected. Logout and revocation affect the
-current session, while other sessions remain active.
+Samvaad V1 uses admin-provisioned accounts. There is no public self-registration.
+The initial administrator is bootstrapped during first-time application setup.
+
+Passwords use BCrypt with generated salt. Plaintext passwords are neither
+persisted nor logged.
+
+V1 authentication uses:
+
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+
+Login verifies the stored password hash, creates a persisted client session, and
+issues a JWT access token plus a rotating refresh token.
+
+Access tokens have a one-day lifetime. Refresh tokens are session-scoped and use
+a 30-day sliding expiry. A successful refresh rotates the refresh token and
+issues a new access token. The previously consumed refresh token is rejected.
 
 Each successful login is associated with a distinct client session. A user may
 have multiple active sessions across devices or clients; there is no primary
@@ -27,41 +33,34 @@ user.
 The five-session limit is enforced transactionally. Login session allocation
 serializes on the user whose session capacity is being checked, so concurrent
 login attempts cannot both observe an available slot and exceed the five-session
-limit. Expired or revoked sessions do not count toward the active-session limit.
+limit.
 
 When the five-session limit is already reached, a new login attempt fails without
 revealing the session-capacity state to the unauthenticated client. The current
 implementation publishes a `LoginBlockedDueToSessionLimitEvent` containing the
 attempt and client metadata. Realtime delivery of that security event to other
-authenticated sessions is not yet implemented because the realtime transport is
-not yet implemented.
+authenticated sessions is deferred until the realtime transport exists.
 
-Session management supports revoking the current session, revoking another
-specific session, and revoking all other sessions while keeping the current
-session active. There is deliberately no separate "logout all devices"
-operation in V1. These session-management operations are design requirements;
-the corresponding HTTP lifecycle endpoints and authorization enforcement are
-not yet implemented.
-
-Refresh tokens are bound to their session and rotated on successful refresh;
-an already consumed or revoked refresh token is rejected. The refresh expiry is
-sliding, so a successful refresh establishes a new 30-day expiry window. Only
-
-the current refresh-token hash is persisted for a session; refresh-token history
-or token-family persistence is not required in V1.
-
-Session records retain client/session metadata useful for session management
-and security analysis, including an installation identifier, client type/name,
-last-seen IP address, and user-agent where available. IP address and user-agent
-are signals rather than hard session identity, and session validity is not
-revoked solely because an IP address changes.
+Normal logout revokes the current session only; other sessions remain active.
+Session revocation invalidates the associated authenticated connection.
 
 Authentication failures must not expose account-enumeration information. Unknown
 usernames/emails and session-state failures use a generic authentication failure.
-For an otherwise valid account, an incorrect password may return a specific
-incorrect-password error to support normal credential-typing UX, without
-revealing additional account information. Admin-authenticated user-management
-endpoints may expose their own appropriate validation errors.
+
+## Authorization boundary
+
+Authentication proves identity; authorization determines whether that identity
+may perform an operation.
+
+Role and ownership enforcement is governed by ADR 0007. In particular:
+
+- administrators provision/list/retrieve/delete users as permitted by the API
+- administrators cannot mutate another user's username, email, password, or profile
+- standard users may mutate only their own email, password, and profile
+- username is immutable after account creation
+
+The server derives authenticated `userId` from session context rather than
+trusting a caller-supplied identity.
 
 ## Current implementation evidence
 
@@ -79,29 +78,28 @@ endpoints may expose their own appropriate validation errors.
 
 ## Remaining implementation gaps
 
-- Password-based user registration is not yet implemented as the authentication
-  flow; the existing user-creation endpoint is still a separate user/profile
-  operation.
-- Authorization enforcement for protected operations is not yet complete.
-- Logout and session-revocation operations are not yet implemented.
-- Realtime delivery of blocked-login security notifications is not yet
-  implemented.
-- JWT signing algorithm, claims beyond the current implementation, production
-  key storage, and key rotation remain implementation/deployment decisions.
+- safe first-time bootstrap of the initial ADMIN account
+- password-aware, admin-only user provisioning
+- complete authorization enforcement
+- `POST /api/auth/logout`
+- required session-revocation HTTP operations
+- authenticated realtime connection/session handling
+- realtime delivery of blocked-login security notifications
+- final JWT signing algorithm, production key storage, and key rotation
 
 ## Consequences
 
-Authentication work introduces durable session and refresh-token state and must
-bind authenticated connections to session-derived identity. The realtime
-transport must eventually be able to deliver security events to authenticated
-sessions, including the blocked-login notification.
+Authentication introduces durable session and refresh-token state and must bind
+authenticated connections to session-derived identity. The realtime transport
+must eventually deliver security events and reject commands after session
+revocation.
 
-The session-capacity check must use a transaction and a database-level lock on
-the user's row (or an equivalent serialization mechanism) around counting active
-sessions and creating a new session. This is preferred over an application-only
-synchronized block because multiple application instances may handle logins.
+The session-capacity check must use a transaction and database-level locking (or
+equivalent serialization) around counting active sessions and creating a new
+session so multiple application instances cannot exceed the limit.
 
 ## Source material
 
-- `docs/Samvaad Product & Design Decisions.md`, sections 3–4
+- `docs/adr/0007-user-provisioning-and-authorization.md`
+- `docs/Samvaad Product & Design Decisions.md`, sections 3–5
 - `docs/Samvaad Technical Design.md`, sections 12–14
