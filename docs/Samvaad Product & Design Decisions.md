@@ -65,6 +65,7 @@ userId
 username
 email
 authentication/account lifecycle data
+role
 ```
 
 ### UserProfile
@@ -96,7 +97,7 @@ There is **no public self-registration** in V1.
 
 User accounts are provisioned by an administrator.
 
-The first administrator is bootstrapped during first-time application setup. A bootstrap credential may exist for initial deployment, but it must not be committed to source control or stored as plaintext after provisioning.
+The initial administrator is bootstrapped during application startup from environment-provided bootstrap credentials. Bootstrap is idempotent: when an administrator already exists, startup performs no mutation. When credentials are absent, startup warns and continues without creating an administrator. Bootstrap credentials must not be committed to source control or persisted in plaintext.
 
 An administrator creates a user with:
 
@@ -108,6 +109,8 @@ email     optional
 
 The server generates the permanent `userId` and creates the empty `UserProfile` as part of the same user-creation lifecycle.
 
+Newly provisioned users are `STANDARD_USER` unless they are the explicitly bootstrapped administrator; the provisioning API cannot choose or change the role.
+
 ---
 
 ## 3.2 Password storage
@@ -118,11 +121,14 @@ Passwords use BCrypt with generated salt.
 
 Plaintext passwords:
 
-- are accepted only at the authentication boundary
+- are accepted only at the authentication/provisioning boundary
 - are never persisted
 - are never stored in domain entities
 - are never placed in events
 - must not be logged
+- are never returned by the API
+
+Once the provisioning migration is complete, `password_hash` is expected to be non-null. Legacy passwordless rows must be handled explicitly by migration rather than silently preserved as a supported account state.
 
 ---
 
@@ -149,14 +155,14 @@ Temporary account pausing/suspension is deferred from V1.
 
 **LOCKED for V1**
 
-Samvaad distinguishes at least:
+Samvaad distinguishes exactly one role per user:
 
 ```text
 ADMIN
 STANDARD_USER
 ```
 
-The initial bootstrap account is an administrator.
+The initial bootstrap account is an administrator. There is no V1 role-change API, and clients cannot assign roles during provisioning.
 
 ---
 
@@ -170,8 +176,11 @@ An authenticated administrator may:
 - list users
 - retrieve user records where the API permits it
 - delete users
+- read any user's profile
 
 The administrator may **not** edit an existing user's username, email, password, or `UserProfile`.
+
+An administrator may edit their **own** profile through the normal self-service profile operation.
 
 Deleting a user is the V1 administrative mechanism for account removal/revocation.
 
@@ -181,17 +190,40 @@ Deleting a user is the V1 administrative mechanism for account removal/revocatio
 
 **LOCKED**
 
-A standard user may operate on their own account/profile only where self-service is permitted:
+A standard user may:
 
-- retrieve their own user/account data
-- retrieve their own profile
+- retrieve their own account/profile
 - update their own profile
 - change their own email
 - change their own password
 
-A standard user cannot modify another user's account or profile.
+A standard user may not read or modify another user's account or profile unless an accepted friendship relationship grants profile-read visibility.
 
-Authorization derives identity from the authenticated server-side session context, not from a caller-supplied identity claim.
+---
+
+## 4.4 Profile visibility
+
+**LOCKED**
+
+Profile read and write permissions are deliberately different:
+
+```text
+READ
+  own profile                         -> allowed
+  ADMIN reading any profile           -> allowed
+  STANDARD_USER reading non-friend   -> denied
+  accepted friend reading profile    -> allowed
+
+WRITE
+  own profile                         -> allowed
+  friend editing friend's profile    -> denied
+  ADMIN editing another profile      -> denied
+  ADMIN editing own profile           -> allowed
+```
+
+Friendship grants **read** access to each friend's profile; it never grants edit access.
+
+The current authentication/authorization slice establishes identity and role enforcement. The accepted-friend relationship check becomes the additional authorization input when the friendship vertical slice is implemented.
 
 ---
 
@@ -213,6 +245,10 @@ Access tokens are JWTs with a one-day lifetime. Refresh tokens are session-scope
 
 Normal logout revokes only the current session.
 
+Every authenticated request must validate both the access JWT and its referenced server-side session. The JWT `sid` identifies the session; the JWT `sub` must match the user bound to that session. Missing, revoked, or expired sessions cause `401 Unauthorized`.
+
+The session is considered dead when its `refresh_token_expires_at` has passed. Per-request session lookup is preferred for V1 correctness and immediate revocation rather than adding a validation cache.
+
 ---
 
 # 6. User/Account API Direction
@@ -222,24 +258,50 @@ Normal logout revokes only the current session.
 The V1 account lifecycle is:
 
 ```text
+bootstrap ADMIN
+      ↓
 admin creates user
       ↓
 User + empty UserProfile
       ↓
 user logs in
       ↓
-user manages own email/password/profile
+user manages own permitted account/profile fields
 ```
 
 There is no generic "edit user" permission for administrators.
 
 A separate profile-creation endpoint is unnecessary because profile creation is coupled to user creation. Profile mutation is an update/patch operation.
 
+HTTP authorization uses the server-derived identity rather than a caller-supplied `userId`.
+
+For protected endpoints:
+
+```text
+unauthenticated                 -> 401
+authenticated but not permitted -> 403
+invalid/expired/revoked session  -> 401
+validation failure               -> 400
+duplicate username               -> 409
+```
+
+The existing API error body shape is preserved for this slice. Cross-user denial uses `403`, not `404`.
+
 ---
 
-# 7. User Discovery & Friend Requests
+# 7. Login Identifier
 
-## 7.1 Exact username discovery
+**LOCKED**
+
+The existing login behavior remains username-or-email based.
+
+Username remains the exact messaging discovery key. Email is not the V1 messaging discovery key.
+
+---
+
+# 8. User Discovery & Friend Requests
+
+## 8.1 Exact username discovery
 
 **LOCKED**
 
@@ -251,7 +313,7 @@ Discovery responses expose only an appropriate public/discovery DTO and must not
 
 ---
 
-## 7.2 Friend request prerequisite
+## 8.2 Friend request prerequisite
 
 **LOCKED**
 
@@ -273,11 +335,13 @@ friendship established
 direct messaging authorized
 ```
 
+An accepted friendship also grants mutual **profile-read visibility**. It does not grant either friend permission to edit the other's profile.
+
 A recipient may accept or reject a request. A sender may cancel a pending request.
 
 ---
 
-## 7.3 Relationship features explicitly deferred
+## 8.3 Relationship features explicitly deferred
 
 **DEFERRED**
 
@@ -293,7 +357,7 @@ The relationship model must remain extensible enough to add them later without c
 
 ---
 
-# 8. Direct Messaging Gate
+# 9. Direct Messaging Gate
 
 **LOCKED**
 
@@ -314,12 +378,12 @@ accept
    ↓
 friendship
    ↓
-chat
+profile visibility + chat
 ```
 
 ---
 
-# 9. Existing Messaging Decisions
+# 10. Existing Messaging Decisions
 
 The existing direct-conversation, message, history, ordering, read-state, and persistence decisions remain in force unless explicitly superseded by an ADR.
 
