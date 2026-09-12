@@ -3,6 +3,7 @@ package com.samvaad.samvaad_server.user;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,5 +72,29 @@ public class UserService {
         sessionRepo.deleteByUserId(userId);
         userProfileRepo.deleteById(userId);
         userRepo.deleteById(userId);
+    }
+
+    @Transactional
+    public UserDto changeEmail(UUID userId, String email) {
+        User user = userRepo.findByIdWithLock(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+
+        if (user.getEmail() != null && user.getEmail().equalsIgnoreCase(email)) {
+            return UserMapper.toDto(user);
+        }
+
+        boolean takenByAnother = userRepo.findByEmailIgnoreCase(email).stream()
+                .anyMatch(holder -> !holder.getUserId().equals(userId));
+        if (takenByAnother) {
+            throw new EmailAlreadyExistsException(email);
+        }
+
+        user.setEmail(email);
+        try {
+            User savedUser = userRepo.saveAndFlush(user);
+            return UserMapper.toDto(savedUser);
+        } catch (DataIntegrityViolationException e) {
+            throw new EmailAlreadyExistsException(email);
+        }
     }
 }

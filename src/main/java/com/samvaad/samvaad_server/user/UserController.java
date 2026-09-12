@@ -53,4 +53,15 @@ public class UserController {
         userService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{userId}/email")
+    public UserDto changeEmail(
+            @PathVariable UUID userId,
+            @Valid @RequestBody EmailUpdateDto request) {
+        AuthenticatedUser caller = CurrentUser.require();
+        if (!caller.userId().equals(userId)) {
+            throw new ForbiddenOperationException();
+        }
+        return userService.changeEmail(userId, request.getEmail());
+    }
 }

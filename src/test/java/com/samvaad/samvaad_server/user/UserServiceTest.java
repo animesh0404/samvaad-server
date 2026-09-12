@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -168,5 +169,110 @@ class UserServiceTest {
         then(sessionRepo).should().deleteByUserId(userId);
         then(userProfileRepo).should().deleteById(userId);
         then(userRepo).should().deleteById(userId);
+    }
+
+    @Test
+    void changesEmailSuccessfully() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("old@example.com");
+        user.setPasswordHash("$2a$10$hashed");
+        user.setRole(UserRole.USER);
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(userRepo.findByEmailIgnoreCase("new@example.com")).willReturn(List.of());
+        given(userRepo.saveAndFlush(user)).willReturn(user);
+
+        UserDto result = userService.changeEmail(userId, "new@example.com");
+
+        assertEquals("new@example.com", result.getEmail());
+        assertEquals("user1", result.getUsername());
+        assertEquals(UserRole.USER, result.getRole());
+        assertEquals("new@example.com", user.getEmail());
+        assertEquals("user1", user.getUsername());
+        assertEquals("$2a$10$hashed", user.getPasswordHash());
+        assertEquals(UserRole.USER, user.getRole());
+        then(userRepo).should().saveAndFlush(user);
+    }
+
+    @Test
+    void changeEmailNonexistentUserThrows() {
+        UUID userId = UUID.randomUUID();
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.changeEmail(userId, "new@example.com"));
+
+        then(userRepo).should(never()).findByEmailIgnoreCase(any());
+        then(userRepo).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void changeEmailDuplicateBelongingToAnotherUserThrows() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("old@example.com");
+
+        User other = new User(UUID.randomUUID());
+        other.setUsername("user2");
+        other.setEmail("Taken@Example.com");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(userRepo.findByEmailIgnoreCase("taken@example.com")).willReturn(List.of(other));
+
+        assertThrows(EmailAlreadyExistsException.class,
+                () -> userService.changeEmail(userId, "taken@example.com"));
+
+        assertEquals("old@example.com", user.getEmail());
+        then(userRepo).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void changeEmailSameEmailIsNoOp() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("same@example.com");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+
+        UserDto result = userService.changeEmail(userId, "same@example.com");
+
+        assertEquals("same@example.com", result.getEmail());
+        then(userRepo).should(never()).findByEmailIgnoreCase(any());
+        then(userRepo).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void changeEmailCaseOnlyVariantIsNoOp() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("User@Example.com");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+
+        UserDto result = userService.changeEmail(userId, "user@example.com");
+
+        assertEquals("User@Example.com", result.getEmail());
+        then(userRepo).should(never()).findByEmailIgnoreCase(any());
+        then(userRepo).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void changeEmailConstraintViolationMapsToConflict() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("user1");
+        user.setEmail("old@example.com");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(userRepo.findByEmailIgnoreCase("race@example.com")).willReturn(List.of());
+        given(userRepo.saveAndFlush(user)).willThrow(new DataIntegrityViolationException("duplicate"));
+
+        assertThrows(EmailAlreadyExistsException.class,
+                () -> userService.changeEmail(userId, "race@example.com"));
     }
 }

@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-user-email-case-insensitive-unique
+      author: Animesh Kahara
+      changes:
+        - sql:
+            # PostgreSQL partial unique index: email stays nullable (multiple
+            # NULLs allowed) while non-null emails are unique case-insensitively.
+            sql: CREATE UNIQUE INDEX uq_users_email_lower ON users (LOWER(email)) WHERE email IS NOT NULL

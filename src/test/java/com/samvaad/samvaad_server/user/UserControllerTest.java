@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,9 +22,11 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.doThrow;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willDoNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -133,5 +136,194 @@ class UserControllerTest {
 
         mockMvc.perform(delete("/api/users/{userId}", targetId))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void userCanChangeOwnEmail() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        UserDto updated = new UserDto();
+        updated.setUserId(userId);
+        updated.setUsername("user1");
+        updated.setEmail("new@example.com");
+        updated.setRole(UserRole.USER);
+
+        given(userService.changeEmail(eq(userId), eq("new@example.com"))).willReturn(updated);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.username").value("user1"))
+                .andExpect(jsonPath("$.email").value("new@example.com"));
+
+        then(userService).should().changeEmail(eq(userId), eq("new@example.com"));
+    }
+
+    @Test
+    void adminCanChangeOwnEmail() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        authenticateAs(UserRole.ADMIN, adminId);
+
+        UserDto updated = new UserDto();
+        updated.setUserId(adminId);
+        updated.setUsername("admin1");
+        updated.setEmail("admin-new@example.com");
+        updated.setRole(UserRole.ADMIN);
+
+        given(userService.changeEmail(eq(adminId), eq("admin-new@example.com"))).willReturn(updated);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", adminId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"admin-new@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin-new@example.com"));
+    }
+
+    @Test
+    void userCannotChangeAnotherUsersEmail() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        mockMvc.perform(patch("/api/users/{userId}/email", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"hijacked@example.com"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void adminCannotChangeAnotherUsersEmail() throws Exception {
+        authenticateAs(UserRole.ADMIN, UUID.randomUUID());
+
+        mockMvc.perform(patch("/api/users/{userId}/email", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"hijacked@example.com"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void invalidEmailReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"not-an-email"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void blankEmailReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":""}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void nullEmailReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":null}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void tooLongEmailReturns400() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        String tooLong = "a".repeat(310) + "@example.com";
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void duplicateEmailReturns409() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+        given(userService.changeEmail(eq(userId), eq("taken@example.com")))
+                .willThrow(new EmailAlreadyExistsException("taken@example.com"));
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"taken@example.com"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email already in use: taken@example.com"));
+    }
+
+    @Test
+    void changeEmailNonexistentUserReturns404() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+        given(userService.changeEmail(eq(userId), eq("new@example.com")))
+                .willThrow(new UserNotFoundException(userId));
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new@example.com"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void sameEmailReturns200() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(UserRole.USER, userId);
+
+        UserDto unchanged = new UserDto();
+        unchanged.setUserId(userId);
+        unchanged.setUsername("user1");
+        unchanged.setEmail("same@example.com");
+        unchanged.setRole(UserRole.USER);
+
+        given(userService.changeEmail(eq(userId), eq("same@example.com"))).willReturn(unchanged);
+
+        mockMvc.perform(patch("/api/users/{userId}/email", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"same@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("same@example.com"));
     }
 }

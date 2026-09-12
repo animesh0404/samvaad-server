@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ public interface UserRepo extends JpaRepository<User, UUID> {
     boolean existsByUsername(String username);
 
     boolean existsByRole(UserRole role);
+
+    List<User> findByEmailIgnoreCase(String email);
 
     @Query("""
         SELECT u FROM User u

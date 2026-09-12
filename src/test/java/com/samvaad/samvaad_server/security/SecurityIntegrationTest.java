@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -412,5 +414,191 @@ class SecurityIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unauthenticatedEmailChangeReturns401() throws Exception {
+        mockMvc.perform(patch("/api/users/{userId}/email", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new@example.com"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void userCanChangeOwnEmail() throws Exception {
+        User user = createUser("mail_self", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new-self@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
+                .andExpect(jsonPath("$.username").value("mail_self"))
+                .andExpect(jsonPath("$.email").value("new-self@example.com"));
+
+        assertTrue(userRepo.findById(user.getUserId()).orElseThrow()
+                .getEmail().equals("new-self@example.com"));
+    }
+
+    @Test
+    void userCannotChangeAnotherUsersEmail() throws Exception {
+        User caller = createUser("mail_caller", UserRole.USER);
+        User target = createUser("mail_target", UserRole.USER);
+        String token = loginAs(caller).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", target.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"hijacked@example.com"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCannotChangeAnotherUsersEmail() throws Exception {
+        User admin = createUser("mail_admin", UserRole.ADMIN);
+        User target = createUser("mail_admintarget", UserRole.USER);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", target.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"hijacked@example.com"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCanChangeOwnEmail() throws Exception {
+        User admin = createUser("mail_adminself", UserRole.ADMIN);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", admin.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"admin-new@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin-new@example.com"));
+    }
+
+    @Test
+    void duplicateEmailReturns409() throws Exception {
+        User first = createUser("mail_first", UserRole.USER);
+        User second = createUser("mail_second", UserRole.USER);
+        String token = loginAs(first).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", first.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"MAIL_SECOND@EXAMPLE.COM"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void invalidEmailReturns400() throws Exception {
+        User user = createUser("mail_invalid", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"not-an-email"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void blankEmailReturns400() throws Exception {
+        User user = createUser("mail_blank", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":""}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void changedEmailCanBeUsedForLogin() throws Exception {
+        User user = createUser("mail_login", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"login-new@example.com"}
+                                """))
+                .andExpect(status().isOk());
+
+        LoginResponseDto login = authenticationService.login(
+                new LoginRequestDto(
+                        "login-new@example.com",
+                        "secret123",
+                        "inst-mail-login",
+                        ClientPlatform.WEB,
+                        "Test Client",
+                        "1.0.0"),
+                "127.0.0.1",
+                "UserAgent");
+
+        assertTrue(login.accessToken() != null && !login.accessToken().isBlank());
+    }
+
+    @Test
+    void existingSessionRemainsValidAfterEmailChange() throws Exception {
+        User user = createUser("mail_session", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+        String refreshToken = login.refreshToken();
+
+        mockMvc.perform(patch("/api/users/{userId}/email", user.getUserId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"session-new@example.com"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists());
+    }
+
+    @Test
+    void databaseRejectsCaseInsensitiveDuplicateEmail() {
+        User first = createUser("mail_db_first", UserRole.USER);
+        first.setEmail("DbUnique@Example.com");
+        userRepo.saveAndFlush(first);
+
+        User second = new User();
+        second.setUsername("mail_db_second");
+        second.setEmail("dbunique@example.com");
+        second.setPasswordHash(passwordEncoder.encode("secret123"));
+        second.setRole(UserRole.USER);
+
+        assertThrows(DataIntegrityViolationException.class, () -> userRepo.saveAndFlush(second));
     }
 }

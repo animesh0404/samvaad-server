@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.exception;
 
+import com.samvaad.samvaad_server.user.EmailAlreadyExistsException;
 import com.samvaad.samvaad_server.user.UserAlreadyExistsException;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileNotFoundException;
@@ -15,6 +16,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UserAlreadyExistsException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleUserAlreadyExists(UserAlreadyExistsException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 

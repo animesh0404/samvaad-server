@@ -90,8 +90,8 @@ deferred. V1 application-level encryption is also deferred; see ADR 0005.
 
 - Realtime transport authentication and realtime delivery of blocked-login
   security notifications are not implemented.
-- User listing, deletion, and user-owned email/password change operations are not
-  yet implemented.
+- User listing, deletion, and user-owned email change are implemented.
+  User-owned password change is not yet implemented.
 - Relationship-based profile visibility (friend-gated reads) is not yet
   implemented; non-admin cross-user profile reads are denied.
 - Messaging, conversations, blocking, read state, archive/mute, and transport
