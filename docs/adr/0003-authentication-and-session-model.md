@@ -2,7 +2,14 @@
 
 ## Status
 
-Accepted; not yet implemented.
+Accepted; partially implemented.
+
+The core HTTP authentication/session foundation described below is implemented:
+BCrypt password verification, persisted client sessions, one-day JWT access
+tokens, session-scoped rotating refresh tokens, five-session capacity
+serialization, and blocked-login event publication. The remaining lifecycle and
+transport behaviors are explicitly tracked as implementation gaps rather than
+being treated as implemented merely because the design is accepted.
 
 ## Decision
 
@@ -23,19 +30,23 @@ login attempts cannot both observe an available slot and exceed the five-session
 limit. Expired or revoked sessions do not count toward the active-session limit.
 
 When the five-session limit is already reached, a new login attempt fails without
-revealing the session-capacity state to the unauthenticated client. Existing
-authenticated sessions receive a real-time security notification that a login
-attempt was blocked because the maximum active-session capacity was reached.
-The blocked login client does not receive that notification.
+revealing the session-capacity state to the unauthenticated client. The current
+implementation publishes a `LoginBlockedDueToSessionLimitEvent` containing the
+attempt and client metadata. Realtime delivery of that security event to other
+authenticated sessions is not yet implemented because the realtime transport is
+not yet implemented.
 
 Session management supports revoking the current session, revoking another
 specific session, and revoking all other sessions while keeping the current
 session active. There is deliberately no separate "logout all devices"
-operation in V1.
+operation in V1. These session-management operations are design requirements;
+the corresponding HTTP lifecycle endpoints and authorization enforcement are
+not yet implemented.
 
 Refresh tokens are bound to their session and rotated on successful refresh;
 an already consumed or revoked refresh token is rejected. The refresh expiry is
 sliding, so a successful refresh establishes a new 30-day expiry window. Only
+
 the current refresh-token hash is persisted for a session; refresh-token history
 or token-family persistence is not required in V1.
 
@@ -52,13 +63,38 @@ incorrect-password error to support normal credential-typing UX, without
 revealing additional account information. Admin-authenticated user-management
 endpoints may expose their own appropriate validation errors.
 
+## Current implementation evidence
+
+- `POST /api/auth/login` verifies the stored password hash, serializes on the
+  user row while checking session capacity, creates a persisted session, and
+  returns an access token, refresh token, expiry, and session identifier.
+- `POST /api/auth/refresh` validates the presented refresh-token hash against the
+  persisted session, rejects revoked/expired sessions, rotates the stored hash,
+  extends the refresh expiry, and issues a new session-bound access token.
+- Session records persist the refresh-token hash and client/session metadata.
+- Active-session capacity is set to five and concurrent login allocation is
+  covered by an integration test.
+- The blocked-login security event is published when capacity is reached and is
+  covered by authentication tests.
+
+## Remaining implementation gaps
+
+- Password-based user registration is not yet implemented as the authentication
+  flow; the existing user-creation endpoint is still a separate user/profile
+  operation.
+- Authorization enforcement for protected operations is not yet complete.
+- Logout and session-revocation operations are not yet implemented.
+- Realtime delivery of blocked-login security notifications is not yet
+  implemented.
+- JWT signing algorithm, claims beyond the current implementation, production
+  key storage, and key rotation remain implementation/deployment decisions.
+
 ## Consequences
 
-Authentication work must introduce durable session and refresh-token state and
-must bind authenticated connections to session-derived identity. The realtime
-transport must be able to deliver security events to authenticated sessions,
-including the blocked-login notification. JWT signing, claims, key storage, and
-key rotation remain deferred implementation decisions.
+Authentication work introduces durable session and refresh-token state and must
+bind authenticated connections to session-derived identity. The realtime
+transport must eventually be able to deliver security events to authenticated
+sessions, including the blocked-login notification.
 
 The session-capacity check must use a transaction and a database-level lock on
 the user's row (or an equivalent serialization mechanism) around counting active
