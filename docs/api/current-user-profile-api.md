@@ -11,7 +11,7 @@ Relationship gating for messaging is governed by ADR 0008.
 
 ### `POST /api/auth/login`
 
-Authenticates a provisioned user using username and password. On success the
+Authenticates a provisioned user using username or email and password. On success the
 server creates a persisted session and returns an access token, refresh token,
 access-token expiry, and session identifier.
 
@@ -26,7 +26,8 @@ successful refresh.
 ### `POST /api/auth/logout`
 
 Revokes the currently authenticated session. Other active sessions for the same
-user remain active.
+user remain active. A revoked session subsequently fails authenticated requests
+and refresh attempts.
 
 ## User administration
 
@@ -51,14 +52,15 @@ The server generates `userId`.
 
 The password is hashed before persistence and is never stored or logged in
 plaintext. The profile is created as part of the user-creation operation, so
-there is no separate V1 `create user profile` endpoint.
+there is no separate V1 `create user profile` endpoint. Provisioned users are
+always created with role `USER`.
 
 ### `GET /api/users`
 
 **Admin only.** Lists users available to the administrator according to the V1
 user-management contract.
 
-The response must use an account-safe DTO and must not expose password hashes,
+The response uses an account-safe DTO and does not expose password hashes,
 refresh-token state, session secrets, or other credential material.
 
 ### `GET /api/users/{userId}`
@@ -69,9 +71,12 @@ rules.
 
 ### `DELETE /api/users/{userId}`
 
-**Admin only.** Deletes/removes an existing user account. User deletion is the
-V1 mechanism for administrative account removal/revocation. Temporary account
-pause/suspension is deferred.
+**Admin only.** Hard-deletes an existing user account. An administrator may
+delete another administrator, but may not delete themselves. Deletion removes
+the user's sessions first, then profile, then account, so previously issued
+access tokens are no longer backed by a valid persisted session.
+
+Temporary account pause/suspension is deferred.
 
 ### Account mutation restrictions
 
@@ -80,27 +85,62 @@ There is intentionally **no generic admin edit-user operation** in V1.
 After creation:
 
 - username is immutable
-- administrator cannot change username
-- administrator cannot change email
-- administrator cannot change password
-- administrator cannot change the user's profile
-
-The absence of a generic edit endpoint is deliberate and preserves the boundary
-between administrative provisioning and user-owned personal data.
+- administrator cannot change another user's username
+- administrator cannot change another user's email
+- administrator cannot change another user's password
+- administrator cannot change another user's profile
+- a user may change their own email and password through the dedicated self-service operations
 
 ### `PATCH /api/users/{userId}/email`
 
 **Self-service only.** The authenticated user may change their own email.
 Another user, including an administrator, may not change it through this V1
-operation.
+operation. An administrator may change their own email.
 
-The exact email verification policy remains a separate security decision.
+Request:
+
+```json
+{
+  "email": "new@example.com"
+}
+```
+
+The email must be non-blank, valid according to the standard email validator,
+and at most 320 characters. Email uniqueness is case-insensitive and is enforced
+by the database for non-null values. A duplicate email returns `409 Conflict`.
+The same email, including a case-only variation, is a successful no-op and returns
+`200` with the current `UserDto`. The submitted representation is preserved when
+an actual change is made.
+
+Email changes do not revoke existing sessions or JWTs. The changed email can be
+used as the login identifier immediately.
+
+Email verification/OTP is not part of this V1 operation; its lifecycle remains
+a separate security decision.
 
 ### `PATCH /api/users/{userId}/password`
 
 **Self-service only.** The authenticated user may change their own password.
-The server must verify the appropriate current credential/change authorization
-and persist only the resulting password hash.
+Another user, including an administrator, may not change it through this V1
+operation. An administrator may change their own password.
+
+Request:
+
+```json
+{
+  "currentPassword": "required",
+  "newPassword": "required"
+}
+```
+
+Both fields are required and non-blank. The current password is verified using
+the persisted BCrypt hash. A wrong current password returns `401 Unauthorized`.
+The new password is BCrypt-hashed before persistence and plaintext is never
+persisted or returned. No additional password-strength policy is enforced by
+this endpoint. The same current/new password is allowed.
+
+Password changes do not revoke existing sessions or JWTs. Existing sessions and
+refresh tokens remain valid; subsequent new logins must use the new password.
 
 ## User profile
 
@@ -187,8 +227,12 @@ from the initial friend-request slice.
 
 ## Relationship to current implementation
 
-The repository currently has the login/refresh foundation, admin bootstrap,
-ADMIN-only password-aware user provisioning with BCrypt hashes, JWT/session
-validation, and user/profile authorization. Remaining work to align with this
-V1 contract includes user listing/deletion, user-owned account mutations,
-and friendship.
+The repository currently implements the Phase 1 account/authentication boundary:
+login, refresh, logout and session revocation, JWT/session validation,
+admin-only provisioning, profile authorization, admin user listing and deletion,
+and self-service email and password changes. The initial ADMIN is seeded by
+Liquibase rather than application startup. Remaining work in this area is limited
+to explicitly deferred/known gaps such as first-login default-password enforcement,
+friend-gated profile visibility, and the profile PATCH field-presence gap.
+User discovery, friendship, direct messaging, and realtime transport remain
+pending.
