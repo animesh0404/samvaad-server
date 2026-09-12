@@ -1,8 +1,8 @@
 # Samvaad — Technical Design
 
-> **Status:** High-level server architecture is sufficiently defined to begin implementation.  
+> **Status:** High-level server architecture is recorded. V1 user/authentication and relationship boundaries are aligned with ADRs 0007 and 0008.  
 > **Focus:** Backend/domain/protocol/persistence/concurrency.  
-> **Rule:** Implementation details that are not architectural invariants should be decided when the code creates a concrete need.
+> **Rule:** Architectural invariants are fixed by ADRs; low-level mechanics are decided when the implementation creates a concrete need.
 
 ---
 
@@ -10,46 +10,21 @@
 
 Samvaad is server-first.
 
-The server owns the authoritative state for:
+The server owns authoritative state for:
 
 - user identity
 - authentication
 - authorization
 - sessions
+- user relationships/friendships
 - conversations
 - messages
 - message ordering
 - canonical timestamps
 - read state
-- blocking
-- archive/mute state
 - synchronization
 
-The client/TUI consumes server contracts.
-
-The client does not become the source of truth for domain state.
-
-## 1.1 Development strategy
-
-Use vertical slices.
-
-The intended sequence is:
-
-```text
-protocol contract
-      ↓
-domain behavior
-      ↓
-persistence
-      ↓
-transport integration
-      ↓
-tests
-      ↓
-demonstrable end-to-end slice
-```
-
-Do not design every future feature before implementing the first slice.
+The client/TUI consumes server contracts and does not become the source of truth for domain state.
 
 ---
 
@@ -62,8 +37,10 @@ Conceptual fields:
 ```text
 userId
 username
+email
 password credential / authentication data
 account lifecycle data
+role
 ```
 
 Rules:
@@ -73,8 +50,11 @@ Rules:
 - username is unique
 - username is case-sensitive
 - username matches `[a-zA-Z0-9_]{3,32}`
+- role distinguishes at least ADMIN and STANDARD_USER in V1
 
 The authenticated user is derived from the server-side session.
+
+V1 users are admin-provisioned; there is no public self-registration.
 
 ---
 
@@ -88,19 +68,14 @@ firstName
 middleName
 lastName
 displayName
+bio
+avatarUrl
+statusMessage
 ```
 
-Display name:
-
-```text
-explicit displayName
-    OR
-firstName + lastName
-```
+A UserProfile is automatically created when its User is created. There is no separate V1 create-profile lifecycle endpoint.
 
 Profile changes do not change user identity.
-
-Messages do not snapshot profile names.
 
 ---
 
@@ -120,40 +95,46 @@ revokedAt
 refresh-token state
 ```
 
-A session represents one authenticated login/device context.
-
-Multiple sessions per user are allowed.
-
-```text
-User
-├── Session A
-├── Session B
-└── Session C
-```
-
-Session state is distinct from account/domain state.
+Multiple sessions per user are allowed, with the existing V1 five-active-session limit.
 
 ---
 
-## 2.4 UserConversationState
+## 2.4 UserFriendship / FriendRequest
 
-Per-user state should conceptually contain:
+V1 introduces a relationship layer between users before direct messaging is authorized.
+
+Conceptually:
 
 ```text
-userId
-conversationId
-archived
-muted
-lastReadSequenceNumber
+FriendRequest
+requestId
+senderUserId
+recipientUserId
+status
+createdAt
+respondedAt
 ```
 
-These values must not be stored as global conversation state because archive, mute, and read position are user-specific.
+Possible initial statuses:
+
+```text
+PENDING
+ACCEPTED
+REJECTED
+CANCELLED
+```
+
+An accepted request establishes friendship between the pair.
+
+The model must support future relationship controls without coupling them to User identity. Blocking, unfriend, mute, and archive are not part of the initial friend-request implementation.
 
 ---
 
 ## 2.5 Conversation
 
 A direct conversation contains two distinct users or one user for self-chat.
+
+For the friendship-gated direct-message path, a conversation between two distinct users is authorized only when the pair has an accepted friendship.
 
 Conceptual identity:
 
@@ -173,7 +154,23 @@ and enforce uniqueness in the database.
 
 ---
 
-## 2.6 Message
+## 2.6 UserConversationState
+
+Per-user state can conceptually contain:
+
+```text
+userId
+conversationId
+archived
+muted
+lastReadSequenceNumber
+```
+
+Archive/mute remain future concerns for the current relationship-focused V1 work, but the model is kept separate so they can be introduced later.
+
+---
+
+## 2.7 Message
 
 Conceptual model:
 
@@ -182,30 +179,18 @@ messageId
 conversationId
 senderUserId
 sequenceNumber
-
 content
-
 clientTimestamp
 serverTimestamp
-
 requestId
-
 repliedToMessageId
-
 edited
 editedAt
-
 deleted
 deletedAt
 ```
 
 The exact physical schema may differ.
-
-Important distinction:
-
-- `messageId` = server identity
-- `requestId` = idempotency identity for a client command
-- `sequenceNumber` = ordering within conversation
 
 ---
 
@@ -219,7 +204,7 @@ The database should enforce invariants wherever correctness depends on concurren
 UNIQUE(username)
 ```
 
-Because usernames are case-sensitive, do not silently apply case-folding.
+Do not silently apply case-folding because usernames are case-sensitive.
 
 ---
 
@@ -229,20 +214,17 @@ Because usernames are case-sensitive, do not silently apply case-folding.
 UNIQUE(normalizedParticipantA, normalizedParticipantB)
 ```
 
-This prevents:
+---
 
-```text
-Conversation 101: A ↔ B
-Conversation 102: A ↔ B
-```
+## 3.3 Friendship/request consistency
 
-even when two requests race.
+For a pair of users, concurrent relationship requests must not create contradictory duplicate active relationships. The exact schema/index strategy is implementation-time work, but the application must define deterministic behavior for repeated requests and opposite-direction races.
 
 ---
 
-## 3.3 First-message atomicity
+## 3.4 First-message atomicity
 
-Conversation creation and first message creation occur in one transaction.
+Conversation creation and first message creation occur in one transaction once messaging is authorized by accepted friendship.
 
 Conceptually:
 
@@ -250,18 +232,16 @@ Conceptually:
 BEGIN
 
 find/create conversation
-check authorization
+check friendship authorization
 validate message
 persist message
 
 COMMIT
 ```
 
-Rollback removes the entire newly-created conversation/message operation.
-
 ---
 
-## 3.4 Request idempotency
+## 3.5 Request idempotency
 
 A successful send request must be replay-safe.
 
@@ -271,336 +251,167 @@ The server needs a durable association between:
 requestId → accepted result/message
 ```
 
-The exact table/index shape is an implementation decision.
+---
 
-The invariant is not.
+## 3.6 Read monotonicity
+
+The server must never accept a read position that moves backwards.
 
 ---
 
-## 3.5 Read monotonicity
+## 3.7 Delete terminality
 
-The server must never accept:
-
-```text
-newReadSequence < currentReadSequence
-```
-
-The transition is:
-
-```text
-lastReadSequence = max(current, requested)
-```
-
-or an equivalent transactional guard.
+A deleted message cannot later be edited or deleted again. A tombstone remains durable.
 
 ---
 
-## 3.6 Delete terminality
+# 4. Authorization Model
 
-A deleted message cannot later be edited or deleted again.
+Authorization has two separate dimensions:
 
-A tombstone remains durable.
+```text
+Authentication → who is the caller?
+Authorization  → what may that caller do?
+```
+
+The server derives the authenticated `userId` from the session context.
+
+### ADMIN
+
+V1 admin authority is deliberately narrow:
+
+```text
+create user
+list users
+retrieve user records as permitted
+ delete user
+```
+
+The administrator may not change another user's username, email, password, or personal profile.
+
+### STANDARD_USER
+
+A standard user may:
+
+```text
+retrieve own account/profile
+change own email
+change own password
+update own profile
+```
+
+A standard user cannot modify another user's account or profile.
 
 ---
 
-# 4. Conversation Creation Race
+# 5. User Provisioning
 
-Two users can race:
+V1 provisioning flow:
 
 ```text
-A → create conversation
-B → create conversation
+bootstrap ADMIN during first-time setup
+        ↓
+ADMIN authenticates
+        ↓
+ADMIN creates user
+        ↓
+username + password + optional email
+        ↓
+User + empty UserProfile
 ```
 
-Both may initially observe no conversation.
+Password handling:
 
-The database uniqueness constraint decides the winner.
+```text
+plaintext password
+      ↓
+BCrypt
+      ↓
+persist password hash only
+```
 
-The losing operation handles the conflict, retrieves the existing conversation, and persists its own message.
+Plaintext passwords must never be persisted or logged.
 
-We do not introduce distributed locks merely to prevent this race.
-
-The database is the synchronization authority for this invariant.
+Username is immutable after creation.
 
 ---
 
-# 5. Message Lifecycle
+# 6. User Discovery & Friendship
 
-## 5.1 Send
+## 6.1 User discovery
 
-Conceptually:
+Authenticated users may search by exact username.
+
+The discovery response must use a restricted DTO and must not expose credentials, session secrets, or unrelated private account data.
+
+Email is not the V1 messaging discovery key.
+
+## 6.2 Friend request
+
+Initial lifecycle:
 
 ```text
-client
-  ↓
-SEND_MESSAGE(requestId, conversation target, content)
-  ↓
-authenticate
-  ↓
-authorize
-  ↓
-validate
-  ↓
-idempotency lookup
-  ↓
-find/create conversation
-  ↓
-allocate server sequence
-  ↓
-persist message
-  ↓
-commit
-  ↓
-MESSAGE_ACCEPTED
-  ↓
-NEW_MESSAGE / delivery events
+NO_RELATIONSHIP
+      ↓
+PENDING
+      ↓
+ACCEPTED
+      ↓
+FRIENDSHIP
 ```
 
-Exact event ordering will be finalized during implementation.
+A request may instead become rejected or cancelled while pending.
+
+The recipient may accept or reject. The sender may cancel while pending.
+
+The exact endpoint vocabulary and persistence schema are finalized with the first friendship vertical slice.
 
 ---
 
-## 5.2 Duplicate send
+# 7. Direct Messaging Authorization
+
+Direct messaging is gated by friendship.
+
+Before conversation creation or message persistence for a distinct-user direct conversation:
 
 ```text
-SEND(requestId=X)
-    ↓
-message M created
-
-SEND(requestId=X)
-    ↓
-existing accepted result found
-    ↓
-no new message
+authenticate caller
+      ↓
+identify recipient
+      ↓
+verify accepted friendship
+      ↓
+authorize messaging
 ```
+
+No accepted friendship means no new direct conversation/message for that pair.
+
+This authorization rule is separate from the authentication/session layer so future relationship controls can be introduced without redesigning credentials.
 
 ---
 
-## 5.3 Edit
+# 8. Conversation Creation Race
 
-```text
-EDIT_MESSAGE
-    ↓
-authenticate
-    ↓
-verify sender owns message
-    ↓
-verify message not deleted
-    ↓
-persist edit
-    ↓
-MESSAGE_UPDATED
-```
+Two users can race to create the same direct conversation. The database uniqueness constraint decides the winner; the losing operation handles the uniqueness conflict, retrieves the existing conversation, and continues with its own message where authorized.
 
-Concurrent accepted edits use server acceptance order; last accepted write wins.
+No distributed lock is required merely to prevent this race.
 
 ---
 
-## 5.4 Delete
+# 9. Message Lifecycle
 
-```text
-DELETE_MESSAGE
-    ↓
-authenticate
-    ↓
-verify sender owns message
-    ↓
-verify not already deleted
-    ↓
-write tombstone
-    ↓
-MESSAGE_DELETED
-```
-
-After this:
-
-```text
-EDIT → reject
-DELETE → reject
-```
+The previously defined message lifecycle remains in force: server-controlled sequence numbers and timestamps, request UUID idempotency, sender-owned edits/deletes, terminal tombstones, replies through `repliedToMessageId`, permanent history, and authoritative server validation.
 
 ---
 
-# 6. Reply Model
+# 10. Authentication Architecture
 
-A reply carries:
-
-```text
-repliedToMessageId
-```
-
-The server should validate that the referenced message belongs to the same conversation.
-
-A reply is not copied into the content field.
-
-Deleting the parent message does not destroy the reply. The parent remains represented by its tombstone.
-
----
-
-# 7. Message Ordering & Time
-
-The server controls:
-
-```text
-serverTimestamp
-sequenceNumber
-```
-
-Client time is informational:
-
-```text
-clientTimestamp
-```
-
-The server must never use clientTimestamp as authoritative ordering.
-
-A slow or incorrectly clocked client cannot rewrite conversation chronology.
-
----
-
-# 8. Message Validation
-
-V1:
-
-```text
-content is non-null
-content contains at least one non-whitespace character
-encoded payload <= 64 KB
-content is plain text
-```
-
-Meaningful newlines/paragraph breaks are preserved.
-
-The server is authoritative even if the client validates the same rules.
-
----
-
-# 9. Read & Delivery State
-
-Delivery and read are separate from message persistence.
-
-## Read
-
-Account-level:
-
-```text
-User
-  └── Conversation
-       └── lastReadSequenceNumber
-```
-
-Monotonic:
-
-```text
-100 → 101 → 102
-```
-
-never:
-
-```text
-102 → 99
-```
-
-A message is read only after actual display.
-
-## Multiple sessions
-
-Because read state is account-level:
-
-```text
-Laptop → marks through 120
-Phone  → now knows account read position is 120
-```
-
-Exact propagation/event mechanics are implementation-time work.
-
----
-
-# 10. Blocking
-
-Block relationship is directional:
-
-```text
-blockerUserId
-blockedUserId
-```
-
-But its messaging effect is bilateral:
-
-```text
-block exists
-    ↓
-conversation becomes read-only for both
-    ↓
-new send rejected
-```
-
-Error:
-
-```text
-CONVERSATION_BLOCKED
-```
-
-with:
-
-```text
-You cannot send messages because this conversation is blocked.
-```
-
-The check must occur before conversation creation/message persistence.
-
-No blocked message is queued.
-
-Self-blocking is rejected.
-
----
-
-# 11. Archive & Mute
-
-These are per-user conversation state.
-
-```text
-UserConversationState
-├── archived
-├── muted
-└── lastReadSequenceNumber
-```
-
-Auto-unarchive:
-
-```text
-default = false
-configurable per user
-```
-
-Mute affects notification/highlight behavior, not message synchronization.
-
----
-
-# 12. Authentication Architecture
-
-## 12.1 Registration
-
-```text
-REGISTER
-    ↓
-validate username/password/profile
-    ↓
-bcrypt password
-    ↓
-persist User + UserProfile
-```
-
-Plaintext password never reaches durable storage.
-
----
-
-## 12.2 Login
+## 10.1 Login
 
 ```text
 LOGIN(username, password)
        ↓
-verify bcrypt
+verify BCrypt
        ↓
 create Session
        ↓
@@ -609,253 +420,97 @@ issue JWT access token
 issue refresh token
 ```
 
----
-
-## 12.3 Access token
-
-Current locked policy:
+## 10.2 Refresh
 
 ```text
-JWT access token
-lifetime = 1 day
-```
-
-The exact JWT claims and signing algorithm remain open until implementation.
-
-The token should identify the user and session sufficiently for the server to bind requests/connections to the correct session.
-
----
-
-## 12.4 Refresh token
-
-Current locked policy:
-
-```text
-refresh lifetime = 30 days
-```
-
-The expiry is sliding.
-
-Every successful refresh:
-
-```text
-old refresh token
+refresh token
       ↓
-invalidate
+validate session-bound hash
       ↓
-new refresh token
-      +
-new access token
+rotate refresh token
+      ↓
+issue new access token
 ```
 
-The 30-day expiry is calculated from the successful rotation.
-
----
-
-## 12.5 Reactive refresh
-
-There is no scheduled refresh loop.
-
-The client refreshes when an actual access-token expiry/authentication failure requires it.
-
-For a persistent connection, the exact expired-token/reconnect sequence is an implementation-time protocol decision.
-
----
-
-## 12.6 Refresh-token reuse
-
-If an already-consumed refresh token is presented:
+Current policy:
 
 ```text
-reject
+access token  = 1 day
+refresh token = 30-day sliding expiry
 ```
 
-V1 does not automatically revoke the entire session.
-
-This is deliberately a simpler policy.
-
----
-
-## 12.7 Session-scoped rotation
-
-Every session has its own refresh chain.
-
-```text
-Laptop Session
-    Refresh A → B → C
-
-Phone Session
-    Refresh X → Y → Z
-```
-
-This avoids cross-device refresh races.
-
----
-
-# 13. Session Revocation
-
-Normal logout:
+## 10.3 Logout
 
 ```text
 current session → revoked
 ```
 
-Other sessions remain valid.
-
-If a session is revoked:
-
-```text
-session revoked
-      ↓
-associated authenticated connection invalidated
-      ↓
-connection closed
-```
-
-Expiry follows the same principle.
+Other sessions remain active.
 
 ---
 
-# 14. Socket Authentication
+# 11. Protocol Direction
 
-After successful authentication, the server associates:
+The realtime/message protocol will be finalized after the user/auth and friendship slices exist.
 
-```text
-connection
-   ↓
-sessionId
-   ↓
-userId
-```
-
-Subsequent commands do not need to carry a trusted userId.
-
-The server derives authority from the authenticated connection/session context.
-
-If a session becomes invalid, the server rejects further commands and terminates the connection.
-
----
-
-# 15. Protocol Direction
-
-High-level command/event vocabulary:
-
-### Commands
-
-```text
-REGISTER
-LOGIN
-REFRESH
-SEND_MESSAGE
-MARK_READ
-EDIT_MESSAGE
-DELETE_MESSAGE
-```
-
-### Events
-
-```text
-LOGIN_SUCCESS
-MESSAGE_ACCEPTED
-NEW_MESSAGE
-MESSAGE_DELIVERED
-CONVERSATION_READ
-MESSAGE_UPDATED
-MESSAGE_DELETED
-ERROR
-```
-
-This is intentionally a direction rather than a fully frozen wire specification.
-
-Exact envelope fields, correlation IDs, payloads, and serialization should be finalized during the first implementation slice.
-
----
-
-# 16. Errors
-
-Errors should have stable machine-readable codes.
-
-Examples already decided:
-
-```text
-USER_NOT_FOUND
-CONVERSATION_BLOCKED
-```
-
-The client may render friendly text, but server error codes remain stable protocol values.
-
-The exact complete error taxonomy is implementation-time work.
-
----
-
-# 17. Synchronization Direction
-
-Startup:
+High-level flow:
 
 ```text
 authenticate
     ↓
-conversation list / unread state
+discover user
     ↓
-open conversation
+friend request
     ↓
-latest message page
+accept
     ↓
-older pages on demand
+friendship
+    ↓
+conversation/message protocol
 ```
 
-History is permanent.
-
-The server does not need to load all message history into memory.
-
-Reconnect and missed-event recovery are intentionally deferred to implementation.
+Do not freeze every future command/event before the relevant vertical slice is implemented.
 
 ---
 
-# 18. Explicitly Implementation-Time
+# 12. Implementation-Time Decisions
 
-Do not block the project on these now:
+The following remain implementation-time choices unless a later ADR changes that:
 
-- JWT signing algorithm
-- JWT key storage/rotation
-- exact JWT claims
-- exact database schema
-- migration tooling
-- socket/WebSocket library
-- framing
+- exact database schema/index layout
+- migration mechanics
+- exact JWT claims/signing/key-management details
+- socket/WebSocket library and framing
+- exact friend-request endpoint payloads
 - sequence allocation implementation
-- exact refresh endpoint wire format
-- retry mechanics
-- reconnect/missed-event recovery
-- rate limiting
-- logging/metrics/tracing
-- audit policy
 - exact pagination cursor
-- Unicode/wire encoding details
+- retry/reconnect/missed-event recovery
+- rate limiting
+- observability strategy
 - deployment topology
 
-These are important, but they become easier to decide once the first vertical slice exists.
-
 ---
 
-# 19. Technical Invariants
-
-The following are the core backend invariants:
+# 13. Technical Invariants
 
 1. Server is authoritative.
 2. Authenticated identity comes from session context.
 3. Username is immutable, unique, and case-sensitive.
-4. A direct participant pair has at most one conversation.
-5. Self-chat is valid.
-6. Conversation + first message creation is atomic.
-7. A request UUID cannot create two messages.
-8. Server sequence numbers determine message order.
-9. Client time is never authoritative.
-10. Read position never moves backwards.
-11. Delete is terminal.
-12. Blocked conversations cannot accept new messages.
-13. Message history is permanent.
-14. Client validation never replaces server validation.
-15. Session revocation invalidates its active connection.
-16. Refresh-token rotation is session-scoped.
-17. Old refresh tokens are rejected after successful rotation.
+4. User creation is admin-only in V1.
+5. A user creation operation creates its empty UserProfile.
+6. Passwords are never persisted or logged in plaintext.
+7. An administrator cannot mutate another user's username, email, password, or profile in V1.
+8. A standard user can mutate only their own permitted account/profile fields.
+9. Exact username discovery is the V1 messaging discovery mechanism.
+10. Direct messaging between distinct users requires accepted friendship.
+11. A direct participant pair has at most one conversation.
+12. Conversation + first message creation is atomic.
+13. A request UUID cannot create two messages.
+14. Server sequence numbers determine message order.
+15. Client time is never authoritative.
+16. Read position never moves backwards.
+17. Delete is terminal.
+18. Message history is permanent.
+19. Client validation never replaces server validation.
+20. Session revocation invalidates its active authenticated connection.
+21. Refresh-token rotation is session-scoped and old refresh tokens are rejected after successful rotation.
