@@ -9,12 +9,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -79,5 +81,37 @@ class UserServiceTest {
         then(passwordEncoder).shouldHaveNoInteractions();
         then(userRepo).should(org.mockito.Mockito.never()).save(any(User.class));
         then(userProfileService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void listUsersReturnsAllUsers() {
+        User user1 = new User(UUID.randomUUID());
+        user1.setUsername("admin1");
+        user1.setEmail("admin1@example.com");
+        user1.setRole(UserRole.ADMIN);
+
+        User user2 = new User(UUID.randomUUID());
+        user2.setUsername("user1");
+        user2.setEmail("user1@example.com");
+        user2.setRole(UserRole.USER);
+
+        given(userRepo.findAll()).willReturn(List.of(user1, user2));
+
+        List<UserDto> result = userService.listUsers();
+
+        assertEquals(2, result.size());
+        assertEquals("admin1", result.get(0).getUsername());
+        assertEquals("user1", result.get(1).getUsername());
+        then(userRepo).should().findAll();
+    }
+
+    @Test
+    void listUsersReturnsEmptyWhenNoUsers() {
+        given(userRepo.findAll()).willReturn(List.of());
+
+        List<UserDto> result = userService.listUsers();
+
+        assertTrue(result.isEmpty());
+        then(userRepo).should().findAll();
     }
 }

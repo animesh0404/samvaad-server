@@ -62,6 +62,7 @@ Existing foundation includes:
 - UserProfile persistence
 - BCrypt password verification
 - `POST /api/auth/login`
+- `GET /api/users` for admin user listing
 - JWT access tokens
 - persisted sessions
 - session-bound JWT access tokens
@@ -79,7 +80,6 @@ Remaining alignment work:
 - ensure user creation atomically creates the empty profile
 - remove/deprecate any separate create-profile lifecycle endpoint
 - implement authorization enforcement for all protected user/profile operations
-- implement `GET /api/users` for admin user listing
 - implement `DELETE /api/users/{userId}` for admin deletion
 - do not add a generic admin edit-user endpoint
 - implement self-service email change

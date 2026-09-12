@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,5 +33,10 @@ public class UserController {
             throw new ForbiddenOperationException();
         }
         return userService.getUser(userId);
+    }
+
+    @GetMapping
+    public List<UserDto> listUsers() {
+        return userService.listUsers();
     }
 }

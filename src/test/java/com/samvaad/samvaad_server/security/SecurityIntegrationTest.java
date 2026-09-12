@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -290,6 +291,32 @@ class SecurityIntegrationTest {
 
         mockMvc.perform(get("/api/users/{userId}", user.getUserId())
                         .header("Authorization", "Bearer " + token1))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminCanListUsers() throws Exception {
+        User admin = createUser("list_admin", UserRole.ADMIN);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void standardUserCannotListUsers() throws Exception {
+        User user = createUser("list_user", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedCannotListUsers() throws Exception {
+        mockMvc.perform(get("/api/users"))
                 .andExpect(status().isUnauthorized());
     }
 }
