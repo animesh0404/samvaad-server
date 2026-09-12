@@ -2,6 +2,9 @@ package com.samvaad.samvaad_server.user.userprofile;
 
 import jakarta.validation.constraints.Size;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class UserProfileUpdateDto {
 
     @Size(max = 100)
@@ -25,6 +28,8 @@ public class UserProfileUpdateDto {
     @Size(max = 255)
     private String statusMessage;
 
+    private final Set<String> presentFields = new HashSet<>();
+
     public UserProfileUpdateDto() {
     }
 
@@ -33,7 +38,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setFirstName(String firstName) {
+        presentFields.add("firstName");
         this.firstName = firstName;
+    }
+
+    public boolean hasFirstName() {
+        return presentFields.contains("firstName");
     }
 
     public String getMiddleName() {
@@ -41,7 +51,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setMiddleName(String middleName) {
+        presentFields.add("middleName");
         this.middleName = middleName;
+    }
+
+    public boolean hasMiddleName() {
+        return presentFields.contains("middleName");
     }
 
     public String getLastName() {
@@ -49,7 +64,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setLastName(String lastName) {
+        presentFields.add("lastName");
         this.lastName = lastName;
+    }
+
+    public boolean hasLastName() {
+        return presentFields.contains("lastName");
     }
 
     public String getDisplayName() {
@@ -57,7 +77,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setDisplayName(String displayName) {
+        presentFields.add("displayName");
         this.displayName = displayName;
+    }
+
+    public boolean hasDisplayName() {
+        return presentFields.contains("displayName");
     }
 
     public String getBio() {
@@ -65,7 +90,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setBio(String bio) {
+        presentFields.add("bio");
         this.bio = bio;
+    }
+
+    public boolean hasBio() {
+        return presentFields.contains("bio");
     }
 
     public String getAvatarUrl() {
@@ -73,7 +103,12 @@ public class UserProfileUpdateDto {
     }
 
     public void setAvatarUrl(String avatarUrl) {
+        presentFields.add("avatarUrl");
         this.avatarUrl = avatarUrl;
+    }
+
+    public boolean hasAvatarUrl() {
+        return presentFields.contains("avatarUrl");
     }
 
     public String getStatusMessage() {
@@ -81,6 +116,11 @@ public class UserProfileUpdateDto {
     }
 
     public void setStatusMessage(String statusMessage) {
+        presentFields.add("statusMessage");
         this.statusMessage = statusMessage;
+    }
+
+    public boolean hasStatusMessage() {
+        return presentFields.contains("statusMessage");
     }
 }

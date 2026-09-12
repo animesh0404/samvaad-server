@@ -5,6 +5,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +22,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -160,5 +166,57 @@ class UserProfileControllerTest {
                 .andExpect(status().isForbidden());
 
         then(userProfileService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void explicitNullClearsField() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(userId, UserRole.USER);
+
+        UserProfileDto response = new UserProfileDto();
+        response.setUserId(userId);
+        given(userProfileService.updateProfile(eq(userId), any(UserProfileUpdateDto.class)))
+                .willReturn(response);
+
+        mockMvc.perform(patch("/api/users/{userId}/profile", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":null,"bio":"Building Samvaad"}
+                                """))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UserProfileUpdateDto> captor =
+                ArgumentCaptor.forClass(UserProfileUpdateDto.class);
+        then(userProfileService).should().updateProfile(eq(userId), captor.capture());
+
+        assertTrue(captor.getValue().hasDisplayName());
+        assertNull(captor.getValue().getDisplayName());
+        assertTrue(captor.getValue().hasBio());
+        assertEquals("Building Samvaad", captor.getValue().getBio());
+    }
+
+    @Test
+    void omittedFieldStaysAbsent() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticateAs(userId, UserRole.USER);
+
+        UserProfileDto response = new UserProfileDto();
+        response.setUserId(userId);
+        given(userProfileService.updateProfile(eq(userId), any(UserProfileUpdateDto.class)))
+                .willReturn(response);
+
+        mockMvc.perform(patch("/api/users/{userId}/profile", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"bio":"Building Samvaad"}
+                                """))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UserProfileUpdateDto> captor =
+                ArgumentCaptor.forClass(UserProfileUpdateDto.class);
+        then(userProfileService).should().updateProfile(eq(userId), captor.capture());
+
+        assertFalse(captor.getValue().hasDisplayName());
+        assertTrue(captor.getValue().hasBio());
     }
 }

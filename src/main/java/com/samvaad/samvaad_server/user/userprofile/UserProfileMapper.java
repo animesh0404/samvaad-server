@@ -21,25 +21,25 @@ public final class UserProfileMapper {
     }
 
     public static void updateEntity(UserProfile profile, UserProfileUpdateDto updateDto) {
-        if (updateDto.getDisplayName() != null) {
+        if (updateDto.hasDisplayName()) {
             profile.setDisplayName(updateDto.getDisplayName());
         }
-        if (updateDto.getBio() != null) {
+        if (updateDto.hasBio()) {
             profile.setBio(updateDto.getBio());
         }
-        if (updateDto.getAvatarUrl() != null) {
+        if (updateDto.hasAvatarUrl()) {
             profile.setAvatarUrl(updateDto.getAvatarUrl());
         }
-        if (updateDto.getFirstName() != null) {
+        if (updateDto.hasFirstName()) {
             profile.setFirstName(updateDto.getFirstName());
         }
-        if (updateDto.getMiddleName() != null) {
+        if (updateDto.hasMiddleName()) {
             profile.setMiddleName(updateDto.getMiddleName());
         }
-        if (updateDto.getLastName() != null) {
+        if (updateDto.hasLastName()) {
             profile.setLastName(updateDto.getLastName());
         }
-        if (updateDto.getStatusMessage() != null) {
+        if (updateDto.hasStatusMessage()) {
             profile.setStatusMessage(updateDto.getStatusMessage());
         }
     }
