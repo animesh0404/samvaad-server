@@ -1,7 +1,7 @@
 # Samvaad — Implementation Roadmap
 
-> **Status:** High-level design is recorded; V1 user/authentication and friend-request boundaries are now locked.  
-> **Next phase:** Complete the user/auth authorization boundary, then implement the friend-request vertical slice, then begin direct messaging.  
+> **Status:** High-level design is recorded; the V1 user/authentication and friend-request boundaries are locked.
+> **Next phase:** Complete the user/auth boundary, then implement the friend-request vertical slice, then begin direct messaging.
 > **Working philosophy:** Keep the server authoritative, keep V1 small, and decide low-level implementation details when the relevant slice creates a concrete need.
 
 ---
@@ -10,7 +10,7 @@
 
 The original high-level design phase is **COMPLETE**.
 
-The repository already contains a substantial HTTP authentication/session foundation and user/profile implementation. The next work is not to invent another broad design phase; it is to reconcile the implementation with the newly locked V1 user/auth rules, establish friend requests, and only then build direct messaging.
+The repository now contains the Phase 1 HTTP authentication/session and user/account boundary: login, refresh, logout/revocation, admin provisioning, profile authorization, admin listing/deletion, and self-service email/password changes. The next product slice is authenticated user discovery followed by friend requests.
 
 ---
 
@@ -29,10 +29,10 @@ The repository already contains a substantial HTTP authentication/session founda
 
 **STATUS: COMPLETE**
 
-Locked V1 decisions now include:
+Locked V1 decisions include:
 
 - admin-only user provisioning; no public self-registration
-- initial administrator bootstrapped during first-time application setup
+- initial administrator seeded by Liquibase; no application-startup admin bootstrap
 - username required at creation and immutable afterwards
 - password required at creation and BCrypt-hashed
 - email optional at creation and user-owned after creation
@@ -48,21 +48,24 @@ Locked V1 decisions now include:
 - accepted friendship is required before direct messaging
 - blocking, unfriend, mute, and archive are deferred from the initial relationship slice
 
-TDD is a development practice for the implementation work and is intentionally not recorded as a project ADR or product decision.
+TDD is a development practice for implementation work and is intentionally not recorded as a project ADR or product decision.
 
 ---
 
 # 4. Phase 1 — Authentication & Authorization Boundary
 
-**STATUS: PARTIALLY COMPLETE**
+**STATUS: COMPLETE FOR THE CURRENT ACCOUNT/AUTH SLICE**
 
-Existing foundation includes:
+Implemented and tested:
 
-- User persistence
-- UserProfile persistence
-- BCrypt password verification
+- User and UserProfile persistence
+- admin-only user provisioning
+- required password at creation with BCrypt hashing
+- automatic empty profile creation with the user
+- fixed initial ADMIN seeded through Liquibase
+- no runtime admin bootstrap configuration or startup mutation
 - `POST /api/auth/login`
-- `GET /api/users` for admin user listing
+- username-or-email login
 - JWT access tokens
 - persisted sessions
 - session-bound JWT access tokens
@@ -71,44 +74,46 @@ Existing foundation includes:
 - session-scoped refresh rotation
 - 30-day sliding refresh expiry
 - one-day access-token lifetime
-- five-active-session capacity enforcement
+- five-active-session capacity enforcement with transactional serialization
+- `POST /api/auth/logout`
+- current-session revocation while other sessions remain active
+- JWT/session validation on authenticated requests
+- ADMIN/USER authorization
+- self-only profile writes and ADMIN cross-user profile reads
+- `GET /api/users` admin listing
+- `DELETE /api/users/{userId}` admin deletion
+- self-service `PATCH /api/users/{userId}/email`
+- self-service `PATCH /api/users/{userId}/password`
+- immutable username
+- no generic admin edit-user endpoint
 
-Remaining alignment work:
+Explicitly deferred/known gaps in this boundary:
 
-- bootstrap/provision the initial ADMIN account safely
-- change `POST /api/users` to require password and remain admin-only
-- ensure user creation atomically creates the empty profile
-- remove/deprecate any separate create-profile lifecycle endpoint
-- implement authorization enforcement for all protected user/profile operations
-- **[DONE]** implement `DELETE /api/users/{userId}` for admin deletion
-- do not add a generic admin edit-user endpoint
-- **[DONE]** implement self-service email change
-- **[DONE]** implement self-service password change
-- enforce immutable username
-- enforce self-only profile updates
-- implement `POST /api/auth/logout`
-- complete session revocation HTTP operations required by the accepted auth model
+- first-login forced change of the seeded default administrator password
+- email verification/OTP lifecycle
+- friend-gated profile visibility until friendship exists
+- reliable distinction between omitted profile PATCH fields and explicit JSON `null` (ADR 0006)
+- final production JWT signing/key-management details
+- realtime delivery/authentication of security events
 
 ### Acceptance
 
-The minimum secure user lifecycle is:
+The secure account lifecycle is:
 
 ```text
-application first setup
-        ↓
-bootstrap ADMIN
+Liquibase seed ADMIN
         ↓
 ADMIN login
         ↓
-authenticated ADMIN
-        ↓
-create USER(username, password, optional email)
+ADMIN creates USER(username, password, optional email)
         ↓
 User + empty UserProfile
         ↓
 USER login
         ↓
 user manages own email/password/profile
+        ↓
+admin can list/delete users
 ```
 
 ---
@@ -343,10 +348,10 @@ The initial relationship slice also excludes blocking, unfriend, mute, and archi
 
 # 17. Immediate Next Step
 
-Complete Phase 1 first. Do not begin direct messaging until the following chain is implemented and tested:
+Phase 1 account/auth implementation is complete enough to move to Phase 2. Do not begin direct messaging until this chain is implemented and tested:
 
 ```text
-bootstrap ADMIN
+Liquibase-seeded ADMIN
       ↓
 ADMIN login
       ↓
