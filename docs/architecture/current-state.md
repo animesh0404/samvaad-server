@@ -68,9 +68,10 @@ Maintained source diagrams:
 
 The authentication/session foundation and the V1 authorization boundary are
 implemented: Liquibase-seeded initial admin, admin-only provisioning with BCrypt
-passwords, JWT/session validation, and profile/account authorization are in place.
-Remaining authentication work includes logout/session revocation operations and
-realtime session authentication/security-event delivery.
+passwords, JWT/session validation, profile/account authorization, and
+session revocation via `POST /api/auth/logout` are all in place. Remaining
+authentication work includes realtime session authentication/security-event
+delivery.
 
 The planned protocol skeleton (CONNECT → LOGIN → LOGIN_SUCCESS) is also still
 pending; the current authentication endpoints are HTTP endpoints rather than the
@@ -87,14 +88,12 @@ deferred. V1 application-level encryption is also deferred; see ADR 0005.
 
 ## Known implementation gaps
 
-- Logout/session revocation HTTP operations are not yet implemented; session
-  revocation is otherwise enforced per request.
+- Realtime transport authentication and realtime delivery of blocked-login
+  security notifications are not implemented.
 - User listing, deletion, and user-owned email/password change operations are not
   yet implemented.
 - Relationship-based profile visibility (friend-gated reads) is not yet
   implemented; non-admin cross-user profile reads are denied.
-- Realtime transport authentication and realtime delivery of blocked-login
-  security notifications are not implemented.
 - Messaging, conversations, blocking, read state, archive/mute, and transport
   protocol are absent.
 - Display-name fallback is designed but not implemented.

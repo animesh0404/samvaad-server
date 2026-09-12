@@ -190,5 +190,5 @@ from the initial friend-request slice.
 The repository currently has the login/refresh foundation, admin bootstrap,
 ADMIN-only password-aware user provisioning with BCrypt hashes, JWT/session
 validation, and user/profile authorization. Remaining work to align with this
-V1 contract includes logout/session revocation, user listing/deletion,
-user-owned account mutations, and friendship.
+V1 contract includes user listing/deletion, user-owned account mutations,
+and friendship.

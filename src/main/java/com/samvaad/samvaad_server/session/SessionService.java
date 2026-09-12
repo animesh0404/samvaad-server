@@ -2,8 +2,11 @@ package com.samvaad.samvaad_server.session;
 
 import com.samvaad.samvaad_server.user.User;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class SessionService {
@@ -47,5 +50,16 @@ public class SessionService {
         session.setLastAuthenticatedAt(LocalDateTime.now());
 
         return sessionRepo.save(session);
+    }
+
+    @Transactional
+    public void revokeSession(UUID sessionId, RevocationReason reason) {
+        Optional<Session> session = sessionRepo.findById(sessionId);
+        if (session.isPresent() && session.get().getRevokedAt() == null) {
+            Session s = session.get();
+            s.setRevokedAt(LocalDateTime.now());
+            s.setRevocationReason(reason);
+            sessionRepo.save(s);
+        }
     }
 }

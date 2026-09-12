@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,6 +17,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
+import com.samvaad.samvaad_server.session.RevocationReason;
 
 @ExtendWith(MockitoExtension.class)
 class SessionServiceTest {
@@ -83,5 +87,44 @@ class SessionServiceTest {
         assertEquals("Mozilla/5.0", created.getLastSeenUserAgent());
         assertNotNull(created.getLastAuthenticatedAt());
         assertNull(created.getRevokedAt());
+    }
+
+    @Test
+    void revokesSessionWhenNotAlreadyRevoked() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setSessionId(sessionId);
+        session.setRevokedAt(null);
+        given(sessionRepo.findById(sessionId)).willReturn(Optional.of(session));
+        given(sessionRepo.save(any(Session.class))).willReturn(session);
+
+        sessionService.revokeSession(sessionId, RevocationReason.USER_LOGOUT);
+
+        assertNotNull(session.getRevokedAt());
+        assertEquals(RevocationReason.USER_LOGOUT, session.getRevocationReason());
+        then(sessionRepo).should().save(session);
+    }
+
+    @Test
+    void idempotentWhenAlreadyRevoked() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setSessionId(sessionId);
+        session.setRevokedAt(LocalDateTime.now());
+        given(sessionRepo.findById(sessionId)).willReturn(Optional.of(session));
+
+        sessionService.revokeSession(sessionId, RevocationReason.USER_LOGOUT);
+
+        then(sessionRepo).should(never()).save(any(Session.class));
+    }
+
+    @Test
+    void noOpWhenSessionMissing() {
+        UUID sessionId = UUID.randomUUID();
+        given(sessionRepo.findById(sessionId)).willReturn(Optional.empty());
+
+        sessionService.revokeSession(sessionId, RevocationReason.USER_LOGOUT);
+
+        then(sessionRepo).should(never()).save(any(Session.class));
     }
 }

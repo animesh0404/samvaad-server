@@ -4,6 +4,7 @@ import com.samvaad.samvaad_server.TestcontainersConfiguration;
 import com.samvaad.samvaad_server.auth.AuthenticationService;
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
+import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.Session;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -210,5 +212,84 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/users/{userId}", target.getUserId())
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void logoutReturns204AndInvalidatesToken() throws Exception {
+        User user = createUser("logout_user", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+        UUID sessionId = login.sessionId();
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void repeatedLogoutReturns204() throws Exception {
+        User user = createUser("logout_repeat_user", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void refreshTokenAfterLogoutIsRejected() throws Exception {
+        User user = createUser("refresh_logout_user", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+        String refreshToken = login.refreshToken();
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void otherSessionRemainsValidAfterLogout() throws Exception {
+        User user = createUser("multi_session_user", UserRole.USER);
+        LoginResponseDto login1 = loginAs(user);
+        String token1 = login1.accessToken();
+        UUID sessionId1 = login1.sessionId();
+
+        Session secondSession = new Session();
+        secondSession.setUser(user);
+        secondSession.setRefreshTokenHash(tokenService.hashRefreshToken(tokenService.generateRefreshToken()));
+        secondSession.setRefreshTokenExpiresAt(LocalDateTime.now().plusDays(30));
+        secondSession.setInstallationId("inst-second");
+        secondSession.setClientPlatform(ClientPlatform.WEB);
+        secondSession.setLastAuthenticatedAt(LocalDateTime.now());
+        sessionRepo.save(secondSession);
+
+        String secondToken = tokenService.generateAccessToken(user, secondSession.getSessionId());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token1))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + secondToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token1))
+                .andExpect(status().isUnauthorized());
     }
 }

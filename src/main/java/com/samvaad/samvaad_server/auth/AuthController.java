@@ -3,8 +3,14 @@ package com.samvaad.samvaad_server.auth;
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
 import com.samvaad.samvaad_server.auth.dto.RefreshTokenRequestDto;
+import com.samvaad.samvaad_server.security.AuthenticatedUser;
+import com.samvaad.samvaad_server.session.RevocationReason;
+import com.samvaad.samvaad_server.session.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,12 +22,15 @@ public class AuthController {
 
     private final AuthenticationService authenticationService;
     private final RefreshTokenService refreshTokenService;
+    private final SessionService sessionService;
 
     public AuthController(
             AuthenticationService authenticationService,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService,
+            SessionService sessionService) {
         this.authenticationService = authenticationService;
         this.refreshTokenService = refreshTokenService;
+        this.sessionService = sessionService;
     }
 
     @PostMapping("/login")
@@ -38,6 +47,14 @@ public class AuthController {
     @PostMapping("/refresh")
     public LoginResponseDto refresh(@Valid @RequestBody RefreshTokenRequestDto refreshRequest) {
         return refreshTokenService.refresh(refreshRequest.getRefreshToken());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+        sessionService.revokeSession(principal.sessionId(), RevocationReason.USER_LOGOUT);
+        return ResponseEntity.noContent().build();
     }
 
     private String resolveClientIp(HttpServletRequest request) {

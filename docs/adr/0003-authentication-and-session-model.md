@@ -116,14 +116,8 @@ uses `403` rather than `404`.
 
 ## Remaining implementation gaps
 
-- safe first-time bootstrap of the initial ADMIN account
-- password-aware, admin-only user provisioning
-- JWT request-filter/session validation
-- complete authorization enforcement
-- `POST /api/auth/logout`
-- required session-revocation HTTP operations
-- authenticated realtime connection/session handling
-- realtime delivery of blocked-login security notifications
+- realtime transport authentication and realtime delivery of blocked-login
+  security notifications
 - final JWT signing algorithm, production key storage, and key rotation
 
 ## Consequences

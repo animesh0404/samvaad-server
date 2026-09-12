@@ -53,12 +53,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (session.isPresent() && isSessionValid(session.get(), claims)) {
                 authenticate(claims, session.get());
+            } else if (session.isPresent() && isLogoutRequest(request)) {
+                authenticate(claims, session.get());
             }
         } catch (InvalidAccessTokenException e) {
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isLogoutRequest(HttpServletRequest request) {
+        return "POST".equals(request.getMethod())
+                && "/api/auth/logout".equals(request.getRequestURI());
     }
 
     private boolean isSessionValid(Session session, AccessTokenClaims claims) {

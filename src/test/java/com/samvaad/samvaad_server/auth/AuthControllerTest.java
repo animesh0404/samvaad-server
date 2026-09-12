@@ -7,14 +7,22 @@ import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.exception.SessionLimitExceededException;
 import com.samvaad.samvaad_server.exception.GlobalExceptionHandler;
+import com.samvaad.samvaad_server.security.AuthenticatedUser;
+import com.samvaad.samvaad_server.session.SessionService;
+import com.samvaad.samvaad_server.user.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +30,6 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
@@ -35,11 +42,24 @@ class AuthControllerTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private SessionService sessionService;
+
     @BeforeEach
     void setUp() {
-        mockMvc = standaloneSetup(new AuthController(authenticationService, refreshTokenService))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                new AuthController(authenticationService, refreshTokenService, sessionService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    private void authenticateAs(UUID sessionId) {
+        AuthenticatedUser principal = new AuthenticatedUser(UUID.randomUUID(), UserRole.USER, sessionId);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        principal,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))));
     }
 
     @Test
@@ -192,6 +212,49 @@ class AuthControllerTest {
                         .content("""
                                 {
                                   "refreshToken": "bad-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid refresh token"));
+    }
+
+    @Test
+    void logoutReturns204AndRevokesSession() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        authenticateAs(sessionId);
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void repeatedLogoutReturns204() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        authenticateAs(sessionId);
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void sameTokenAfterLogoutReturns401OnRefresh() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        authenticateAs(sessionId);
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent());
+
+        given(refreshTokenService.refresh("old-refresh-token"))
+                .willThrow(new InvalidRefreshTokenException());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "old-refresh-token"
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())

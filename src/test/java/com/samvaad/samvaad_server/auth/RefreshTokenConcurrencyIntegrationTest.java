@@ -9,6 +9,7 @@ import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserRepo;
+import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ class RefreshTokenConcurrencyIntegrationTest {
     private SessionRepo sessionRepo;
 
     @Autowired
+    private UserProfileRepo userProfileRepo;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -59,6 +63,7 @@ class RefreshTokenConcurrencyIntegrationTest {
     @BeforeEach
     void setUp() {
         sessionRepo.deleteAll();
+        userProfileRepo.deleteAll();
         userRepo.deleteAll();
 
         User user = new User();
