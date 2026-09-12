@@ -7,11 +7,12 @@ Accepted.
 ## Decision
 
 Samvaad V1 uses admin-provisioned accounts. There is no public self-registration.
-The initial administrator is bootstrapped during application startup from
-environment-provided credentials. Bootstrap is idempotent: if an administrator
-already exists, startup performs no mutation. If credentials are absent, startup
-warns and continues without creating an administrator. Bootstrap credentials are
-never logged, committed to source control, or persisted in plaintext.
+The initial administrator is created by Liquibase as a database seed during
+schema initialization. Application startup does not provision or mutate the
+administrator, and there are no runtime bootstrap-admin environment variables.
+The seeded account uses the fixed administrator identity and a known default
+password; first-login enforcement for changing that default password remains a
+separate deferred UI/backend decision.
 
 Passwords use BCrypt with generated salt. Plaintext passwords are neither
 persisted nor logged.
@@ -65,7 +66,7 @@ In particular:
 - administrators may create users, list users, retrieve permitted user records,
   delete users, and read any user's profile
 - administrators cannot mutate another user's username, email, password, or profile
-- administrators may mutate their own profile through normal self-service
+- administrators may mutate their own profile, email, and password through normal self-service
 - standard users may mutate only their own email, password, and profile
 - standard users may read their own profile and, once an accepted friendship
   exists, the other user's profile
@@ -95,7 +96,7 @@ Protected-endpoint authorization uses the following HTTP semantics:
 - authenticated but not permitted: `403 Forbidden`
 - invalid, expired, revoked, or session-missing access token: `401`
 - validation failure: `400`
-- duplicate username: `409`
+- duplicate username or email: `409`
 
 The existing API error body shape is preserved for this slice. Cross-user denial
 uses `403` rather than `404`.
@@ -108,11 +109,17 @@ uses `403` rather than `404`.
 - `POST /api/auth/refresh` validates the presented refresh-token hash against the
   persisted session, rejects revoked/expired sessions, rotates the stored hash,
   extends the refresh expiry, and issues a new session-bound access token.
+- `POST /api/auth/logout` revokes the current persisted session; subsequent
+  authenticated requests and refresh attempts for that session are rejected.
 - Session records persist the refresh-token hash and client/session metadata.
 - Active-session capacity is set to five and concurrent login allocation is
   covered by an integration test.
 - The blocked-login security event is published when capacity is reached and is
   covered by authentication tests.
+- User email changes are self-service, case-insensitively unique, and do not
+  revoke existing sessions.
+- User password changes are self-service, require the current password, persist
+  only a new BCrypt hash, and do not revoke existing sessions.
 
 ## Spring Boot default user
 
@@ -145,6 +152,7 @@ password has no effect on Samvaad API authentication.
 - realtime transport authentication and realtime delivery of blocked-login
   security notifications
 - final JWT signing algorithm, production key storage, and key rotation
+- first-login enforcement for changing the seeded administrator's known default password
 
 ## Consequences
 
