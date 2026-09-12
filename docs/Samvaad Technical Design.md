@@ -336,7 +336,7 @@ Profile-read visibility and profile-write ownership are separate authorization r
 V1 provisioning flow:
 
 ```text
-bootstrap ADMIN during application startup
+Liquibase seeds initial ADMIN
         ↓
 ADMIN authenticates
         ↓
@@ -347,15 +347,14 @@ username + password + optional email
 User + empty UserProfile
 ```
 
-Bootstrap behavior:
+Initial administrator behavior:
 
 ```text
-ADMIN exists       → no-op
-credentials absent → warn and continue
-credentials present→ create ADMIN
+Liquibase database initialization → create fixed ADMIN + empty UserProfile
+Application startup                 → no administrator mutation
 ```
 
-The bootstrap credential values come from environment configuration. They must never be logged, committed, or persisted in plaintext.
+The initial administrator password is stored only as a BCrypt hash in the Liquibase seed. The known default-password lifecycle is intentionally a UI concern for the current backend slice; the backend does not yet enforce first-login password change.
 
 Password handling:
 
