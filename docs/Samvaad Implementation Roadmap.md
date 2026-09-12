@@ -1,283 +1,226 @@
 # Samvaad — Implementation Roadmap
 
-> **Status:** High-level design complete; authentication/session foundation partially implemented.  
-> **Next phase:** Complete the remaining authentication boundary, then establish the realtime protocol skeleton.  
-> **Working philosophy:** Do not turn every implementation detail into a design meeting.
+> **Status:** High-level design is recorded; V1 user/authentication and friend-request boundaries are now locked.  
+> **Next phase:** Complete the user/auth authorization boundary, then implement the friend-request vertical slice, then begin direct messaging.  
+> **Working philosophy:** Keep the server authoritative, keep V1 small, and decide low-level implementation details when the relevant slice creates a concrete need.
 
 ---
 
 # 1. Current Position
 
-The high-level backend design phase is **COMPLETE**.
+The original high-level design phase is **COMPLETE**.
 
-Implementation is now underway. The HTTP authentication/session foundation has
-been implemented ahead of the originally planned realtime protocol skeleton.
-The roadmap therefore records actual implementation state rather than assuming
-that phases were completed strictly in numerical order.
-
-We intentionally stopped the exhaustive-specification phase because continuing to decide every low-level detail before implementation would create a false sense of certainty.
-
-Implementation should now reveal the remaining technical questions.
+The repository already contains a substantial HTTP authentication/session foundation and user/profile implementation. The next work is not to invent another broad design phase; it is to reconcile the implementation with the newly locked V1 user/auth rules, establish friend requests, and only then build direct messaging.
 
 ---
 
 # 2. Working Rules
 
-## 2.1 When deciding what comes next
-
-When continuing the design journey:
-
-1. Start with a concrete example.
-2. Ask only a real unresolved question.
-3. Do not reopen locked decisions.
-4. If the answer is an obvious implementation choice, make the choice and document it.
-5. If a decision affects architecture or a durable invariant, stop and discuss it.
-6. Keep the backend as the priority.
-7. Defer client/TUI UX unless it creates a server contract.
+1. Do not reopen a locked ADR without concrete implementation evidence.
+2. Keep account identity separate from personal profile data.
+3. Derive authorization identity from the authenticated server-side session.
+4. Prefer one clear endpoint per semantic operation; do not create separate aliases for the same update operation.
+5. Keep relationship authorization separate from authentication.
+6. Defer client/TUI-specific UX unless it creates a server contract.
 
 ---
 
-# 3. Phase 0 — High-Level Design
+# 3. Phase 0 — Design Reconciliation
 
 **STATUS: COMPLETE**
 
-Locked areas include:
+Locked V1 decisions now include:
 
-- user identity
-- username rules
-- user/profile separation
-- password hashing
-- sessions
-- JWT access tokens
-- refresh-token rotation
-- direct conversations
-- self-chat
-- conversation uniqueness
-- atomic first message
-- message lifecycle
-- idempotency
-- server ordering
-- permanent history
-- pagination direction
-- read state
-- blocking
-- archive/mute
-- V1 exclusions
+- admin-only user provisioning; no public self-registration
+- initial administrator bootstrapped during first-time application setup
+- username required at creation and immutable afterwards
+- password required at creation and BCrypt-hashed
+- email optional at creation and user-owned after creation
+- `User` and `UserProfile` remain separate
+- `UserProfile` is automatically created with `User`
+- no separate V1 create-profile lifecycle endpoint
+- ADMIN and STANDARD_USER roles
+- administrator may create, list, retrieve as permitted, and delete users
+- administrator may not change another user's username, email, password, or profile
+- users may change their own email, password, and profile
+- login, refresh, and logout are the authentication lifecycle endpoints
+- exact username discovery for relationship setup
+- accepted friendship is required before direct messaging
+- blocking, unfriend, mute, and archive are deferred from the initial relationship slice
+
+TDD is a development practice for the implementation work and is intentionally not recorded as a project ADR or product decision.
 
 ---
 
-# 4. Phase 1 — Protocol Skeleton
-
-**STATUS: PENDING**
-
-This phase remains pending. The current repository has an HTTP authentication
-surface, but the planned realtime CONNECT/LOGIN/LOGIN_SUCCESS protocol and
-command/event envelope have not yet been implemented.
-
-Goal: establish the smallest coherent server/client protocol before building the complete domain.
-
-Start with:
-
-```text
-CONNECT
-  ↓
-LOGIN
-  ↓
-LOGIN_SUCCESS
-  ↓
-authenticated session
-```
-
-Then establish the minimal command/event envelope.
-
-We do not need to freeze every future event.
-
-### Acceptance
-
-A minimal test client can:
-
-1. connect
-2. authenticate
-3. receive authentication success
-4. obtain the session/token state required for authenticated operation
-
----
-
-# 5. Phase 2 — User & Authentication
+# 4. Phase 1 — Authentication & Authorization Boundary
 
 **STATUS: PARTIALLY COMPLETE**
 
-The authentication/session foundation is implemented over HTTP. The remaining
-work is to complete the authentication boundary and its lifecycle operations.
-
-### Implemented
+Existing foundation includes:
 
 - User persistence
 - UserProfile persistence
 - BCrypt password verification
-- HTTP login at `POST /api/auth/login`
-- JWT access-token issuance
-- persisted client sessions
+- `POST /api/auth/login`
+- JWT access tokens
+- persisted sessions
 - session-bound JWT access tokens
-- refresh-token issuance
-- HTTP refresh at `POST /api/auth/refresh`
+- `POST /api/auth/refresh`
 - hashed refresh-token persistence
-- session-scoped refresh-token rotation
+- session-scoped refresh rotation
 - 30-day sliding refresh expiry
 - one-day access-token lifetime
-- five-active-session capacity limit
-- transactional login capacity enforcement with user-row serialization
-- blocked-login event publication when capacity is reached
-- authentication/session unit and integration tests, including login/refresh concurrency tests
+- five-active-session capacity enforcement
 
-### Remaining
+Remaining alignment work:
 
-- password-based registration flow
-- authorization enforcement for protected operations
-- logout
-- session revocation operations
-- realtime delivery of blocked-login security notifications
-- binding authenticated realtime connections to session-derived identity
+- bootstrap/provision the initial ADMIN account safely
+- change `POST /api/users` to require password and remain admin-only
+- ensure user creation atomically creates the empty profile
+- remove/deprecate any separate create-profile lifecycle endpoint
+- implement authorization enforcement for all protected user/profile operations
+- implement `GET /api/users` for admin user listing
+- implement `DELETE /api/users/{userId}` for admin deletion
+- do not add a generic admin edit-user endpoint
+- implement self-service email change
+- implement self-service password change
+- enforce immutable username
+- enforce self-only profile updates
+- implement `POST /api/auth/logout`
+- complete session revocation HTTP operations required by the accepted auth model
 
-Current token policy:
+### Acceptance
 
-```text
-Access token  → 1 day
-Refresh token → 30-day sliding expiry
-```
-
-Refresh behavior:
-
-```text
-access token expires
-      ↓
-reactive refresh
-      ↓
-rotate refresh token
-      ↓
-new access token
-```
-
-Refresh-token reuse:
+The minimum secure user lifecycle is:
 
 ```text
-old token reused
-      ↓
-reject
+application first setup
+        ↓
+bootstrap ADMIN
+        ↓
+ADMIN login
+        ↓
+authenticated ADMIN
+        ↓
+create STANDARD_USER(username, password, optional email)
+        ↓
+User + empty UserProfile
+        ↓
+STANDARD_USER login
+        ↓
+user manages own email/password/profile
 ```
-
-No absolute session lifetime in V1.
-
-### Current acceptance state
-
-The implemented HTTP path can:
-
-```text
-login
-  ↓
-receive tokens
-  ↓
-refresh
-  ↓
-receive rotated tokens
-```
-
-The original end-to-end registration → login → authenticated realtime session →
-logout acceptance flow is **not yet complete**.
 
 ---
 
-# 6. Phase 3 — Minimal Send Message
-
-This is the first genuinely useful vertical slice.
+# 5. Phase 2 — User Discovery
 
 **STATUS: PENDING**
 
-Goal:
-
-> authenticated user sends one plain-text message to another user.
+Goal: authenticated users can find another user by exact username before sending a friend request.
 
 Implement:
 
-- exact username discovery
-- block authorization check
+- exact username lookup
+- restricted discovery DTO
+- authorization requiring an authenticated session
+- no password/session/private credential fields in discovery responses
+
+### Acceptance
+
+A valid authenticated user can resolve a known username, while an unknown username produces a stable not-found result without creating any relationship or conversation state.
+
+---
+
+# 6. Phase 3 — Friend Request Vertical Slice
+
+**STATUS: PENDING**
+
+This is the first relationship feature and the gate for direct messaging.
+
+Goal:
+
+> One authenticated user sends a friend request to another discovered user, the recipient accepts it, and the two users become friends.
+
+Minimum lifecycle:
+
+```text
+no relationship
+      ↓
+request sent
+      ↓
+pending
+      ↓
+accepted
+      ↓
+friendship
+```
+
+Implement:
+
+- friend request persistence
+- sender/recipient ownership
+- pending state
+- send request
+- list/view incoming requests as needed by the contract
+- accept request
+- reject request
+- cancel pending request
+- uniqueness/duplicate-request rules
+- server-side authorization
+- future-compatible relationship representation
+
+Do not implement blocking, unfriend, mute, or archive in this slice.
+
+### Acceptance
+
+Two authenticated users can discover one another, establish friendship through an accepted request, and the server can authorize subsequent direct messaging based on the friendship state.
+
+---
+
+# 7. Phase 4 — Direct Conversation & Minimal Send Message
+
+**STATUS: PENDING**
+
+Only start this phase after the friend-request slice works.
+
+Goal:
+
+> An authenticated user sends a plain-text message to an accepted friend.
+
+Implement:
+
+- accepted-friendship authorization gate
 - direct conversation lookup/creation
-- database uniqueness
-- atomic conversation + first message
+- database uniqueness for a user pair
+- atomic conversation + first message creation
 - message validation
 - server timestamp
 - server sequence
 - request UUID idempotency
-- MESSAGE_ACCEPTED
-- NEW_MESSAGE
-
-### Example
-
-```text
-Alice
-  ↓
-SEND_MESSAGE(requestId=X, recipient=Bob, "Hello")
-  ↓
-authenticate
-  ↓
-check Bob exists
-  ↓
-check block
-  ↓
-find/create A↔B conversation
-  ↓
-validate content
-  ↓
-persist message
-  ↓
-commit
-  ↓
-MESSAGE_ACCEPTED
-```
+- message acceptance event
+- delivery event skeleton
 
 ### Acceptance
 
-Retrying the same `requestId` never creates a second message.
+A user who is not an accepted friend cannot create a conversation or persist a message to another user.
 
 ---
 
-# 7. Phase 4 — Receiving & Delivery
-
-Goal: make the second user receive messages reliably.
+# 8. Phase 5 — Receiving & Delivery
 
 **STATUS: PENDING**
 
 Implement:
 
-- NEW_MESSAGE
-- delivery semantics
+- realtime message delivery
 - multi-session delivery
 - delivery state separate from message content
-
-Example:
-
-```text
-Alice
-  ↓
-Server
-  ↓
-Bob laptop
-Bob phone
-```
-
-Both sessions may receive the same logical message.
-
-The message itself remains one database record.
-
-### Acceptance
-
-Multiple active sessions do not create duplicate message records.
+- authenticated connection/session binding
 
 ---
 
-# 8. Phase 5 — History & Pagination
-
-Goal: durable message retrieval.
+# 9. Phase 6 — History & Pagination
 
 **STATUS: PENDING**
 
@@ -287,310 +230,143 @@ Implement:
 - latest-page-first retrieval
 - older-page pagination
 - conversation list
-- latest message preview
-
-High-level flow:
-
-```text
-authenticate
-   ↓
-conversation list
-   ↓
-open conversation
-   ↓
-latest page
-   ↓
-older pages
-```
-
-Do not load the entire history by default.
-
-### Acceptance
-
-A conversation with a large history can be opened without loading all messages.
+- latest-message preview
 
 ---
 
-# 9. Phase 6 — Read State
-
-Goal: account-level monotonic read state.
+# 10. Phase 7 — Read State
 
 **STATUS: PENDING**
 
 Implement:
 
-```text
-lastReadSequenceNumber
-```
-
-and:
-
-```text
-MARK_READ
-```
-
-Rules:
-
-- only moves forward
-- shared across sessions
-- only represents messages actually displayed
-
-### Acceptance
-
-If laptop marks through sequence 100, phone cannot move the account back to 90.
+- account-level `lastReadSequenceNumber`
+- `MARK_READ`
+- monotonic read progression
+- cross-session read-state convergence
 
 ---
 
-# 10. Phase 7 — Message Mutation
-
-Goal: editing and deletion.
+# 11. Phase 8 — Message Mutation
 
 **STATUS: PENDING**
 
 Implement:
 
-```text
-EDIT_MESSAGE
-MESSAGE_UPDATED
-
-DELETE_MESSAGE
-MESSAGE_DELETED
-```
-
-Rules:
-
-- sender owns edit/delete
-- last-write-wins for edits
-- deletion is terminal
-- deleted message remains as tombstone
-
-### Acceptance
-
-Concurrent edit/delete tests resolve deterministically.
+- edit message
+- delete message
+- message-update events
+- terminal tombstones
 
 ---
 
-# 11. Phase 8 — Replies
-
-Goal: first-class reply relationships.
+# 12. Phase 9 — Replies
 
 **STATUS: PENDING**
 
 Implement:
 
-```text
-repliedToMessageId
-```
-
-Validate:
-
-```text
-parent conversation == child conversation
-```
-
-A deleted parent remains represented by its tombstone.
-
-### Acceptance
-
-A reply remains durable even when its parent is deleted.
+- `repliedToMessageId`
+- same-conversation validation
+- durable reply relationship when parent is deleted
 
 ---
 
-# 12. Phase 9 — Archive, Mute & Blocking
+# 13. Phase 10 — Deferred Relationship Controls
 
-**STATUS: PENDING**
+**STATUS: FUTURE**
 
-Implement per-user conversation state.
+Potential later additions include:
 
-### Archive
+- unfriend
+- blocking
+- mute
+- archive
+- account pause/suspension
 
-```text
-archived
-```
-
-### Auto-unarchive
-
-```text
-default = false
-configurable
-```
-
-### Mute
-
-```text
-muted
-```
-
-### Blocking
-
-```text
-blockerUserId
-blockedUserId
-```
-
-Blocked conversation:
-
-```text
-read-only for both sides
-```
-
-Send error:
-
-```text
-CONVERSATION_BLOCKED
-```
-
-### Acceptance
-
-A blocked sender cannot queue or persist a message.
+These must be added without changing the permanent `userId` identity model or breaking the accepted friendship abstraction.
 
 ---
 
-# 13. Phase 10 — Offline & Reconnect
-
-This phase deliberately waits until the preceding slices exist.
+# 14. Phase 11 — Offline & Reconnect
 
 **STATUS: PENDING**
 
-Implement:
+Implement after the core realtime/message model exists:
 
 - startup synchronization
 - reconnect
+- missed-event recovery
 - state convergence
 - retry-safe mutation behavior
-- missed-event recovery
-
-Do not invent the exact recovery protocol until the actual socket/message model exists.
-
-The existing idempotency invariant gives us a foundation for safe retries.
 
 ---
 
-# 14. Phase 11 — Hardening
+# 15. Phase 12 — Hardening
 
 **STATUS: PENDING**
 
-Once the core path works, add:
+Cover:
 
-### Authorization tests
-
-- sender ownership
-- blocked send
-- unknown recipient
-- session validity
-
-### Concurrency tests
-
-- conversation creation race
-- duplicate request race
-- edit race
-- delete race
-- multi-session state
-
-### Boundary tests
-
-- empty message
-- whitespace-only message
-- exactly 64 KB
-- 64 KB + 1 byte
-- username boundaries
-- invalid usernames
-
-### Authentication tests
-
-- expired access token
-- refresh rotation
-- refresh-token reuse
-- revoked session
-- logout
-- multiple sessions
-
-### Persistence tests
-
-- transaction rollback
-- uniqueness constraints
-- tombstones
-- read monotonicity
+- authentication and authorization failures
+- user ownership checks
+- admin-only operations
+- friendship authorization
+- duplicate friend-request races
+- conversation creation races
+- message idempotency races
+- session revocation
+- refresh-token rotation/reuse
+- persistence constraints and rollback
+- username boundary validation
+- message boundary validation
 
 ---
 
-# 15. What We Deliberately Do Not Build Yet
+# 16. V1 Explicit Exclusions
 
-V1 excludes:
+The existing V1 exclusions remain unless a later ADR supersedes them:
 
-- reactions
+- E2EE
 - attachments/media
 - groups
-- admin/moderation
 - rich text/Markdown
-- push notification infrastructure
+- reactions
+- advanced moderation
 - advanced presence
-- typing indicators
-- end-to-end encryption
 - voice/video
-- message revision history
-- client/TUI-specific UX features
+- client/TUI-specific UX infrastructure
 
-These can be designed after the core messaging server works.
-
----
-
-# 16. Implementation-Time Decisions
-
-The following are intentionally not blockers:
-
-- exact JWT signing algorithm
-- JWT key management
-- exact JWT claims
-- exact database technology/index layout
-- migration tooling
-- socket/WebSocket implementation
-- framing
-- sequence allocation implementation
-- exact refresh endpoint schema
-- retry semantics
-- reconnect protocol
-- missed-event recovery
-- rate limiting
-- metrics/tracing/logging
-- audit strategy
-- exact pagination cursor
-- deployment topology
-
-The rule is:
-
-> If a detail does not change a locked domain invariant, prefer deciding it while implementing the relevant slice.
+The initial relationship slice also excludes blocking, unfriend, mute, and archive.
 
 ---
 
-# 17. Definition of Done for Each Slice
+# 17. Immediate Next Step
 
-A slice is done when:
+Complete Phase 1 first. Do not begin direct messaging until the following chain is implemented and tested:
 
-- the relevant product behavior is locked
-- the technical contract is clear enough to implement
-- persistence changes exist
-- migrations exist where needed
-- server-side validation exists
-- authorization exists
-- happy path works
-- failure paths are tested
-- concurrency implications are considered
-- multiple sessions are considered where relevant
-- the slice is demonstrable end-to-end
-
-Do not require the entire future system to be designed before declaring a slice complete.
-
----
-
-# 18. Immediate Next Step
-
-Complete the remaining authentication boundary before declaring Phase 2 complete:
-
-1. implement password-based registration
-2. implement authorization enforcement
-3. implement logout/session revocation
-4. define and implement authenticated realtime session handling
-5. then build the minimal protocol skeleton from CONNECT → LOGIN → LOGIN_SUCCESS
-
-After that works, move to the first messaging vertical slice.
+```text
+bootstrap ADMIN
+      ↓
+ADMIN login
+      ↓
+ADMIN creates user(username + password + optional email)
+      ↓
+User + empty UserProfile
+      ↓
+user login
+      ↓
+user updates own profile/email/password
+      ↓
+admin can list/delete users
+      ↓
+exact username discovery
+      ↓
+friend request
+      ↓
+accept
+      ↓
+friendship
+      ↓
+chat
+```
