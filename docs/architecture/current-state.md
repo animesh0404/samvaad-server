@@ -41,9 +41,9 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
   `LoginBlockedDueToSessionLimitEvent`. The event is currently an internal
   application event; realtime delivery to authenticated sessions is not yet
   implemented.
-- The initial `ADMIN` is bootstrapped at startup from environment-provided
-  credentials. Bootstrap is idempotent, skips creation with a warning when
-  credentials are absent, and stores only a BCrypt hash.
+- The initial `ADMIN` is seeded by Liquibase during database initialization. The
+  application has no runtime admin bootstrap configuration or startup mutation
+  path.
 - V1 has exactly two roles, `ADMIN` and `USER`. Provisioned users are forced to
   `USER`; callers cannot choose a role.
 - Admin-only provisioning requires a password, forces the `USER` role, hashes
@@ -67,10 +67,10 @@ Maintained source diagrams:
 ## Next planned work
 
 The authentication/session foundation and the V1 authorization boundary are
-implemented: admin bootstrap, admin-only provisioning with BCrypt passwords,
-JWT/session validation, and profile/account authorization are in place. Remaining
-authentication work includes logout/session revocation operations and realtime
-session authentication/security-event delivery.
+implemented: Liquibase-seeded initial admin, admin-only provisioning with BCrypt
+passwords, JWT/session validation, and profile/account authorization are in place.
+Remaining authentication work includes logout/session revocation operations and
+realtime session authentication/security-event delivery.
 
 The planned protocol skeleton (CONNECT → LOGIN → LOGIN_SUCCESS) is also still
 pending; the current authentication endpoints are HTTP endpoints rather than the

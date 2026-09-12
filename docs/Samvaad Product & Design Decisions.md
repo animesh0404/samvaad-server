@@ -97,7 +97,9 @@ There is **no public self-registration** in V1.
 
 User accounts are provisioned by an administrator.
 
-The initial administrator is bootstrapped during application startup from environment-provided bootstrap credentials. Bootstrap is idempotent: when an administrator already exists, startup performs no mutation. When credentials are absent, startup warns and continues without creating an administrator. Bootstrap credentials must not be committed to source control or persisted in plaintext.
+The initial administrator is a **Liquibase-seeded account**, created during database initialization together with its empty `UserProfile`. Application startup does not provision or mutate the administrator, and there are no bootstrap-admin environment variables.
+
+The initial administrator uses the fixed seeded account and a known default password. Password-change enforcement is intentionally outside the current backend slice; the UI will force the administrator to change the default password when that frontend flow is implemented.
 
 An administrator creates a user with:
 
@@ -109,7 +111,7 @@ email     optional
 
 The server generates the permanent `userId` and creates the empty `UserProfile` as part of the same user-creation lifecycle.
 
-Newly provisioned users are `USER` unless they are the explicitly bootstrapped administrator; the provisioning API cannot choose or change the role.
+Newly provisioned users are `USER` unless they are the explicitly seeded administrator; the provisioning API cannot choose or change the role.
 
 ---
 
@@ -162,7 +164,7 @@ ADMIN
 USER
 ```
 
-The initial bootstrap account is an administrator. There is no V1 role-change API, and clients cannot assign roles during provisioning.
+The initial seeded account is an administrator. There is no V1 role-change API, and clients cannot assign roles during provisioning.
 
 ---
 
@@ -258,7 +260,7 @@ The session is considered dead when its `refresh_token_expires_at` has passed. P
 The V1 account lifecycle is:
 
 ```text
-bootstrap ADMIN
+Liquibase seeds ADMIN
       ↓
 admin creates user
       ↓

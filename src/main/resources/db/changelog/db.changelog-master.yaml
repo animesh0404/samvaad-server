@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/changes/005-add-user-role.yaml
   - include:
       file: db/changelog/changes/006-password-hash-not-null.yaml
+  - include:
+      file: db/changelog/changes/007-seed-initial-admin.yaml

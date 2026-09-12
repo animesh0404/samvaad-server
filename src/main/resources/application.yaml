@@ -11,8 +11,3 @@ spring:
 samvaad:
   auth:
     jwt-secret: ${SAMVAAD_JWT_SECRET}
-  bootstrap:
-    admin:
-      username: ${SAMVAAD_BOOTSTRAP_ADMIN_USERNAME:}
-      password: ${SAMVAAD_BOOTSTRAP_ADMIN_PASSWORD:}
-      email: ${SAMVAAD_BOOTSTRAP_ADMIN_EMAIL:}

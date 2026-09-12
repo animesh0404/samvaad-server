@@ -17,17 +17,27 @@ than caller-supplied identity fields.
 
 ## Decision
 
+### Initial administrator
+
+The initial administrator is a **database seed**, not an application-startup
+bootstrap operation. Liquibase creates the initial `ADMIN` row as part of the
+schema initialization and stores only a BCrypt password hash. The corresponding
+empty `UserProfile` is seeded in the same migration.
+
+There are no `SAMVAAD_BOOTSTRAP_ADMIN_*` environment variables and no runtime
+administrator-provisioning runner/service. Application startup must not mutate
+the database merely to establish the initial administrator.
+
+The seeded development/deployment bootstrap credential uses the fixed initial
+administrator account defined by the migration. The initial password is a
+known default and password-change enforcement is intentionally outside the
+current backend slice; the UI will force the administrator to change it when
+that frontend flow is implemented.
+
 ### User provisioning
 
 V1 uses **admin-only user provisioning**. There is no public self-registration
 flow.
-
-The initial administrator is provisioned during application startup from
-environment-provided bootstrap credentials. Bootstrap is idempotent: if an
-administrator already exists, startup performs no mutation. If bootstrap
-credentials are absent, startup logs a warning and continues without creating
-an administrator. Bootstrap credentials must never be logged, committed to
-source control, or persisted in plaintext.
 
 An authenticated administrator may create a user with:
 
@@ -166,17 +176,19 @@ uses `403` rather than `404`.
 ## Consequences
 
 The V1 account and profile APIs must distinguish self-service ownership from
-self-service, administrative read authority, and relationship-based profile visibility.
+administrative read authority, and relationship-based profile visibility.
 A generic "edit user" capability must not grant an administrator permission to
 mutate personal profile or credential data.
 
 A user-creation request must carry the initial password, but the stored `User`
-record contains only its BCrypt hash. The database schema should make
-`password_hash` non-null once the provisioning migration is complete; any legacy
-rows created before this invariant must be handled explicitly by the migration
-rather than silently accepted as passwordless accounts.
+record contains only its BCrypt hash. The database schema makes
+`password_hash` non-null; passwordless users are not a supported account state.
 
-Authentication becomes server-derived identity: protected endpoints cannot trust
+Initial administrator creation is a Liquibase responsibility and therefore
+occurs before normal application services start. Runtime application startup
+has no special administrator mutation path.
+
+Authentication remains server-derived identity: protected endpoints cannot trust
 path/body `userId` values as proof of ownership.
 
 Per-request session lookup provides immediate revocation at the cost of a

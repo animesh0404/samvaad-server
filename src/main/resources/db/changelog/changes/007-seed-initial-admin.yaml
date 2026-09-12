@@ -1,0 +1,53 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-seed-initial-admin
+      author: Animesh Kahara
+      changes:
+        - insert:
+            tableName: users
+            columns:
+              - column:
+                  name: user_id
+                  value: 00000000-0000-0000-0000-000000000001
+              - column:
+                  name: username
+                  value: admin
+              - column:
+                  name: email
+                  value: admin@example.com
+              - column:
+                  name: password_hash
+                  value: $2a$10$K49f0.U50RY3z.GoidSc6e7bU3JjMlpBm28RlHkbfWL4GDllqD5vW
+              - column:
+                  name: role
+                  value: ADMIN
+              - column:
+                  name: created_at
+                  valueDate: now()
+              - column:
+                  name: updated_at
+                  valueDate: now()
+              - column:
+                  name: created_by
+                  value: system
+              - column:
+                  name: updated_by
+                  value: system
+        - insert:
+            tableName: user_profiles
+            columns:
+              - column:
+                  name: user_id
+                  value: 00000000-0000-0000-0000-000000000001
+              - column:
+                  name: created_at
+                  valueDate: now()
+              - column:
+                  name: updated_at
+                  valueDate: now()
+              - column:
+                  name: created_by
+                  value: system
+              - column:
+                  name: updated_by
+                  value: system
