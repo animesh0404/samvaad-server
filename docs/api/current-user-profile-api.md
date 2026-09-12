@@ -175,18 +175,16 @@ Accepted fields:
 `displayName`, `bio`, `avatarUrl`, `firstName`, `middleName`, `lastName`, and
 `statusMessage`.
 
-The intended field semantics are:
+The field semantics are:
 
-| Request field state | Required result |
+| Request field state | Result |
 | --- | --- |
 | Omitted | Leave existing value unchanged |
 | Present with non-null value | Replace existing value |
 | Present with `null` | Clear existing value |
 
-### Known implementation gap
-
-The current implementation does not yet reliably distinguish omitted fields from
-explicit JSON `null`; see ADR 0006.
+The implementation tracks field presence separately from field value, so these
+three states are represented and applied distinctly.
 
 ## User discovery
 
@@ -230,9 +228,7 @@ from the initial friend-request slice.
 The repository currently implements the Phase 1 account/authentication boundary:
 login, refresh, logout and session revocation, JWT/session validation,
 admin-only provisioning, profile authorization, admin user listing and deletion,
-and self-service email and password changes. The initial ADMIN is seeded by
-Liquibase rather than application startup. Remaining work in this area is limited
-to explicitly deferred/known gaps such as first-login default-password enforcement,
-friend-gated profile visibility, and the profile PATCH field-presence gap.
-User discovery, friendship, direct messaging, and realtime transport remain
-pending.
+and self-service email and password changes, including the accepted profile PATCH
+field-presence semantics. The initial ADMIN is seeded by Liquibase rather than
+application startup. User discovery, friendship, direct messaging, and realtime
+transport remain pending.

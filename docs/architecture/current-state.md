@@ -36,6 +36,7 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
 - `DELETE /api/users/{userId}` provides ADMIN-only hard deletion. An administrator cannot delete themselves; deletion removes sessions before profile/account removal.
 - `PATCH /api/users/{userId}/email` provides self-service email change. Email is case-insensitively unique, duplicate email returns `409`, and existing sessions remain valid.
 - `PATCH /api/users/{userId}/password` provides self-service password change. The current password is required and verified; the new password is BCrypt-hashed and existing sessions remain valid.
+- Profile PATCH distinguishes omitted fields from explicitly present `null` values: omitted fields remain unchanged, non-null values replace existing values, and explicit `null` clears the corresponding field.
 
 Maintained source diagrams:
 
@@ -73,5 +74,4 @@ per-user conversation state, and transport protocol behavior.
 - Relationship-based profile visibility (friend-gated reads) is not yet implemented; non-admin cross-user profile reads are denied.
 - Messaging, conversations, blocking, read state, archive/mute, and transport protocol are absent.
 - Display-name fallback is designed but not implemented.
-- Profile PATCH cannot yet distinguish omitted fields from explicit `null`.
 - Current error responses do not yet expose the planned stable machine-readable error-code contract.

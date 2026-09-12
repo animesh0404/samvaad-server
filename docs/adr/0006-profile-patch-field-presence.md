@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; implementation incomplete.
+Accepted; implemented.
 
 ## Decision
 
@@ -13,14 +13,14 @@ For `PATCH /api/users/{userId}/profile`:
 - a present `null` field explicitly clears the stored value.
 
 `UserProfileUpdateDto` is the dedicated PATCH request DTO. The implementation
-must retain whether each field was present separately from its value.
+retains whether each field was present separately from its value.
 
 ## Consequences
 
-The current Java DTO maps omitted properties and explicit JSON `null` to the
-same `null` value, so it cannot yet implement the clearing rule. A future
-implementation must change this deliberately and add tests for all three cases;
-it must not silently preserve the current “null means unchanged” behavior.
+The profile PATCH implementation distinguishes omitted properties from explicit
+JSON `null`. Omitted fields remain unchanged, while explicitly present `null`
+values clear the corresponding stored profile field. Tests cover omitted,
+non-null, and explicit-null behavior.
 
 ## Source material
 

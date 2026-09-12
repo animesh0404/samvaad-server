@@ -10,7 +10,7 @@
 
 The original high-level design phase is **COMPLETE**.
 
-The repository now contains the Phase 1 HTTP authentication/session and user/account boundary: login, refresh, logout/revocation, admin provisioning, profile authorization, admin listing/deletion, and self-service email/password changes. The next product slice is authenticated user discovery followed by friend requests.
+The repository now contains the Phase 1 HTTP authentication/session and user/account boundary: login, refresh, logout/revocation, admin provisioning, profile authorization, admin listing/deletion, self-service email/password changes, and the accepted profile PATCH field-presence semantics. The next product slice is authenticated user discovery followed by friend requests.
 
 ---
 
@@ -54,7 +54,7 @@ TDD is a development practice for implementation work and is intentionally not r
 
 # 4. Phase 1 — Authentication & Authorization Boundary
 
-**STATUS: COMPLETE FOR THE CURRENT ACCOUNT/AUTH SLICE**
+**STATUS: COMPLETE**
 
 Implemented and tested:
 
@@ -86,15 +86,7 @@ Implemented and tested:
 - self-service `PATCH /api/users/{userId}/password`
 - immutable username
 - no generic admin edit-user endpoint
-
-Explicitly deferred/known gaps in this boundary:
-
-- first-login forced change of the seeded default administrator password
-- email verification/OTP lifecycle
-- friend-gated profile visibility until friendship exists
-- reliable distinction between omitted profile PATCH fields and explicit JSON `null` (ADR 0006)
-- final production JWT signing/key-management details
-- realtime delivery/authentication of security events
+- profile PATCH field-presence semantics: omitted fields remain unchanged, non-null values replace existing values, and explicit `null` clears the field
 
 ### Acceptance
 
@@ -348,7 +340,7 @@ The initial relationship slice also excludes blocking, unfriend, mute, and archi
 
 # 17. Immediate Next Step
 
-Phase 1 account/auth implementation is complete enough to move to Phase 2. Do not begin direct messaging until this chain is implemented and tested:
+Phase 1 account/auth implementation is complete. Move to Phase 2: exact username discovery. Do not begin direct messaging until this chain is implemented and tested:
 
 ```text
 Liquibase-seeded ADMIN
