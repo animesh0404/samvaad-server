@@ -99,7 +99,7 @@ User accounts are provisioned by an administrator.
 
 The initial administrator is a **Liquibase-seeded account**, created during database initialization together with its empty `UserProfile`. Application startup does not provision or mutate the administrator, and there are no bootstrap-admin environment variables.
 
-The initial administrator uses the fixed seeded account and a known default password. Password-change enforcement is intentionally outside the current backend slice; the UI will force the administrator to change the default password when that frontend flow is implemented.
+The initial administrator uses the fixed seeded account and a known default password. **Self-service password change is implemented**, but first-login enforcement requiring the administrator to change that default password remains outside the current backend slice and is deferred to the future first-login flow.
 
 An administrator creates a user with:
 
@@ -123,7 +123,7 @@ Passwords use BCrypt with generated salt.
 
 Plaintext passwords:
 
-- are accepted only at the authentication/provisioning boundary
+- are accepted only at the authentication/provisioning/password-change boundary
 - are never persisted
 - are never stored in domain entities
 - are never placed in events
@@ -141,9 +141,9 @@ Once the provisioning migration is complete, `password_hash` is expected to be n
 After creation:
 
 - username cannot be changed by anyone
-- administrator cannot change email
-- administrator cannot change password
-- administrator cannot edit the user's profile
+- administrator cannot change another user's email
+- administrator cannot change another user's password
+- administrator cannot edit another user's profile
 - user may change their own email
 - user may change their own password
 
@@ -179,8 +179,9 @@ An authenticated administrator may:
 - retrieve user records where the API permits it
 - delete users
 - read any user's profile
+- change their own email and password through self-service operations
 
-The administrator may **not** edit an existing user's username, email, password, or `UserProfile`.
+The administrator may **not** edit another existing user's username, email, password, or `UserProfile`.
 
 An administrator may edit their **own** profile through the normal self-service profile operation.
 
@@ -213,7 +214,7 @@ Profile read and write permissions are deliberately different:
 READ
   own profile                         -> allowed
   ADMIN reading any profile           -> allowed
-  USER reading non-friend   -> denied
+  USER reading non-friend             -> denied
   accepted friend reading profile    -> allowed
 
 WRITE
@@ -284,7 +285,7 @@ unauthenticated                 -> 401
 authenticated but not permitted -> 403
 invalid/expired/revoked session  -> 401
 validation failure               -> 400
-duplicate username               -> 409
+duplicate username or email      -> 409
 ```
 
 The existing API error body shape is preserved for this slice. Cross-user denial uses `403`, not `404`.
