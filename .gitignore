@@ -39,3 +39,6 @@ out/
 ## Environment file
 .env
 .envrc
+## Local API testing (Postman)
+.postman/
+postman/
