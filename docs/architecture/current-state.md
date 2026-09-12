@@ -30,17 +30,33 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
   password verification, persisted sessions, session-bound JWT access tokens,
   and refresh tokens.
 - Refresh is implemented at `POST /api/auth/refresh` with persisted refresh-
-  token hashes and refresh-token rotation.
+  token hashes, expiry/revocation checks, and refresh-token rotation.
+- Access tokens currently have a one-day lifetime; refresh expiry is 30 days and
+  slides forward on successful refresh.
+- A maximum of five active sessions per user is enforced transactionally by
+  serializing on the user row while active session capacity is checked and a
+  session is created.
+- When session capacity is exhausted, the authentication service publishes a
+  `LoginBlockedDueToSessionLimitEvent`. The event is currently an internal
+  application event; realtime delivery to authenticated sessions is not yet
+  implemented.
 
-The maintained source diagram is
-[current-user-profile.puml](diagrams/current-user-profile.puml).
+Maintained source diagrams:
 
-## Next planned slice
+- [Current User/Profile persistence model](diagrams/current-user-profile.puml)
+- [Current authentication/session model](diagrams/current-authentication-session.puml)
 
-The authentication foundation is now implemented. Remaining authentication
-work includes completing authorization enforcement and the remaining session
-lifecycle operations required by ADR 0003, including logout/session
-revocation.
+## Next planned work
+
+The authentication/session foundation is implemented, but the full
+authentication boundary is not complete. Remaining authentication work includes
+password-based registration, authorization enforcement, logout/session
+revocation operations, and realtime session authentication/security-event
+delivery.
+
+The planned protocol skeleton (CONNECT → LOGIN → LOGIN_SUCCESS) is also still
+pending; the current authentication endpoints are HTTP endpoints rather than the
+planned realtime protocol.
 
 The broader messaging vertical slices are still pending: conversations,
 messages, per-user conversation state, and transport protocol behavior.
@@ -53,8 +69,10 @@ deferred. V1 application-level encryption is also deferred; see ADR 0005.
 
 ## Known implementation gaps
 
-- Authorization enforcement and logout/session revocation are not yet
-  complete.
+- Password-based registration is not yet part of the authentication flow.
+- Authorization enforcement and logout/session revocation are not yet complete.
+- Realtime transport authentication and realtime delivery of blocked-login
+  security notifications are not implemented.
 - Messaging, conversations, blocking, read state, archive/mute, and transport
   protocol are absent.
 - Display-name fallback is designed but not implemented.
