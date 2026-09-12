@@ -50,7 +50,7 @@ Rules:
 - username is unique
 - username is case-sensitive
 - username matches `[a-zA-Z0-9_]{3,32}`
-- role distinguishes at least ADMIN and STANDARD_USER in V1
+- role is exactly one of ADMIN or STANDARD_USER in V1
 
 The authenticated user is derived from the server-side session.
 
@@ -77,6 +77,26 @@ A UserProfile is automatically created when its User is created. There is no sep
 
 Profile changes do not change user identity.
 
+### Profile authorization
+
+Profile reads and writes are intentionally different:
+
+```text
+READ
+  own profile                         -> allowed
+  ADMIN reading any profile           -> allowed
+  STANDARD_USER reading non-friend   -> denied
+  accepted friend reading profile    -> allowed
+
+WRITE
+  own profile                         -> allowed
+  accepted friend editing friend     -> denied
+  ADMIN editing another profile      -> denied
+  ADMIN editing own profile           -> allowed
+```
+
+Friendship grants mutual profile-read visibility, but never profile-edit permission. The accepted-friend check becomes an authorization input when the friendship model is implemented.
+
 ---
 
 ## 2.3 Session
@@ -96,6 +116,10 @@ refresh-token state
 ```
 
 Multiple sessions per user are allowed, with the existing V1 five-active-session limit.
+
+For every authenticated HTTP request, the server validates the JWT and then validates the referenced session using `sid`. The session must exist, not be revoked, and not be past `refresh_token_expires_at`; JWT `sub` must match the session user. Missing, revoked, or expired sessions return `401`.
+
+Per-request session lookup is the V1 correctness choice; no long-lived session-validation cache is required.
 
 ---
 
@@ -124,7 +148,7 @@ REJECTED
 CANCELLED
 ```
 
-An accepted request establishes friendship between the pair.
+An accepted request establishes friendship between the pair and grants mutual profile-read visibility.
 
 The model must support future relationship controls without coupling them to User identity. Blocking, unfriend, mute, and archive are not part of the initial friend-request implementation.
 
@@ -284,7 +308,8 @@ V1 admin authority is deliberately narrow:
 create user
 list users
 retrieve user records as permitted
- delete user
+read any user profile
+delete user
 ```
 
 The administrator may not change another user's username, email, password, or personal profile.
@@ -300,7 +325,9 @@ change own password
 update own profile
 ```
 
-A standard user cannot modify another user's account or profile.
+A standard user cannot modify another user's account or profile. Once an accepted friendship exists, a standard user may also read the friend's profile.
+
+Profile-read visibility and profile-write ownership are separate authorization rules.
 
 ---
 
@@ -309,7 +336,7 @@ A standard user cannot modify another user's account or profile.
 V1 provisioning flow:
 
 ```text
-bootstrap ADMIN during first-time setup
+bootstrap ADMIN during application startup
         ↓
 ADMIN authenticates
         ↓
@@ -319,6 +346,16 @@ username + password + optional email
         ↓
 User + empty UserProfile
 ```
+
+Bootstrap behavior:
+
+```text
+ADMIN exists       → no-op
+credentials absent → warn and continue
+credentials present→ create ADMIN
+```
+
+The bootstrap credential values come from environment configuration. They must never be logged, committed, or persisted in plaintext.
 
 Password handling:
 
@@ -332,7 +369,7 @@ persist password hash only
 
 Plaintext passwords must never be persisted or logged.
 
-Username is immutable after creation.
+New provisioned users receive `STANDARD_USER`; the provisioning API cannot set a role. Username is immutable after creation.
 
 ---
 
@@ -363,6 +400,8 @@ FRIENDSHIP
 A request may instead become rejected or cancelled while pending.
 
 The recipient may accept or reject. The sender may cancel while pending.
+
+The friendship relationship is also the authorization basis for mutual profile reads and direct messaging between the two users.
 
 The exact endpoint vocabulary and persistence schema are finalized with the first friendship vertical slice.
 
@@ -409,7 +448,7 @@ The previously defined message lifecycle remains in force: server-controlled seq
 ## 10.1 Login
 
 ```text
-LOGIN(username, password)
+LOGIN(username-or-email, password)
        ↓
 verify BCrypt
        ↓
@@ -466,7 +505,7 @@ accept
     ↓
 friendship
     ↓
-conversation/message protocol
+profile visibility + conversation/message protocol
 ```
 
 Do not freeze every future command/event before the relevant vertical slice is implemented.
@@ -501,16 +540,17 @@ The following remain implementation-time choices unless a later ADR changes that
 6. Passwords are never persisted or logged in plaintext.
 7. An administrator cannot mutate another user's username, email, password, or profile in V1.
 8. A standard user can mutate only their own permitted account/profile fields.
-9. Exact username discovery is the V1 messaging discovery mechanism.
-10. Direct messaging between distinct users requires accepted friendship.
-11. A direct participant pair has at most one conversation.
-12. Conversation + first message creation is atomic.
-13. A request UUID cannot create two messages.
-14. Server sequence numbers determine message order.
-15. Client time is never authoritative.
-16. Read position never moves backwards.
-17. Delete is terminal.
-18. Message history is permanent.
-19. Client validation never replaces server validation.
-20. Session revocation invalidates its active authenticated connection.
-21. Refresh-token rotation is session-scoped and old refresh tokens are rejected after successful rotation.
+9. An accepted friendship grants mutual profile-read visibility but never profile-edit permission.
+10. Exact username discovery is the V1 messaging discovery mechanism.
+11. Direct messaging between distinct users requires accepted friendship.
+12. A direct participant pair has at most one conversation.
+13. Conversation + first message creation is atomic.
+14. A request UUID cannot create two messages.
+15. Server sequence numbers determine message order.
+16. Client time is never authoritative.
+17. Read position never moves backwards.
+18. Delete is terminal.
+19. Message history is permanent.
+20. Client validation never replaces server validation.
+21. Session revocation invalidates its active authenticated connection.
+22. Refresh-token rotation is session-scoped and old refresh tokens are rejected after successful rotation.
