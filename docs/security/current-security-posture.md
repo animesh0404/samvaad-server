@@ -8,7 +8,7 @@ implemented.
 - Passwords must use BCrypt with generated salt. Plaintext passwords must never
   be persisted or logged.
 - V1 uses session-derived identity, JWT access tokens, and rotating refresh
-  tokens when authentication is implemented.
+  tokens.
 - End-to-end encryption is excluded from V1.
 - Application-level encryption of profile/private application data is deferred
   for V1. It remains a planned future security phase.
@@ -17,8 +17,16 @@ See ADRs 0003 and 0005 and the original design documents for rationale.
 
 ## Current implementation
 
-- There is no password, authentication, session, JWT, or refresh-token
-  implementation yet.
+- Password verification uses the configured Spring Security `PasswordEncoder`
+  and the authentication flow rejects users without a password hash.
+- Login is implemented at `POST /api/auth/login`. Successful authentication
+  creates a persisted session, generates a session-bound JWT access token, and
+  returns a refresh token.
+- Refresh is implemented at `POST /api/auth/refresh`. Refresh tokens are stored
+  as hashes, validated against the persisted session, checked for revocation and
+  expiry, and rotated when a refresh succeeds.
+- The local JWT signing secret is supplied through the `SAMVAAD_JWT_SECRET`
+  environment variable rather than committed application configuration.
 - User email and current profile fields are persisted as ordinary plaintext
   columns. No application-level profile/message encryption exists.
 - PostgreSQL credentials in the committed local configuration are development
@@ -26,10 +34,19 @@ See ADRs 0003 and 0005 and the original design documents for rationale.
 - JPA auditing exists, but the current actor is the fixed value `"system"`;
   this is not authenticated-user attribution.
 
-## Implications for future work
+## Remaining gaps and implications
 
-Do not claim profile/message encryption, E2EE, or completed authentication.
-When authentication is implemented, enforce the password and session decisions.
-When application-level encryption is designed, introduce it at a deliberate
-boundary without changing domain behavior, API contracts, or message semantics
-solely to expose ciphertext handling.
+Authentication/session issuance and refresh-token rotation are implemented, but
+this does not mean the complete planned security boundary is finished.
+Authorization enforcement, logout/session revocation, and the remaining
+authentication lifecycle behavior still need to be completed where required by
+ADR 0003.
+
+Do not claim profile/message encryption or E2EE. When application-level
+encryption is designed, introduce it at a deliberate boundary without
+changing domain behavior, API contracts, or message semantics solely to expose
+ciphertext handling.
+
+Exact JWT signing/claims/key management remains intentionally deferred. The
+local `SAMVAAD_JWT_SECRET` setup is a development configuration mechanism, not a
+production key-management design.
