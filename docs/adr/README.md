@@ -1,16 +1,15 @@
 # Architecture Decision Records
 
 ADRs are concise records of durable architectural decisions and their
-consequences. They are not a replacement for the original Samvaad design
-records, which remain unchanged in this directory:
+consequences. They complement the original Samvaad design records by making
+current implementation constraints easy to identify and review.
+
+The detailed product/design and technical-design documents remain the broader
+reference material:
 
 - [Samvaad Product & Design Decisions](../Samvaad%20Product%20%26%20Design%20Decisions.md)
 - [Samvaad Technical Design](../Samvaad%20Technical%20Design.md)
 - [Samvaad Implementation Roadmap](../Samvaad%20Implementation%20Roadmap.md)
-
-Those documents contain the detailed reasoning, product rules, technical
-model, and historical roadmap. ADRs summarize only decisions that are useful
-to identify quickly while implementing or reviewing a change.
 
 In the original decision record, **LOCKED** means accepted and **DEFERRED**
 means unresolved. A conflict between implementation and a LOCKED decision must
@@ -27,3 +26,5 @@ an earlier ADR only by explicitly naming it.
 | [0004](0004-conversation-and-message-integrity.md) | Conversation and message integrity |
 | [0005](0005-v1-scope-and-data-protection-boundary.md) | V1 scope and data-protection boundary |
 | [0006](0006-profile-patch-field-presence.md) | Profile PATCH field-presence semantics |
+| [0007](0007-user-provisioning-and-authorization.md) | Admin-provisioned users and V1 authorization boundary |
+| [0008](0008-friend-request-gated-direct-messaging.md) | Friend-request-gated direct messaging |
