@@ -5,6 +5,7 @@ import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.security.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,5 +39,18 @@ public class UserController {
     @GetMapping
     public List<UserDto> listUsers() {
         return userService.listUsers();
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable UUID userId) {
+        AuthenticatedUser caller = CurrentUser.require();
+        if (caller.role() != UserRole.ADMIN) {
+            throw new ForbiddenOperationException();
+        }
+        if (caller.userId().equals(userId)) {
+            throw new ForbiddenOperationException();
+        }
+        userService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
     }
 }

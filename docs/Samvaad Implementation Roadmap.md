@@ -80,7 +80,7 @@ Remaining alignment work:
 - ensure user creation atomically creates the empty profile
 - remove/deprecate any separate create-profile lifecycle endpoint
 - implement authorization enforcement for all protected user/profile operations
-- implement `DELETE /api/users/{userId}` for admin deletion
+- **[DONE]** implement `DELETE /api/users/{userId}` for admin deletion
 - do not add a generic admin edit-user endpoint
 - implement self-service email change
 - implement self-service password change
@@ -358,7 +358,7 @@ user login
       ↓
 user updates own profile/email/password
       ↓
-admin can list/delete users
+admin can list/delete users ✓
       ↓
 exact username discovery
       ↓

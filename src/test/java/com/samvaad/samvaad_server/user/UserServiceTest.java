@@ -1,5 +1,7 @@
 package com.samvaad.samvaad_server.user;
 
+import com.samvaad.samvaad_server.session.SessionRepo;
+import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,8 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -31,13 +37,19 @@ class UserServiceTest {
     private UserProfileService userProfileService;
 
     @Mock
+    private UserProfileRepo userProfileRepo;
+
+    @Mock
+    private SessionRepo sessionRepo;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepo, userProfileService, passwordEncoder);
+        userService = new UserService(userRepo, userProfileService, userProfileRepo, sessionRepo, passwordEncoder);
     }
 
     @Test
@@ -113,5 +125,48 @@ class UserServiceTest {
 
         assertTrue(result.isEmpty());
         then(userRepo).should().findAll();
+    }
+
+    @Test
+    void deleteUserRemovesSessionsProfileAndUser() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("target");
+
+        given(userRepo.findById(userId)).willReturn(Optional.of(user));
+
+        userService.deleteUser(userId);
+
+        then(sessionRepo).should().deleteByUserId(userId);
+        then(userProfileRepo).should().deleteById(userId);
+        then(userRepo).should().deleteById(userId);
+    }
+
+    @Test
+    void deleteNonexistentUserThrows() {
+        UUID userId = UUID.randomUUID();
+
+        given(userRepo.findById(userId)).willReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.deleteUser(userId));
+
+        then(sessionRepo).should(never()).deleteByUserId(any());
+        then(userProfileRepo).should(never()).deleteById(any());
+        then(userRepo).should(never()).deleteById(any());
+    }
+
+    @Test
+    void deleteUserWithNoDependencies() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("target");
+
+        given(userRepo.findById(userId)).willReturn(Optional.of(user));
+
+        userService.deleteUser(userId);
+
+        then(sessionRepo).should().deleteByUserId(userId);
+        then(userProfileRepo).should().deleteById(userId);
+        then(userRepo).should().deleteById(userId);
     }
 }

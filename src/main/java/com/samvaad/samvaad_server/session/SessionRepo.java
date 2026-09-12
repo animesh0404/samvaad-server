@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,4 +27,8 @@ public interface SessionRepo extends JpaRepository<Session, UUID> {
     @EntityGraph(attributePaths = "user")
     @Query("SELECT s FROM Session s WHERE s.sessionId = :sessionId")
     Optional<Session> findWithUserBySessionId(@Param("sessionId") UUID sessionId);
+
+    @Modifying
+    @Query("DELETE FROM Session s WHERE s.user.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
 }

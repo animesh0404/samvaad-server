@@ -10,6 +10,7 @@ import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.User;
+import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.UserRepo;
 import com.samvaad.samvaad_server.user.UserRole;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
@@ -28,11 +29,11 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -317,6 +318,99 @@ class SecurityIntegrationTest {
     @Test
     void unauthenticatedCannotListUsers() throws Exception {
         mockMvc.perform(get("/api/users"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminCanDeleteAnotherUser() throws Exception {
+        User admin = createUser("delete_admin", UserRole.ADMIN);
+        User user = createUser("delete_target", UserRole.USER);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void adminCanDeleteAnotherAdmin() throws Exception {
+        User admin1 = createUser("delete_admin1", UserRole.ADMIN);
+        User admin2 = createUser("delete_admin2", UserRole.ADMIN);
+        String token = loginAs(admin1).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", admin2.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void adminCannotDeleteSelf() throws Exception {
+        User admin = createUser("delete_self_admin", UserRole.ADMIN);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", admin.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void standardUserCannotDelete() throws Exception {
+        User admin = createUser("delete_std_admin", UserRole.ADMIN);
+        User user = createUser("delete_std_user", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", admin.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void standardUserCannotDeleteSelf() throws Exception {
+        User user = createUser("delete_std_self", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unauthenticatedCannotDelete() throws Exception {
+        mockMvc.perform(delete("/api/users/{userId}", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void nonexistentUserReturns404() throws Exception {
+        User admin = createUser("delete_notfound_admin", UserRole.ADMIN);
+        String token = loginAs(admin).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", UUID.randomUUID())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletedUsersSessionIsInvalidated() throws Exception {
+        User user = createUser("delete_invalidate_user", UserRole.USER);
+        LoginResponseDto login = loginAs(user);
+        String token = login.accessToken();
+        String refreshToken = login.refreshToken();
+
+        User admin = createUser("delete_invalidate_admin", UserRole.ADMIN);
+        String adminToken = loginAs(admin).accessToken();
+
+        mockMvc.perform(delete("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/{userId}", user.getUserId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }
