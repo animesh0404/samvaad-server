@@ -114,6 +114,32 @@ uses `403` rather than `404`.
 - The blocked-login security event is published when capacity is reached and is
   covered by authentication tests.
 
+## Spring Boot default user
+
+Spring Boot logs a generated security password and an
+`inMemoryUserDetailsManager` bean at startup. This is
+`UserDetailsServiceAutoConfiguration` fallback behavior: it activates because
+the application defines no `AuthenticationManager`,
+`AuthenticationProvider`, `UserDetailsService`,
+`AuthenticationManagerResolver`, or `JwtDecoder` bean and sets no
+`spring.security.user.*` properties.
+
+That fallback is intentionally unused. Samvaad authentication uses `UserRepo`
+plus `PasswordEncoder` for login, `JwtAuthenticationFilter` plus `SessionRepo`
+for request authentication, persisted sessions for refresh and
+logout/revocation, and `SecurityContextHolder` populated by the JWT filter for
+authorization. No part of the flow calls `UserDetailsService` or
+`AuthenticationManager`.
+
+Decision: leave the fallback alone. Do not add a `UserDetailsService`,
+`AuthenticationProvider`, or `AuthenticationManager` merely to suppress the
+startup message, do not introduce a second username/password path, and do not
+exclude Spring Security auto-configuration to remove the log. A
+`UserDetailsService` adapter would also mismatch login semantics (the login
+identifier is username-or-email, versus `loadUserByUsername`) and could bypass
+session-capacity locking, login events, and revocation checks. The generated
+password has no effect on Samvaad API authentication.
+
 ## Remaining implementation gaps
 
 - realtime transport authentication and realtime delivery of blocked-login
