@@ -1,0 +1,56 @@
+@startuml
+title Current implemented authentication and session model
+
+entity users {
+  * user_id : UUID <<PK>>
+  --
+  username : VARCHAR(32)
+  email : VARCHAR(320)
+  password_hash : VARCHAR(72)
+}
+
+entity sessions {
+  * session_id : UUID <<PK>>
+  --
+  user_id : UUID <<FK>>
+  refresh_token_hash : VARCHAR(128) <<unique, not null>>
+  refresh_token_expires_at : TIMESTAMP
+  installation_id : VARCHAR(255)
+  client_platform : VARCHAR(16)
+  client_name : VARCHAR(255)
+  client_version : VARCHAR(64)
+  last_seen_ip : VARCHAR(45)
+  last_seen_user_agent : VARCHAR(512)
+  last_authenticated_at : TIMESTAMP
+  revoked_at : TIMESTAMP <<nullable>>
+  revocation_reason : VARCHAR(32) <<nullable>>
+}
+
+users ||--o{ sessions : owns
+
+note right of sessions
+Current implemented HTTP authentication foundation:
+
+POST /api/auth/login
+  -> BCrypt verification
+  -> transactional session allocation
+  -> persisted refresh-token hash
+  -> session-bound JWT access token
+
+POST /api/auth/refresh
+  -> hash presented refresh token
+  -> validate session and expiry
+  -> rotate stored refresh-token hash
+  -> issue new session-bound JWT
+
+Access token lifetime: 1 day
+Refresh expiry: 30 days sliding
+Maximum active sessions: 5
+
+Not yet implemented:
+- authorization enforcement
+- logout/session revocation endpoints
+- realtime security-event delivery
+- realtime transport authentication
+end note
+@enduml
