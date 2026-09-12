@@ -1,7 +1,7 @@
 # Samvaad — Technical Design
 
-> **Status:** High-level server architecture is recorded. V1 user/authentication and relationship boundaries are aligned with ADRs 0007 and 0008.  
-> **Focus:** Backend/domain/protocol/persistence/concurrency.  
+> **Status:** High-level server architecture is recorded. V1 user/authentication and relationship boundaries are aligned with ADRs 0007 and 0008.
+> **Focus:** Backend/domain/protocol/persistence/concurrency.
 > **Rule:** Architectural invariants are fixed by ADRs; low-level mechanics are decided when the implementation creates a concrete need.
 
 ---
@@ -85,14 +85,14 @@ Profile reads and writes are intentionally different:
 READ
   own profile                         -> allowed
   ADMIN reading any profile           -> allowed
-  USER reading non-friend   -> denied
-  accepted friend reading profile    -> allowed
+  USER reading non-friend              -> denied
+  accepted friend reading profile     -> allowed
 
 WRITE
   own profile                         -> allowed
-  accepted friend editing friend     -> denied
-  ADMIN editing another profile      -> denied
-  ADMIN editing own profile           -> allowed
+  accepted friend editing friend      -> denied
+  ADMIN editing another profile       -> denied
+  ADMIN editing own profile            -> allowed
 ```
 
 Friendship grants mutual profile-read visibility, but never profile-edit permission. The accepted-friend check becomes an authorization input when the friendship model is implemented.
@@ -230,23 +230,21 @@ UNIQUE(username)
 
 Do not silently apply case-folding because usernames are case-sensitive.
 
----
+## 3.2 Email uniqueness
 
-## 3.2 Conversation uniqueness
+Non-null email addresses are unique case-insensitively. PostgreSQL enforces this with a unique index over `LOWER(email)` while allowing multiple `NULL` values.
+
+## 3.3 Conversation uniqueness
 
 ```text
 UNIQUE(normalizedParticipantA, normalizedParticipantB)
 ```
 
----
-
-## 3.3 Friendship/request consistency
+## 3.4 Friendship/request consistency
 
 For a pair of users, concurrent relationship requests must not create contradictory duplicate active relationships. The exact schema/index strategy is implementation-time work, but the application must define deterministic behavior for repeated requests and opposite-direction races.
 
----
-
-## 3.4 First-message atomicity
+## 3.5 First-message atomicity
 
 Conversation creation and first message creation occur in one transaction once messaging is authorized by accepted friendship.
 
@@ -263,9 +261,7 @@ persist message
 COMMIT
 ```
 
----
-
-## 3.5 Request idempotency
+## 3.6 Request idempotency
 
 A successful send request must be replay-safe.
 
@@ -275,15 +271,11 @@ The server needs a durable association between:
 requestId → accepted result/message
 ```
 
----
-
-## 3.6 Read monotonicity
+## 3.7 Read monotonicity
 
 The server must never accept a read position that moves backwards.
 
----
-
-## 3.7 Delete terminality
+## 3.8 Delete terminality
 
 A deleted message cannot later be edited or deleted again. A tombstone remains durable.
 
@@ -310,6 +302,8 @@ list users
 retrieve user records as permitted
 read any user profile
 delete user
+change own email
+change own password
 ```
 
 The administrator may not change another user's username, email, password, or personal profile.
@@ -354,7 +348,7 @@ Liquibase database initialization → create fixed ADMIN + empty UserProfile
 Application startup                 → no administrator mutation
 ```
 
-The initial administrator password is stored only as a BCrypt hash in the Liquibase seed. The known default-password lifecycle is intentionally a UI concern for the current backend slice; the backend does not yet enforce first-login password change.
+The initial administrator password is stored only as a BCrypt hash in the Liquibase seed. First-login enforcement requiring the administrator to change the known default password remains deferred; ordinary self-service password change is implemented.
 
 Password handling:
 
