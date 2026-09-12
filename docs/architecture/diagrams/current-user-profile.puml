@@ -6,6 +6,7 @@ entity users {
   --
   username : VARCHAR(32) <<unique, not null>>
   email : VARCHAR(320) <<nullable>>
+  password_hash : VARCHAR(72) <<nullable>>
   created_at : TIMESTAMP
   updated_at : TIMESTAMP
   created_by : VARCHAR(255)
@@ -30,8 +31,10 @@ entity user_profiles {
 
 users ||--o| user_profiles : shared user_id
 note right of user_profiles
-Current persisted model only.
-Authentication, sessions, conversations,
-and messages are not implemented.
+Current User/Profile persisted model only.
+Authentication and session persistence
+are documented separately.
+Conversations, messages, and realtime transport
+are not implemented.
 end note
 @enduml
