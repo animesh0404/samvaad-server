@@ -1,5 +1,8 @@
 package com.samvaad.samvaad_server.user.userprofile;
 
+import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
+import com.samvaad.samvaad_server.security.AuthenticatedUser;
+import com.samvaad.samvaad_server.security.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +20,10 @@ public class UserProfileController {
 
     @GetMapping
     public UserProfileDto getProfile(@PathVariable UUID userId) {
+        AuthenticatedUser caller = CurrentUser.require();
+        if (!ProfileAccessPolicy.canRead(caller, userId)) {
+            throw new ForbiddenOperationException();
+        }
         return userProfileService.getProfile(userId);
     }
 
@@ -24,6 +31,10 @@ public class UserProfileController {
     public UserProfileDto updateProfile(
             @PathVariable UUID userId,
             @Valid @RequestBody UserProfileUpdateDto updateDto) {
+        AuthenticatedUser caller = CurrentUser.require();
+        if (!ProfileAccessPolicy.canWrite(caller, userId)) {
+            throw new ForbiddenOperationException();
+        }
         return userProfileService.updateProfile(userId, updateDto);
     }
 }

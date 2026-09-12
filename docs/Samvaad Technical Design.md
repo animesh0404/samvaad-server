@@ -50,7 +50,7 @@ Rules:
 - username is unique
 - username is case-sensitive
 - username matches `[a-zA-Z0-9_]{3,32}`
-- role is exactly one of ADMIN or STANDARD_USER in V1
+- role is exactly one of ADMIN or USER in V1
 
 The authenticated user is derived from the server-side session.
 
@@ -85,7 +85,7 @@ Profile reads and writes are intentionally different:
 READ
   own profile                         -> allowed
   ADMIN reading any profile           -> allowed
-  STANDARD_USER reading non-friend   -> denied
+  USER reading non-friend   -> denied
   accepted friend reading profile    -> allowed
 
 WRITE
@@ -314,7 +314,7 @@ delete user
 
 The administrator may not change another user's username, email, password, or personal profile.
 
-### STANDARD_USER
+### USER
 
 A standard user may:
 
@@ -369,7 +369,7 @@ persist password hash only
 
 Plaintext passwords must never be persisted or logged.
 
-New provisioned users receive `STANDARD_USER`; the provisioning API cannot set a role. Username is immutable after creation.
+New provisioned users receive `USER`; the provisioning API cannot set a role. Username is immutable after creation.
 
 ---
 

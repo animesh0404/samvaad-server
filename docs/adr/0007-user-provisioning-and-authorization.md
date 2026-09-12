@@ -11,7 +11,7 @@ provisioned by an administrator. The account identity and personal profile are
 separate concepts, and administrative authority must be deliberately limited
 so that an administrator does not implicitly control a user's personal data.
 
-V1 authorization is based on two roles: `ADMIN` and `STANDARD_USER`. Identity
+V1 authorization is based on two roles: `ADMIN` and `USER`. Identity
 must always be derived from authenticated server-side session context rather
 than caller-supplied identity fields.
 
@@ -37,7 +37,7 @@ An authenticated administrator may create a user with:
 
 The server generates the permanent `userId`.
 
-Newly provisioned non-admin users are assigned the `STANDARD_USER` role. The
+Newly provisioned non-admin users are assigned the `USER` role. The
 caller cannot select or change the role through the provisioning API.
 
 Creating a `User` also creates its corresponding empty `UserProfile` in the same
@@ -49,10 +49,10 @@ there is no separate V1 "create profile" lifecycle endpoint.
 V1 has exactly one role per user:
 
 - `ADMIN`
-- `STANDARD_USER`
+- `USER`
 
 The role belongs to the `User` identity. The role column is non-null and defaults
-to `STANDARD_USER` for provisioned users. There is no role-change API in this
+to `USER` for provisioned users. There is no role-change API in this
 V1 slice.
 
 ### Username
@@ -107,7 +107,7 @@ Profile read access is relationship-aware:
 
 - every authenticated user may read their own profile;
 - an authenticated `ADMIN` may read any user's profile;
-- an authenticated `STANDARD_USER` may not read a non-friend's profile;
+- an authenticated `USER` may not read a non-friend's profile;
 - once two users have an accepted friendship, each friend may read the other
   user's profile;
 - friendship never grants profile edit permission.

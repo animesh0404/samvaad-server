@@ -23,7 +23,8 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
   user.
 - Profile fields include names, display name, bio, avatar URL, and status
   message.
-- User creation and lookup, profile GET, and profile PATCH endpoints exist.
+- User provisioning (`POST /api/users`, ADMIN-only), user lookup, profile GET, and
+  profile PATCH endpoints exist.
 - API DTOs are mapped separately from JPA entities.
 - The current auditor reports `"system"` as the actor.
 - Authentication login is implemented at `POST /api/auth/login` with BCrypt
@@ -40,6 +41,23 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
   `LoginBlockedDueToSessionLimitEvent`. The event is currently an internal
   application event; realtime delivery to authenticated sessions is not yet
   implemented.
+- The initial `ADMIN` is bootstrapped at startup from environment-provided
+  credentials. Bootstrap is idempotent, skips creation with a warning when
+  credentials are absent, and stores only a BCrypt hash.
+- V1 has exactly two roles, `ADMIN` and `USER`. Provisioned users are forced to
+  `USER`; callers cannot choose a role.
+- Admin-only provisioning requires a password, forces the `USER` role, hashes
+  the password with BCrypt, and never returns credential material.
+- `password_hash` is `NOT NULL`; the schema does not permit passwordless users.
+- Requests are authenticated from the access JWT: signature and expiry are
+  validated, the `sid` is resolved to a persisted session, the session must exist,
+  must not be revoked, and must not be past `refresh_token_expires_at`, and the
+  JWT `sub` must match the session's user. Missing/revoked/expired/mismatched
+  sessions are rejected with `401`.
+- Profile authorization is enforced from the authenticated session identity:
+  users may read and write their own profile, an `ADMIN` may read any profile but
+  may not write another user's profile, and cross-user access is rejected with
+  `403`.
 
 Maintained source diagrams:
 
@@ -48,11 +66,11 @@ Maintained source diagrams:
 
 ## Next planned work
 
-The authentication/session foundation is implemented, but the full
-authentication boundary is not complete. Remaining authentication work includes
-password-based registration, authorization enforcement, logout/session
-revocation operations, and realtime session authentication/security-event
-delivery.
+The authentication/session foundation and the V1 authorization boundary are
+implemented: admin bootstrap, admin-only provisioning with BCrypt passwords,
+JWT/session validation, and profile/account authorization are in place. Remaining
+authentication work includes logout/session revocation operations and realtime
+session authentication/security-event delivery.
 
 The planned protocol skeleton (CONNECT → LOGIN → LOGIN_SUCCESS) is also still
 pending; the current authentication endpoints are HTTP endpoints rather than the
@@ -69,8 +87,12 @@ deferred. V1 application-level encryption is also deferred; see ADR 0005.
 
 ## Known implementation gaps
 
-- Password-based registration is not yet part of the authentication flow.
-- Authorization enforcement and logout/session revocation are not yet complete.
+- Logout/session revocation HTTP operations are not yet implemented; session
+  revocation is otherwise enforced per request.
+- User listing, deletion, and user-owned email/password change operations are not
+  yet implemented.
+- Relationship-based profile visibility (friend-gated reads) is not yet
+  implemented; non-admin cross-user profile reads are denied.
 - Realtime transport authentication and realtime delivery of blocked-login
   security notifications are not implemented.
 - Messaging, conversations, blocking, read state, archive/mute, and transport

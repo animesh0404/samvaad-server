@@ -20,8 +20,12 @@ public class User extends AuditableEntity {
     @Column(name = "email", length = 320)
     private String email;
 
-    @Column(name = "password_hash", length = 72)
+    @Column(name = "password_hash", nullable = false, length = 72)
     private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 16)
+    private UserRole role = UserRole.USER;
 
     public User() {}
 
@@ -59,5 +63,13 @@ public class User extends AuditableEntity {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
     }
 }

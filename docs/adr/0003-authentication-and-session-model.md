@@ -57,7 +57,7 @@ Authentication proves identity; authorization determines whether that identity
 may perform an operation.
 
 Role and ownership enforcement is governed by ADR 0007. V1 has exactly one role
-per user: `ADMIN` or `STANDARD_USER`. There is no role-change API, and callers
+per user: `ADMIN` or `USER`. There is no role-change API, and callers
 cannot choose a role during normal user provisioning.
 
 In particular:

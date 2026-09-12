@@ -7,3 +7,7 @@ databaseChangeLog:
       file: db/changelog/changes/003-create-sessions.yaml
   - include:
       file: db/changelog/changes/004-add-user-password-hash.yaml
+  - include:
+      file: db/changelog/changes/005-add-user-role.yaml
+  - include:
+      file: db/changelog/changes/006-password-hash-not-null.yaml

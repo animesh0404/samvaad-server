@@ -8,6 +8,8 @@ public interface TokenService {
 
     String generateAccessToken(User user, UUID sessionId);
 
+    AccessTokenClaims parseAccessToken(String accessToken);
+
     String generateRefreshToken();
 
     String hashRefreshToken(String rawRefreshToken);

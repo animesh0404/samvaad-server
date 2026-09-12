@@ -14,11 +14,19 @@ public final class UserMapper {
         return user;
     }
 
+    public static User toEntity(CreateUserRequestDto dto) {
+        User user = new User();
+        user.setUsername(dto.getUsername());
+        user.setEmail(dto.getEmail());
+        return user;
+    }
+
     public static UserDto toDto(User user) {
         UserDto dto = new UserDto();
         dto.setUserId(user.getUserId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
+        dto.setRole(user.getRole());
         return dto;
     }
 

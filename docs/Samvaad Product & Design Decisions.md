@@ -109,7 +109,7 @@ email     optional
 
 The server generates the permanent `userId` and creates the empty `UserProfile` as part of the same user-creation lifecycle.
 
-Newly provisioned users are `STANDARD_USER` unless they are the explicitly bootstrapped administrator; the provisioning API cannot choose or change the role.
+Newly provisioned users are `USER` unless they are the explicitly bootstrapped administrator; the provisioning API cannot choose or change the role.
 
 ---
 
@@ -159,7 +159,7 @@ Samvaad distinguishes exactly one role per user:
 
 ```text
 ADMIN
-STANDARD_USER
+USER
 ```
 
 The initial bootstrap account is an administrator. There is no V1 role-change API, and clients cannot assign roles during provisioning.
@@ -211,7 +211,7 @@ Profile read and write permissions are deliberately different:
 READ
   own profile                         -> allowed
   ADMIN reading any profile           -> allowed
-  STANDARD_USER reading non-friend   -> denied
+  USER reading non-friend   -> denied
   accepted friend reading profile    -> allowed
 
 WRITE

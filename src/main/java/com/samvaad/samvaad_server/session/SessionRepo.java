@@ -2,6 +2,7 @@ package com.samvaad.samvaad_server.session;
 
 import com.samvaad.samvaad_server.user.User;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -21,4 +22,8 @@ public interface SessionRepo extends JpaRepository<Session, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Session s WHERE s.refreshTokenHash = :refreshTokenHash")
     Optional<Session> findByRefreshTokenHash(@Param("refreshTokenHash") String refreshTokenHash);
+
+    @EntityGraph(attributePaths = "user")
+    @Query("SELECT s FROM Session s WHERE s.sessionId = :sessionId")
+    Optional<Session> findWithUserBySessionId(@Param("sessionId") UUID sessionId);
 }

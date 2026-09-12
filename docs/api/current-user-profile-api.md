@@ -106,7 +106,11 @@ and persist only the resulting password hash.
 
 ### `GET /api/users/{userId}/profile`
 
-**Self-service only for V1.** Returns the authenticated user's profile.
+Returns the target user's profile, subject to V1 profile read authorization:
+the authenticated user may read their own profile, and an authenticated `ADMIN`
+may read any user's profile. A standard user may not read another user's profile
+in this slice; relationship-based (friend-gated) profile reads are deferred.
+Unauthorized cross-user reads are rejected with `403`.
 
 The profile contains fields such as:
 
@@ -123,8 +127,8 @@ statusMessage
 ### `PATCH /api/users/{userId}/profile`
 
 **Self-service only.** The authenticated user may update only their own profile.
-An administrator cannot use this endpoint to edit another user's personal
-profile.
+An administrator may update their own profile but cannot use this endpoint to
+edit another user's personal profile. Cross-user writes are rejected with `403`.
 
 Accepted fields:
 
@@ -183,7 +187,8 @@ from the initial friend-request slice.
 
 ## Relationship to current implementation
 
-The repository currently has the login/refresh foundation and user/profile
-HTTP implementation, while authorization enforcement, logout, password-aware
-user provisioning, user listing/deletion, user-owned account mutations, and
-friendship remain work to align the implementation with this V1 contract.
+The repository currently has the login/refresh foundation, admin bootstrap,
+ADMIN-only password-aware user provisioning with BCrypt hashes, JWT/session
+validation, and user/profile authorization. Remaining work to align with this
+V1 contract includes logout/session revocation, user listing/deletion,
+user-owned account mutations, and friendship.

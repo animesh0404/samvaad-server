@@ -13,6 +13,8 @@ public interface UserRepo extends JpaRepository<User, UUID> {
 
     boolean existsByUsername(String username);
 
+    boolean existsByRole(UserRole role);
+
     @Query("""
         SELECT u FROM User u
         WHERE u.username = :identifier

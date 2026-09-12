@@ -4,6 +4,7 @@ import com.samvaad.samvaad_server.TestcontainersConfiguration;
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
 import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
+import com.samvaad.samvaad_server.auth.token.AccessTokenClaims;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.Session;
@@ -175,6 +176,11 @@ class RefreshTokenIntegrationTest {
         @Override
         public String generateAccessToken(User user, UUID sessionId) {
             throw new IllegalStateException("Simulated access-token generation failure");
+        }
+
+        @Override
+        public AccessTokenClaims parseAccessToken(String accessToken) {
+            return delegate.parseAccessToken(accessToken);
         }
 
         @Override

@@ -1,6 +1,9 @@
 package com.samvaad.samvaad_server.auth.token;
 
+import com.samvaad.samvaad_server.auth.exception.InvalidAccessTokenException;
 import com.samvaad.samvaad_server.user.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +51,23 @@ public class JwtTokenService implements TokenService {
                 .expiration(expiry)
                 .signWith(signingKey)
                 .compact();
+    }
+
+    @Override
+    public AccessTokenClaims parseAccessToken(String accessToken) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(accessToken)
+                    .getPayload();
+
+            UUID userId = UUID.fromString(claims.getSubject());
+            UUID sessionId = UUID.fromString(claims.get("sid", String.class));
+            return new AccessTokenClaims(userId, sessionId);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new InvalidAccessTokenException("Invalid access token", e);
+        }
     }
 
     @Override

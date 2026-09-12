@@ -17,6 +17,8 @@ public class UserDto {
 
     private String email;
 
+    private UserRole role;
+
     public UserDto() { }
 
     public UserDto(UUID userId, String username) {
@@ -43,4 +45,8 @@ public class UserDto {
     public String getEmail() { return email; }
 
     public void setEmail(String email) { this.email = email; }
+
+    public UserRole getRole() { return role; }
+
+    public void setRole(UserRole role) { this.role = role; }
 }

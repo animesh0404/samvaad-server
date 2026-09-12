@@ -67,6 +67,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(ex.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenOperationException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleForbidden(ForbiddenOperationException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
     public record ErrorResponse(String message) {
     }
 }

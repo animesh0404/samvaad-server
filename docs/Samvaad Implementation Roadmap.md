@@ -39,7 +39,7 @@ Locked V1 decisions now include:
 - `User` and `UserProfile` remain separate
 - `UserProfile` is automatically created with `User`
 - no separate V1 create-profile lifecycle endpoint
-- ADMIN and STANDARD_USER roles
+- ADMIN and USER roles
 - administrator may create, list, retrieve as permitted, and delete users
 - administrator may not change another user's username, email, password, or profile
 - users may change their own email, password, and profile
@@ -102,11 +102,11 @@ ADMIN login
         ↓
 authenticated ADMIN
         ↓
-create STANDARD_USER(username, password, optional email)
+create USER(username, password, optional email)
         ↓
 User + empty UserProfile
         ↓
-STANDARD_USER login
+USER login
         ↓
 user manages own email/password/profile
 ```
