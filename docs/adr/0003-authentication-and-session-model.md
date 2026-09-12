@@ -7,7 +7,11 @@ Accepted.
 ## Decision
 
 Samvaad V1 uses admin-provisioned accounts. There is no public self-registration.
-The initial administrator is bootstrapped during first-time application setup.
+The initial administrator is bootstrapped during application startup from
+environment-provided credentials. Bootstrap is idempotent: if an administrator
+already exists, startup performs no mutation. If credentials are absent, startup
+warns and continues without creating an administrator. Bootstrap credentials are
+never logged, committed to source control, or persisted in plaintext.
 
 Passwords use BCrypt with generated salt. Plaintext passwords are neither
 persisted nor logged.
@@ -52,15 +56,49 @@ usernames/emails and session-state failures use a generic authentication failure
 Authentication proves identity; authorization determines whether that identity
 may perform an operation.
 
-Role and ownership enforcement is governed by ADR 0007. In particular:
+Role and ownership enforcement is governed by ADR 0007. V1 has exactly one role
+per user: `ADMIN` or `STANDARD_USER`. There is no role-change API, and callers
+cannot choose a role during normal user provisioning.
 
-- administrators provision/list/retrieve/delete users as permitted by the API
+In particular:
+
+- administrators may create users, list users, retrieve permitted user records,
+  delete users, and read any user's profile
 - administrators cannot mutate another user's username, email, password, or profile
+- administrators may mutate their own profile through normal self-service
 - standard users may mutate only their own email, password, and profile
+- standard users may read their own profile and, once an accepted friendship
+  exists, the other user's profile
+- friendship grants profile-read visibility only; it never grants profile-edit
+  permission
 - username is immutable after account creation
 
 The server derives authenticated `userId` from session context rather than
 trusting a caller-supplied identity.
+
+For every authenticated request, the access JWT is validated for signature and
+expiration, then its `sid` is resolved against the server-side session. The
+session must exist, must not be revoked, and must not be past
+`refresh_token_expires_at`. The JWT `sub` must match the session's user. A valid
+JWT with a missing, revoked, or expired session is rejected with `401`.
+
+Session validation is performed per authenticated request to preserve immediate
+revocation semantics; V1 does not require a long-lived session-validation cache.
+
+The existing login identifier behavior remains username-or-email based. Username
+is still the exact messaging discovery key; email is not the V1 messaging
+discovery key.
+
+Protected-endpoint authorization uses the following HTTP semantics:
+
+- unauthenticated access: `401 Unauthorized`
+- authenticated but not permitted: `403 Forbidden`
+- invalid, expired, revoked, or session-missing access token: `401`
+- validation failure: `400`
+- duplicate username: `409`
+
+The existing API error body shape is preserved for this slice. Cross-user denial
+uses `403` rather than `404`.
 
 ## Current implementation evidence
 
@@ -80,6 +118,7 @@ trusting a caller-supplied identity.
 
 - safe first-time bootstrap of the initial ADMIN account
 - password-aware, admin-only user provisioning
+- JWT request-filter/session validation
 - complete authorization enforcement
 - `POST /api/auth/logout`
 - required session-revocation HTTP operations
@@ -101,5 +140,5 @@ session so multiple application instances cannot exceed the limit.
 ## Source material
 
 - `docs/adr/0007-user-provisioning-and-authorization.md`
-- `docs/Samvaad Product & Design Decisions.md`, sections 3–5
-- `docs/Samvaad Technical Design.md`, sections 12–14
+- `docs/Samvaad Product & Design Decisions.md`
+- `docs/Samvaad Technical Design.md`
