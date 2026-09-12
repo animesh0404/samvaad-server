@@ -13,6 +13,52 @@ The versions and tools below are derived directly from the repository configurat
 - **Framework**: Spring Boot 4.1.1
 - **Database**: PostgreSQL 18 (configured via Docker Compose in `compose.yaml`)
 - **Container Runtime**: Docker (required for Docker Compose or Testcontainers)
+- **Local environment loading**: `direnv` (used to load the local `.env` file)
+
+### Local environment variables
+
+The application requires `SAMVAAD_JWT_SECRET` for the JWT signing configuration. The real local secret must not be committed.
+
+Create the local environment file from the committed example:
+
+```bash
+cp .env.example .env
+```
+
+Generate a development secret:
+
+```bash
+openssl rand -base64 32
+```
+
+Put the generated value in `.env`:
+
+```dotenv
+SAMVAAD_JWT_SECRET=<your-local-secret>
+```
+
+Samvaad uses `direnv` to load `.env` automatically when entering the repository. The repository's `.envrc` contains the `dotenv` directive.
+
+If `direnv` is not already integrated with Bash, add its hook and reload the shell:
+
+```bash
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Allow the repository environment:
+
+```bash
+direnv allow
+```
+
+Verify that the variable is loaded without printing the secret:
+
+```bash
+test -n "$SAMVAAD_JWT_SECRET" && echo "JWT secret loaded" || echo "JWT secret missing"
+```
+
+`.env` and `.envrc` are local-only and are excluded by `.gitignore`. `.env.example` is safe to commit and must contain only a placeholder value.
 
 ---
 
@@ -72,7 +118,8 @@ When running against the Compose-managed PostgreSQL database:
    ```bash
    docker compose up -d
    ```
-2. Start the Spring Boot application:
+2. Ensure `SAMVAAD_JWT_SECRET` is loaded as described above.
+3. Start the Spring Boot application:
    ```bash
    ./gradlew bootRun
    ```
