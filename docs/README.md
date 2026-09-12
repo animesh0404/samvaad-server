@@ -14,7 +14,7 @@ When reading or contributing to documentation and code, distinguish carefully be
 | **DEFERRED** | An intentionally postponed design decision or feature area where resolution is scheduled for a later phase or when concrete needs arise. Must not be implemented prematurely or presented as already decided. | V1 application-level profile/message encryption; exact JWT key management/rotation; transport reconnect mechanics; pagination cursor protocol. |
 | **Implementation-time decisions** | Tactical details deliberately left open during high-level design to be resolved by concrete implementation constraints and empirical evidence as vertical slices are built. | Field-level Bean Validation constraints; Jackson serialization configs; mapper method structures. |
 | **Current implementation** | What is actually written, tested, and executable in the repository right now. | User/profile HTTP endpoints; BCrypt-backed login; persisted sessions; session-bound JWT access tokens; rotating refresh tokens; five-session capacity enforcement; Liquibase migrations. |
-| **Known implementation gaps** | Specific divergences between current codebase behavior and accepted design or API contracts that remain to be resolved. | Authorization enforcement; logout/session-revocation operations; realtime delivery of blocked-login security events; messaging/transport; profile PATCH field-presence semantics. |
+| **Known implementation gaps** | Specific divergences between current codebase behavior and accepted design or API contracts that remain to be resolved. | Password registration; authorization enforcement; logout/session-revocation operations; realtime delivery of blocked-login security events; messaging/transport; profile PATCH field-presence semantics. |
 
 ---
 
@@ -29,7 +29,7 @@ These three original records contain the product rationale, technical architectu
 - **[Samvaad Technical Design](Samvaad%20Technical%20Design.md)**  
   System architecture, entity relationships, database constraints, protocol flows, and security boundaries.
 - **[Samvaad Implementation Roadmap](Samvaad%20Implementation%20Roadmap.md)**  
-  Phased implementation plan detailing vertical slices from project bootstrap to V1 readiness.
+  Phased implementation plan detailing vertical slices from project bootstrap to V1 readiness. It records actual implementation status even when work proceeds out of numerical phase order.
 
 ### 2. Architecture Decision Records (ADRs)
 
@@ -48,7 +48,7 @@ ADRs record durable decisions and their trade-offs concisely for fast reference 
 Concise technical snapshots of the current codebase state:
 
 - **Architecture**: **[Current Implementation State](architecture/current-state.md)**  
-  Summary of implemented layers, database models, remaining authentication work, next planned slices, and maintained [diagrams](architecture/diagrams/current-user-profile.puml).
+  Summary of implemented layers, database models, remaining authentication work, next planned slices, and maintained [architecture diagrams](architecture/diagrams/current-user-profile.puml).
 - **API**: **[Current User and Profile API](api/current-user-profile-api.md)**  
   Contract, payload schemas, and known gaps for implemented HTTP endpoints, including the current login and refresh endpoints.
 - **Security**: **[Current Security Posture](security/current-security-posture.md)**  
