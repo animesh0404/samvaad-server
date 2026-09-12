@@ -1,7 +1,7 @@
 # Samvaad — Implementation Roadmap
 
-> **Status:** High-level design complete.  
-> **Next phase:** Implement the first backend vertical slice.  
+> **Status:** High-level design complete; authentication/session foundation partially implemented.  
+> **Next phase:** Complete the remaining authentication boundary, then establish the realtime protocol skeleton.  
 > **Working philosophy:** Do not turn every implementation detail into a design meeting.
 
 ---
@@ -10,7 +10,10 @@
 
 The high-level backend design phase is **COMPLETE**.
 
-We have enough locked invariants to begin writing code.
+Implementation is now underway. The HTTP authentication/session foundation has
+been implemented ahead of the originally planned realtime protocol skeleton.
+The roadmap therefore records actual implementation state rather than assuming
+that phases were completed strictly in numerical order.
 
 We intentionally stopped the exhaustive-specification phase because continuing to decide every low-level detail before implementation would create a false sense of certainty.
 
@@ -65,7 +68,11 @@ Locked areas include:
 
 # 4. Phase 1 — Protocol Skeleton
 
-**STATUS: NEXT**
+**STATUS: PENDING**
+
+This phase remains pending. The current repository has an HTTP authentication
+surface, but the planned realtime CONNECT/LOGIN/LOGIN_SUCCESS protocol and
+command/event envelope have not yet been implemented.
 
 Goal: establish the smallest coherent server/client protocol before building the complete domain.
 
@@ -98,20 +105,39 @@ A minimal test client can:
 
 # 5. Phase 2 — User & Authentication
 
-Goal: build the actual authentication boundary.
+**STATUS: PARTIALLY COMPLETE**
 
-Implement:
+The authentication/session foundation is implemented over HTTP. The remaining
+work is to complete the authentication boundary and its lifecycle operations.
+
+### Implemented
 
 - User persistence
 - UserProfile persistence
-- registration
-- bcrypt password hashing
-- login
-- JWT access token
-- refresh token
-- session persistence
+- BCrypt password verification
+- HTTP login at `POST /api/auth/login`
+- JWT access-token issuance
+- persisted client sessions
+- session-bound JWT access tokens
+- refresh-token issuance
+- HTTP refresh at `POST /api/auth/refresh`
+- hashed refresh-token persistence
+- session-scoped refresh-token rotation
+- 30-day sliding refresh expiry
+- one-day access-token lifetime
+- five-active-session capacity limit
+- transactional login capacity enforcement with user-row serialization
+- blocked-login event publication when capacity is reached
+- authentication/session unit and integration tests, including login/refresh concurrency tests
+
+### Remaining
+
+- password-based registration flow
+- authorization enforcement for protected operations
 - logout
-- session revocation
+- session revocation operations
+- realtime delivery of blocked-login security notifications
+- binding authenticated realtime connections to session-derived identity
 
 Current token policy:
 
@@ -142,29 +168,30 @@ reject
 
 No absolute session lifetime in V1.
 
-### Acceptance
+### Current acceptance state
 
-A client can:
+The implemented HTTP path can:
 
 ```text
-register
-  ↓
 login
   ↓
 receive tokens
   ↓
-authenticate
+refresh
   ↓
-logout
-  ↓
-session becomes invalid
+receive rotated tokens
 ```
+
+The original end-to-end registration → login → authenticated realtime session →
+logout acceptance flow is **not yet complete**.
 
 ---
 
 # 6. Phase 3 — Minimal Send Message
 
 This is the first genuinely useful vertical slice.
+
+**STATUS: PENDING**
 
 Goal:
 
@@ -218,6 +245,8 @@ Retrying the same `requestId` never creates a second message.
 
 Goal: make the second user receive messages reliably.
 
+**STATUS: PENDING**
+
 Implement:
 
 - NEW_MESSAGE
@@ -249,6 +278,8 @@ Multiple active sessions do not create duplicate message records.
 # 8. Phase 5 — History & Pagination
 
 Goal: durable message retrieval.
+
+**STATUS: PENDING**
 
 Implement:
 
@@ -284,6 +315,8 @@ A conversation with a large history can be opened without loading all messages.
 
 Goal: account-level monotonic read state.
 
+**STATUS: PENDING**
+
 Implement:
 
 ```text
@@ -312,6 +345,8 @@ If laptop marks through sequence 100, phone cannot move the account back to 90.
 
 Goal: editing and deletion.
 
+**STATUS: PENDING**
+
 Implement:
 
 ```text
@@ -339,6 +374,8 @@ Concurrent edit/delete tests resolve deterministically.
 
 Goal: first-class reply relationships.
 
+**STATUS: PENDING**
+
 Implement:
 
 ```text
@@ -360,6 +397,8 @@ A reply remains durable even when its parent is deleted.
 ---
 
 # 12. Phase 9 — Archive, Mute & Blocking
+
+**STATUS: PENDING**
 
 Implement per-user conversation state.
 
@@ -411,6 +450,8 @@ A blocked sender cannot queue or persist a message.
 
 This phase deliberately waits until the preceding slices exist.
 
+**STATUS: PENDING**
+
 Implement:
 
 - startup synchronization
@@ -426,6 +467,8 @@ The existing idempotency invariant gives us a foundation for safe retries.
 ---
 
 # 14. Phase 11 — Hardening
+
+**STATUS: PENDING**
 
 Once the core path works, add:
 
@@ -542,30 +585,12 @@ Do not require the entire future system to be designed before declaring a slice 
 
 # 18. Immediate Next Step
 
-The next concrete engineering task is:
+Complete the remaining authentication boundary before declaring Phase 2 complete:
 
-## Build the protocol skeleton for authentication.
+1. implement password-based registration
+2. implement authorization enforcement
+3. implement logout/session revocation
+4. define and implement authenticated realtime session handling
+5. then build the minimal protocol skeleton from CONNECT → LOGIN → LOGIN_SUCCESS
 
-Start with an example:
-
-```text
-Client
-  │
-  │ CONNECT
-  ▼
-Server
-  │
-  │ LOGIN(username, password)
-  ▼
-Authentication
-  │
-  │ validate credentials
-  │ create session
-  │ issue JWT + refresh token
-  ▼
-LOGIN_SUCCESS
-```
-
-Then implement that minimal path in Java.
-
-After it works, we can decide the next implementation detail from the evidence rather than from speculation.
+After that works, move to the first messaging vertical slice.
