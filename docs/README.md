@@ -11,10 +11,10 @@ When reading or contributing to documentation and code, distinguish carefully be
 | Term | Meaning & Rule | Example in Samvaad |
 | --- | --- | --- |
 | **LOCKED** | An accepted, binding architectural or product decision recorded in the canonical design documents or ADRs. Must not be silently bypassed, overridden, or reopened; any conflict requires raising an explicit decision. | Server-authoritative state; User/UserProfile boundary; BCrypt passwords; exclusion of E2EE, groups, and reactions from V1. |
-| **DEFERRED** | An intentionally postponed design decision or feature area where resolution is scheduled for a later phase or when concrete needs arise. Must not be implemented prematurely or presented as already decided. | V1 application-level profile/message encryption; exact JWT key management; transport reconnect mechanics; pagination cursor protocol. |
+| **DEFERRED** | An intentionally postponed design decision or feature area where resolution is scheduled for a later phase or when concrete needs arise. Must not be implemented prematurely or presented as already decided. | V1 application-level profile/message encryption; exact JWT key management/rotation; transport reconnect mechanics; pagination cursor protocol. |
 | **Implementation-time decisions** | Tactical details deliberately left open during high-level design to be resolved by concrete implementation constraints and empirical evidence as vertical slices are built. | Field-level Bean Validation constraints; Jackson serialization configs; mapper method structures. |
-| **Current implementation** | What is actually written, tested, and executable in the repository right now. | User creation/lookup endpoints; UserProfile GET/PATCH endpoints; Liquibase migrations; fixed "system" auditor. |
-| **Known implementation gaps** | Specific divergences between current codebase behavior and accepted design or API contracts that remain to be resolved. | Profile PATCH cannot yet differentiate omitted fields from explicit `null` (ADR 0006); authentication/authorization are absent; messaging is absent. |
+| **Current implementation** | What is actually written, tested, and executable in the repository right now. | User/profile HTTP endpoints; BCrypt-backed login; persisted sessions; session-bound JWT access tokens; rotating refresh tokens; five-session capacity enforcement; Liquibase migrations. |
+| **Known implementation gaps** | Specific divergences between current codebase behavior and accepted design or API contracts that remain to be resolved. | Authorization enforcement; logout/session-revocation operations; realtime delivery of blocked-login security events; messaging/transport; profile PATCH field-presence semantics. |
 
 ---
 
@@ -38,7 +38,7 @@ ADRs record durable decisions and their trade-offs concisely for fast reference 
 - **[ADR Index](adr/README.md)**: Overview and indexing rules.
 - **[ADR 0001: Server-Authoritative Identity and State](adr/0001-server-authoritative-identity-and-state.md)**: Server maintains authority over all identities, state transitions, and client claims.
 - **[ADR 0002: User/Profile Boundary and Email Ownership](adr/0002-user-profile-boundary-and-email-ownership.md)**: Email belongs to the `User` identity entity; public profile attributes live in `UserProfile`.
-- **[ADR 0003: Authentication and Session Model](adr/0003-authentication-and-session-model.md)**: BCrypt password hashing, session-derived identity, JWT access tokens, and rotating refresh tokens.
+- **[ADR 0003: Authentication and Session Model](adr/0003-authentication-and-session-model.md)**: BCrypt password hashing, session-derived identity, JWT access tokens, and rotating refresh tokens; implementation status is tracked in the ADR.
 - **[ADR 0004: Conversation and Message Integrity](adr/0004-conversation-and-message-integrity.md)**: Direct conversation invariants, message idempotency keys, and append-only message sequencing.
 - **[ADR 0005: V1 Scope and Data-Protection Boundary](adr/0005-v1-scope-and-data-protection-boundary.md)**: Clear V1 non-goals (no E2EE, groups, or rich text) and deferral of application-level encryption.
 - **[ADR 0006: Profile PATCH Field-Presence Semantics](adr/0006-profile-patch-field-presence.md)**: Contract for partial updates (omitted = unchanged, non-null = replace, null = clear).
@@ -48,19 +48,19 @@ ADRs record durable decisions and their trade-offs concisely for fast reference 
 Concise technical snapshots of the current codebase state:
 
 - **Architecture**: **[Current Implementation State](architecture/current-state.md)**  
-  Summary of implemented layers, database models, next planned slice, and maintained [diagrams](architecture/diagrams/current-user-profile.puml).
+  Summary of implemented layers, database models, remaining authentication work, next planned slices, and maintained [diagrams](architecture/diagrams/current-user-profile.puml).
 - **API**: **[Current User and Profile API](api/current-user-profile-api.md)**  
-  Contract, payload schemas, and known gaps for implemented HTTP endpoints (`POST /api/users`, `GET /api/users/{userId}`, `GET /api/users/{userId}/profile`, `PATCH /api/users/{userId}/profile`).
+  Contract, payload schemas, and known gaps for implemented HTTP endpoints, including the current login and refresh endpoints.
 - **Security**: **[Current Security Posture](security/current-security-posture.md)**  
-  Assessment of active security controls, plaintext persistence status, and requirements for the upcoming authentication slice.
+  Factual snapshot of active security controls, persistence of sensitive values, authentication/session implementation, and remaining security gaps.
 
 ### 4. Developer Guides
 
 Guides for developers and coding tools onboarding into the codebase:
 
 - **[Environment Setup](development/setup.md)**  
-  Prerequisites, toolchain requirements (Java 25, Gradle 9.7.0, PostgreSQL 18), Docker Compose, Testcontainers dev mode, and build commands.
+  Prerequisites, toolchain requirements (Java 25, Gradle 9.7.0, PostgreSQL 18), Docker Compose, Testcontainers dev mode, environment-secret setup, and build commands.
 - **[Testing Guide](development/testing.md)**  
-  Test suite structure (unit mappers, MockMvc controllers, Testcontainers context verification) and Gradle test execution commands.
+  Test suite structure across user/profile, authentication/session, concurrency, and Spring/Testcontainers verification, plus Gradle test execution commands.
 - **[Agent Guidance](../AGENTS.md)**  
   Rules of engagement and guardrails for AI coding assistants working in this repository.
