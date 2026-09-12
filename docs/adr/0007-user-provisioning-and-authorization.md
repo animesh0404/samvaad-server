@@ -30,9 +30,9 @@ the database merely to establish the initial administrator.
 
 The seeded development/deployment bootstrap credential uses the fixed initial
 administrator account defined by the migration. The initial password is a
-known default and password-change enforcement is intentionally outside the
-current backend slice; the UI will force the administrator to change it when
-that frontend flow is implemented.
+known default. Self-service password change is implemented, but first-login
+enforcement requiring the administrator to change that default remains outside
+the current backend slice.
 
 ### User provisioning
 
@@ -79,7 +79,12 @@ only the resulting hash is persisted. Plaintext passwords are never persisted,
 logged, emitted in events, or returned by the API.
 
 After creation, changing email is a user-owned operation; the admin may not edit
-it in V1. The user may change their own password after authentication.
+another user's email in V1. The user may change their own password after
+authentication. The same self-service operations are available to an administrator
+for their own account.
+
+Email is case-insensitively unique for non-null values and the database enforces
+that invariant. Duplicate email attempts return `409 Conflict`.
 
 ### Administrator permissions
 
@@ -90,10 +95,11 @@ For V1, an administrator may:
 - retrieve user records as permitted by the API
 - delete users
 - read any user's `UserProfile`
+- change their own email and password through self-service operations
 
-An administrator may **not** edit an existing user's username, password, email,
-or `UserProfile`. An administrator may edit their own profile through the normal
-self-service profile operation.
+An administrator may **not** edit another existing user's username, password,
+email, or `UserProfile`. An administrator may edit their own profile through the
+normal self-service profile operation.
 
 Deleting a user is the V1 administrative mechanism for removing/revoking that
 account. Account pausing, suspension, or temporary disablement is deferred.
@@ -168,7 +174,7 @@ exact V1 discovery key; email is not used as the messaging discovery key.
 - an authenticated user lacking permission returns `403 Forbidden`;
 - invalid, expired, revoked, or session-missing access tokens return `401`;
 - validation failures remain `400`;
-- duplicate username remains `409`.
+- duplicate username or email returns `409`.
 
 The existing API error body shape is preserved for this slice. Cross-user denial
 uses `403` rather than `404`.
