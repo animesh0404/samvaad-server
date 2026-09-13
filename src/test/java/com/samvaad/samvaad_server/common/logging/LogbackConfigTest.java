@@ -68,6 +68,14 @@ class LogbackConfigTest {
     }
 
     @Test
+    void includesApplicationIdentifierInConsoleAndFilePatterns() throws Exception {
+        String xml = logbackXml();
+        int occurrences = xml.split("\\[samvaad-server\\]", -1).length - 1;
+        assertTrue(occurrences >= 2,
+                "samvaad-server identifier must appear in both console and file patterns");
+    }
+
+    @Test
     void testsDoNotWriteRepositoryLogFiles() throws Exception {
         String yaml = testApplicationYaml();
         assertTrue(yaml.contains("build/logs/"),

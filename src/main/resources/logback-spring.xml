@@ -13,7 +13,7 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{traceId}] [%thread] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [samvaad-server] [%X{traceId}] [%thread] %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -28,7 +28,7 @@
             <maxFileSize>${SAMVAAD_LOG_MAX_SIZE}</maxFileSize>
         </triggeringPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{traceId}] [%thread] %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [samvaad-server] [%X{traceId}] [%thread] %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
