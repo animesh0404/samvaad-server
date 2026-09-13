@@ -95,6 +95,33 @@ class AuthControllerTest {
     }
 
     @Test
+    void logsInSuccessfullyWithoutInstallationId() throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        LoginResponseDto response = new LoginResponseDto(
+                "mock-jwt-token",
+                "mock-refresh-token",
+                86400L,
+                sessionId
+        );
+
+        given(authenticationService.login(any(LoginRequestDto.class), any(), any()))
+                .willReturn(response);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "identifier": "animesh",
+                                  "password": "secretpassword",
+                                  "clientPlatform": "TUI"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("mock-jwt-token"))
+                .andExpect(jsonPath("$.sessionId").value(sessionId.toString()));
+    }
+
+    @Test
     void rejectsInvalidPayloadWithBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

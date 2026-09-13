@@ -26,6 +26,11 @@ public class SessionService {
         );
     }
 
+    /**
+     * Creates a session. {@code installationId} is optional client/device metadata
+     * and may be null. Blank handling is done by the caller; this method persists
+     * the value unchanged.
+     */
     public Session createSession(
             User user,
             String refreshTokenHash,

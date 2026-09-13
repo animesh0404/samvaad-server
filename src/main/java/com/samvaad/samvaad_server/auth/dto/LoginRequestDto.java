@@ -12,7 +12,7 @@ public class LoginRequestDto {
     @NotBlank(message = "Password must not be blank")
     private String password;
 
-    @NotBlank(message = "Installation ID must not be blank")
+    // Optional client/device metadata. Null when the client has no installation identity.
     private String installationId;
 
     @NotNull(message = "Client platform is required")

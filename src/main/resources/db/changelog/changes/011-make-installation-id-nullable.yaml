@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-make-installation-id-nullable
+      author: Animesh Kahara
+      changes:
+        - dropNotNullConstraint:
+            tableName: sessions
+            columnName: installation_id
+            columnDataType: VARCHAR(255)

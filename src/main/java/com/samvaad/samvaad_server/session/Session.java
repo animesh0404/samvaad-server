@@ -26,7 +26,7 @@ public class Session extends AuditableEntity {
     @Column(name = "refresh_token_expires_at", nullable = false)
     private LocalDateTime refreshTokenExpiresAt;
 
-    @Column(name = "installation_id", nullable = false, length = 255)
+    @Column(name = "installation_id", length = 255)
     private String installationId;
 
     @Enumerated(EnumType.STRING)

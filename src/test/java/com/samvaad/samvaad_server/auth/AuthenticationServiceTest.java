@@ -297,4 +297,155 @@ class AuthenticationServiceTest {
                 authenticationService.login(request, "127.0.0.1", "Mozilla/5.0")
         );
     }
+
+    @Test
+    void successfullyLogsInWithoutInstallationId() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("animesh");
+        user.setPasswordHash("hashed-password");
+
+        LoginRequestDto request = new LoginRequestDto(
+                "animesh",
+                "correct-password",
+                null,
+                ClientPlatform.WEB,
+                "Web Client",
+                "1.0.0"
+        );
+
+        given(userRepo.findByIdentifier("animesh")).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("correct-password", "hashed-password")).willReturn(true);
+
+        given(transactionTemplate.execute(any())).willAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(sessionService.countActiveSessions(user)).willReturn(2L);
+        given(tokenService.generateRefreshToken()).willReturn("raw-refresh-token");
+        given(tokenService.hashRefreshToken("raw-refresh-token")).willReturn("hashed-refresh-token");
+        given(tokenService.getRefreshTokenValidityDays()).willReturn(30L);
+        given(tokenService.getAccessTokenValiditySeconds()).willReturn(86400L);
+
+        Session session = new Session();
+        session.setSessionId(sessionId);
+        given(sessionService.createSession(
+                eq(user),
+                eq("hashed-refresh-token"),
+                any(LocalDateTime.class),
+                isNull(),
+                eq(ClientPlatform.WEB),
+                eq("Web Client"),
+                eq("1.0.0"),
+                eq("127.0.0.1"),
+                eq("Mozilla/5.0")
+        )).willReturn(session);
+
+        given(tokenService.generateAccessToken(user, sessionId)).willReturn("jwt-access-token");
+
+        LoginResponseDto response = authenticationService.login(request, "127.0.0.1", "Mozilla/5.0");
+
+        assertNotNull(response);
+        assertEquals("jwt-access-token", response.accessToken());
+        assertEquals(sessionId, response.sessionId());
+    }
+
+    @Test
+    void normalizesBlankInstallationIdToNull() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("animesh");
+        user.setPasswordHash("hashed-password");
+
+        LoginRequestDto request = new LoginRequestDto(
+                "animesh",
+                "correct-password",
+                "   ",
+                ClientPlatform.TUI,
+                null,
+                null
+        );
+
+        given(userRepo.findByIdentifier("animesh")).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("correct-password", "hashed-password")).willReturn(true);
+
+        given(transactionTemplate.execute(any())).willAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(sessionService.countActiveSessions(user)).willReturn(0L);
+        given(tokenService.generateRefreshToken()).willReturn("raw-refresh-token");
+        given(tokenService.hashRefreshToken("raw-refresh-token")).willReturn("hashed-refresh-token");
+        given(tokenService.getRefreshTokenValidityDays()).willReturn(30L);
+        given(tokenService.getAccessTokenValiditySeconds()).willReturn(86400L);
+
+        Session session = new Session();
+        session.setSessionId(sessionId);
+        given(sessionService.createSession(
+                eq(user),
+                eq("hashed-refresh-token"),
+                any(LocalDateTime.class),
+                isNull(),
+                eq(ClientPlatform.TUI),
+                isNull(),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("Mozilla/5.0")
+        )).willReturn(session);
+
+        given(tokenService.generateAccessToken(user, sessionId)).willReturn("jwt-access-token");
+
+        LoginResponseDto response = authenticationService.login(request, "127.0.0.1", "Mozilla/5.0");
+
+        assertNotNull(response);
+        assertEquals(sessionId, response.sessionId());
+    }
+
+    @Test
+    void blocksLoginWithNullInstallationIdAndPublishesNullInEvent() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("animesh");
+        user.setPasswordHash("hashed-password");
+
+        LoginRequestDto request = new LoginRequestDto(
+                "animesh",
+                "correct-password",
+                null,
+                ClientPlatform.WEB,
+                null,
+                null
+        );
+
+        given(userRepo.findByIdentifier("animesh")).willReturn(Optional.of(user));
+        given(passwordEncoder.matches("correct-password", "hashed-password")).willReturn(true);
+
+        given(transactionTemplate.execute(any())).willAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(sessionService.countActiveSessions(user)).willReturn(5L);
+
+        assertThrows(SessionLimitExceededException.class, () ->
+                authenticationService.login(request, "127.0.0.1", "Mozilla/5.0")
+        );
+
+        ArgumentCaptor<LoginBlockedDueToSessionLimitEvent> eventCaptor =
+                ArgumentCaptor.forClass(LoginBlockedDueToSessionLimitEvent.class);
+        then(eventPublisher).should().publishEvent(eventCaptor.capture());
+
+        LoginBlockedDueToSessionLimitEvent event = eventCaptor.getValue();
+        assertEquals(userId, event.userId());
+        assertNull(event.installationId());
+
+        then(sessionService).should(never()).createSession(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
 }

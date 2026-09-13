@@ -66,13 +66,17 @@ public class AuthenticationService {
             User lockedUser = userRepo.findByIdWithLock(user.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(user.getUserId()));
 
+            // Single normalization boundary: blank/whitespace-only becomes null.
+            // Non-blank values are persisted unchanged. No synthetic IDs are generated.
+            String normalizedInstallationId = normalizeInstallationId(request.getInstallationId());
+
             // Count active sessions
             long activeSessions = sessionService.countActiveSessions(lockedUser);
             if (activeSessions >= SessionService.MAX_ACTIVE_SESSIONS) {
                 eventPublisher.publishEvent(new LoginBlockedDueToSessionLimitEvent(
                         lockedUser.getUserId(),
                         Instant.now(),
-                        request.getInstallationId(),
+                        normalizedInstallationId,
                         request.getClientPlatform(),
                         request.getClientName(),
                         request.getClientVersion(),
@@ -92,7 +96,7 @@ public class AuthenticationService {
                     lockedUser,
                     refreshTokenHash,
                     refreshTokenExpiresAt,
-                    request.getInstallationId(),
+                    normalizedInstallationId,
                     request.getClientPlatform(),
                     request.getClientName(),
                     request.getClientVersion(),
@@ -118,6 +122,13 @@ public class AuthenticationService {
                 result.expiresIn(),
                 result.sessionId()
         );
+    }
+
+    private String normalizeInstallationId(String installationId) {
+        if (installationId == null || installationId.isBlank()) {
+            return null;
+        }
+        return installationId;
     }
 
     private record LoginResult(String accessToken, String refreshToken, long expiresIn, UUID sessionId) {}
