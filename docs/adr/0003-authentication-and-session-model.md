@@ -121,6 +121,17 @@ uses `403` rather than `404`.
 - User password changes are self-service, require the current password, persist
   only a new BCrypt hash, and do not revoke existing sessions.
 
+## Client/session identity clarification
+
+The authentication boundary is the user plus persisted session. Installation
+identity is a separate client/device concern and is governed by ADR 0010.
+
+A session may carry client, device, or installation metadata, but installation
+identity is not fundamental to authentication. The current implementation still
+requires an `installationId` during login/session creation; that requirement is
+transitional and must be audited/refactored before client development so clients
+without a natural installation lifecycle do not have to invent one.
+
 ## Spring Boot default user
 
 Spring Boot logs a generated security password and an
@@ -149,10 +160,10 @@ password has no effect on Samvaad API authentication.
 
 ## Remaining implementation gaps
 
-- realtime transport authentication and realtime delivery of blocked-login
-  security notifications
+- realtime delivery of blocked-login security notifications
 - final JWT signing algorithm, production key storage, and key rotation
 - first-login enforcement for changing the seeded administrator's known default password
+- installation-ID/session contract audit and refactor as described by ADR 0010
 
 ## Consequences
 
@@ -168,5 +179,6 @@ session so multiple application instances cannot exceed the limit.
 ## Source material
 
 - `docs/adr/0007-user-provisioning-and-authorization.md`
+- `docs/adr/0010-client-session-and-installation-identity.md`
 - `docs/Samvaad Product & Design Decisions.md`
 - `docs/Samvaad Technical Design.md`

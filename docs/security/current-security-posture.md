@@ -20,6 +20,8 @@
 - STOMP message sends derive sender identity from the authenticated principal; the client cannot provide a sender ID.
 - STOMP sends reuse the existing friendship authorization, sequence, timestamp, persistence, and request-ID idempotency logic.
 - Realtime broadcast occurs only after successful persistence; failed sends persist and broadcast nothing.
+- Operational logging is intended to capture meaningful business/application and security/authentication events with traceable correlation context, while avoiding routine low-level CRUD logging and sensitive authentication secrets.
+- Operational log files use configurable size-based rolling, compressed archives, and bounded retention; the default retention target is 50 rolled files.
 
 ## Deferred / future
 
@@ -28,6 +30,7 @@
 - Typing/presence, delivery receipts, and push notifications.
 - Message mutations/replies.
 - Blocking, unfriend, mute, archive.
-- Rate limiting, stable machine-readable error codes, and full audit policy.
+- Rate limiting and stable machine-readable error codes.
+- Full audit/event-history policy beyond operational logging.
 - Horizontal scaling/external brokers and a crash-safe outbox.
 - End-to-end encryption.

@@ -51,6 +51,12 @@ Implemented:
 
 Implementation boundary: the HTTP and STOMP transports enter the same message business logic. The STOMP layer does not maintain separate persistence, sequencing, friendship, or idempotency rules.
 
+## Pre-client architecture cleanup
+
+NEXT.
+
+Audit and refactor the current installation-ID/session contract so authentication remains session-based and installation identity becomes optional client/device metadata where appropriate. The goal is to avoid forcing web, TUI, or portable desktop clients to invent an installation identity while retaining a natural installation concept for mobile clients where useful. Reconcile the login/session implementation and API documentation after the refactor.
+
 ## Later / deferred
 
 - reconnect/missed-event synchronization

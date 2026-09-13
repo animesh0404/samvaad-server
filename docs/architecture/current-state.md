@@ -25,6 +25,17 @@
   - participant-only conversation subscriptions
   - shared message persistence/idempotency/authorization/sequencing logic
   - persistence before broadcast
+- Operational logging policy covering meaningful business/application and security/authentication events, correlation/trace context, secret avoidance, and bounded rolling file retention.
+
+## Client/session identity: current state vs architectural direction
+
+The current authentication implementation is session-based: JWT `sub` identifies the user and `sid` resolves the persisted server-side session. The current login/session-creation contract nevertheless requires an `installationId`, which is persisted as session metadata.
+
+The architectural direction is that installation identity is optional client/device metadata, not a fundamental authentication identity. Admin web UI, normal web clients, TUI clients, and portable desktop executables do not inherently require an installation identifier. Android and iOS clients may naturally use installation identity for device-specific lifecycle and future push-notification capabilities.
+
+The current mandatory `installationId` requirement is therefore transitional. An installation-ID/session contract audit and refactor is required before client development. Until that implementation work is complete, API documentation must continue to describe the actual mandatory contract.
+
+See ADR 0010 for the durable client/session and installation-identity decision.
 
 ## Architecture diagrams
 
@@ -53,6 +64,7 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - rate limiting and stable machine-readable error codes
 - dedicated conversation recency field if `updatedAt` later proves insufficient
 - friend-gated profile visibility
+- full audit/event-history policy beyond operational logging
 
 ## Known V1 limitation
 

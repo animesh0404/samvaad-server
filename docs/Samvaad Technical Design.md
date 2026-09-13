@@ -26,6 +26,28 @@ Profile data is separate from identity. Profile writes are self-only; profile vi
 
 Session is first-class server state referenced by JWT `sid`. Every authenticated HTTP request validates the JWT and persisted session. The same JWT/session validation model is applied when a STOMP connection is authenticated.
 
+### Client/session identity
+
+The authentication primitive is the authenticated user plus persisted session. Client platform, client name/version, and similar information are session metadata rather than alternate identity authorities.
+
+Installation identity is optional at the architectural level. It is a client/device lifecycle concern, not a prerequisite for authentication. Admin web UI, normal web clients, TUI clients, and portable desktop executables do not inherently require a stable installation identity. Android and iOS applications naturally have an installation/device lifecycle and may use an installation identifier when needed for future device-specific capabilities such as push notifications.
+
+The current implementation still requires `installationId` during login/session creation. This is transitional and must be audited/refactored before client development; the API contract must not be documented as optional until the implementation actually changes.
+
+The intended relationship is:
+
+```text
+User
+  ├── Session
+  ├── Session
+  └── Session
+
+Optional:
+Session → client/device/installation metadata
+```
+
+The session remains the authentication and revocation boundary. See ADR 0010 for the durable installation-identity decision.
+
 ## FriendRequest / Friendship
 
 An accepted friend-request row represents friendship. `areFriends(a,b)` is the relationship authorization input for distinct-user direct messaging.
@@ -154,7 +176,15 @@ The current session-validation logic is intentionally duplicated between the HTT
 
 Reconnect/missed-event synchronization, offline queues, read state/read receipts, typing/presence, delivery receipts, push notifications, message edits/deletes/replies, blocking/unfriend/mute/archive, horizontal scaling/external brokers, end-to-end encryption, and a general event bus are outside Realtime V1.
 
-# 11. Technical Invariants
+# 11. Operational Logging
+
+Samvaad operational logging is centered on meaningful business/application operations and useful security/authentication events, especially around service-layer business boundaries. Routine low-level repository CRUD/getters should not be logged mechanically.
+
+Relevant log lines should carry a consistent correlation/trace identifier so a business operation can be followed across application components. Passwords, access tokens, refresh tokens, and equivalent secrets must never be logged; sensitive user or message data should be logged only when operationally justified.
+
+Operational file logs use configuration-driven size-based rolling, compressed archives, and bounded retention. The default retention target is 50 rolled files, with file-size limits and retention count configurable. Full immutable audit/event history remains a separate future concern rather than being implied by operational logging.
+
+# 12. Technical Invariants
 
 1. Server is authoritative.
 2. Authenticated identity comes from server authentication context.
@@ -169,3 +199,4 @@ Reconnect/missed-event synchronization, offline queues, read state/read receipts
 11. Conversation subscriptions are participant-only.
 12. STOMP `CONNECT` uses the existing access JWT plus persisted session validation.
 13. The simple broker is an in-memory V1 choice, not the horizontal-scaling architecture.
+14. Authentication is session-based; installation identity is optional client/device metadata.
