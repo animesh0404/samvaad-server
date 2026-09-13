@@ -9,7 +9,7 @@ Current implementation phases:
 - Phase 3 — Friend request vertical slice: complete.
 - Phase 4 — Direct messaging vertical slice: complete.
 - Phase 5 — Conversation/message reads and listing: complete.
-- Realtime V1 — STOMP/WebSocket message delivery: complete.
+- Realtime V1 — STOMP/WebSocket message delivery: complete and manually verified end-to-end.
 
 Phase 4 provides the direct-message write path. Phase 5 adds authenticated HTTP conversation/message reads without realtime assumptions.
 
@@ -23,6 +23,8 @@ Realtime V1 now provides:
 - Sender identity derived from the authenticated STOMP principal.
 - Reuse of the existing message persistence, friendship authorization, sequencing, timestamps, and idempotency logic.
 - Broadcast only after the message service successfully persists/commits the message.
+
+A manual smoke test has verified authenticated Alice and Bob clients connecting, subscribing to the same conversation, and Alice's realtime message being delivered to Bob without polling. See [Realtime V1 Smoke Test](verification/realtime-smoke-test.md) for the recorded evidence.
 
 The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, external brokers/horizontal scaling, and end-to-end encryption remain deferred.
 
