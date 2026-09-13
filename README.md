@@ -51,8 +51,6 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 - **Realtime**: Spring WebSocket/STOMP with simple broker
 - **Testing**: JUnit 5, Mockito, Spring MockMvc, Testcontainers PostgreSQL
 
----
-
 ## Local Development
 
 ```bash
@@ -96,4 +94,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Operational logging implementation**: implement the already-defined logging policy in the application, covering meaningful business/application and useful security/authentication events at appropriate service boundaries, with correlation/trace context and rolling file retention. This is separate from a future full audit/event-history system. Realtime follow-on work and other deferred messaging features remain later concerns.
+**TUI client development**: build the first client as a thin consumer of the stable server authentication, session, HTTP messaging, and STOMP/WebSocket contracts. The TUI must not introduce a separate authentication/session model or manufacture an installation identity merely to authenticate.
