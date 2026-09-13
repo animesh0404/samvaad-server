@@ -39,6 +39,14 @@ Keep the distinction between:
 
 The category should be apparent from the logger/context and should not be used as a reason to expose secrets or unnecessary sensitive data.
 
+## Implementation
+
+The server uses Spring Boot's SLF4J/Logback logging stack with two operational appenders: console output and a rolling file output. Both patterns identify the application as `[samvaad-server]` and carry the MDC `traceId` alongside timestamp, level, thread, logger, and message fields.
+
+HTTP correlation is established by the correlation filter and STOMP correlation context is established by the STOMP interception path. The correlation context is carried through MDC; the logging aspect does not create trace identifiers.
+
+Selective service-layer business operations are annotated with `@OperationalLog`. `OperationalLoggingAspect` provides a generic DEBUG-level envelope containing the operation name, `SUCCESS`/`FAILURE` outcome, and duration; failures additionally include the exception type and are rethrown unchanged. The aspect does not log arguments, return values, or sensitive data. Domain-specific INFO/WARN events remain explicit in the owning services so business meaning is not duplicated by the generic envelope.
+
 ## File rotation and retention
 
 Operational file logging uses configuration-driven size-based rolling with compressed archives and bounded retention.
@@ -52,7 +60,7 @@ The policy is:
 - remove the oldest rolled files when the retention limit is exceeded
 - default retention target: **50 rolled files**
 
-The size limit and retention count remain configurable through application logging configuration.
+The size limit and retention count remain configurable through application logging configuration. The current default maximum active file size is **10MB**.
 
 ## Audit boundary
 

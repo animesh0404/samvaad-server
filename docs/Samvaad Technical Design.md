@@ -32,7 +32,7 @@ The authentication primitive is the authenticated user plus persisted session. C
 
 Installation identity is optional at the architectural level. It is a client/device lifecycle concern, not a prerequisite for authentication. Admin web UI, normal web clients, TUI clients, and portable desktop executables do not inherently require a stable installation identity. Android and iOS applications naturally have an installation/device lifecycle and may use an installation identifier when needed for future device-specific capabilities such as push notifications.
 
-The current implementation still requires `installationId` during login/session creation. This is transitional and must be audited/refactored before client development; the API contract must not be documented as optional until the implementation actually changes.
+The current implementation accepts a missing `installationId`; blank/whitespace values normalize to null, while nonblank values remain supported. This preserves installation metadata as optional while keeping compatibility for clients that provide it.
 
 The intended relationship is:
 
@@ -180,9 +180,11 @@ Reconnect/missed-event synchronization, offline queues, read state/read receipts
 
 Samvaad operational logging is centered on meaningful business/application operations and useful security/authentication events, especially around service-layer business boundaries. Routine low-level repository CRUD/getters should not be logged mechanically.
 
-Relevant log lines should carry a consistent correlation/trace identifier so a business operation can be followed across application components. Passwords, access tokens, refresh tokens, and equivalent secrets must never be logged; sensitive user or message data should be logged only when operationally justified.
+Relevant log lines carry the fixed application identifier `[samvaad-server]` and a consistent correlation/trace identifier so a business operation can be followed across application components. Passwords, access tokens, refresh tokens, and equivalent secrets must never be logged; sensitive user or message data should be logged only when operationally justified.
 
-Operational file logs use configuration-driven size-based rolling, compressed archives, and bounded retention. The default retention target is 50 rolled files, with file-size limits and retention count configurable. Full immutable audit/event history remains a separate future concern rather than being implied by operational logging.
+Correlation IDs are established at the transport boundary and carried through MDC. Selective service-layer operations use `@OperationalLog` with `OperationalLoggingAspect` to add a generic DEBUG envelope containing operation name, success/failure outcome, and duration, with exception type on failure. The aspect does not create correlation IDs, log arguments/returns, expose sensitive data, or alter exceptions. Domain-specific INFO/WARN operational events remain explicit in the owning services.
+
+Operational file logs use configuration-driven size-based rolling, compressed archives, and bounded retention. The default active file size is 10MB and the default retention target is 50 rolled files, with both values configurable. Full immutable audit/event history remains a separate future concern rather than being implied by operational logging.
 
 # 12. Technical Invariants
 
