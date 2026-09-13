@@ -6,6 +6,7 @@ participant "Spring Security" as Security
 participant "MessageController" as Controller
 participant "MessageService" as Service
 database "PostgreSQL" as DB
+participant "STOMP Broker" as Broker
 
 Client -> Security : POST /api/conversations/direct/messages
 Security -> Security : validate JWT + persisted session
@@ -30,10 +31,27 @@ are transactional. Database uniqueness resolves
 conversation creation races.
 end note
 
+== Realtime delivery ==
+
+Client -> Security : STOMP CONNECT /ws + access JWT
+Security -> Client : STOMP CONNECTED + authenticated principal
+Client -> Broker : SUBSCRIBE /topic/conversations/{conversationId}
+Client -> Broker : SEND /app/chat.send
+Broker -> Service : authenticated chat send
+Service -> DB : authorize + persist message
+DB --> Service : persisted message
+Service -> Broker : server-authoritative MessageDto
+Broker --> Client : MESSAGE /topic/conversations/{conversationId}
+
+note over Service,Broker
+Realtime V1 broadcasts only after successful message persistence.
+HTTP and STOMP sends reuse the same message-service authorization,
+sequencing, timestamp, persistence, and request-ID idempotency logic.
+end note
+
 note over Client,DB
-This is the current HTTP write slice only.
-Conversation/message reads, STOMP/WebSocket realtime
-delivery, read state, mutations, replies, and
-reconnect/offline synchronization are not implemented.
+Realtime V1 is implemented for the single-instance slice.
+Reconnect/missed-event synchronization, read state, mutations,
+replies, and offline synchronization remain deferred.
 end note
 @enduml
