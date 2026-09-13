@@ -55,11 +55,17 @@ Implementation boundary: the HTTP and STOMP transports enter the same message bu
 
 COMPLETE.
 
-The installation-ID/session contract was audited and refactored so authentication remains session-based and installation identity is optional client/device metadata. `POST /api/auth/login` now accepts clients that omit `installationId`; blank/whitespace values normalize to null, while nonblank values remain supported. Liquibase migration `011-make-installation-id-nullable.yaml` makes the persisted session field nullable. A focused happy-path smoke test verified login without `installationId`, an authenticated follow-up request, and backward-compatible login with `installationId`.
+The installation-ID/session contract was audited and refactored so authentication remains session-based and installation identity is optional client/device metadata. `POST /api/auth/login` accepts clients that omit `installationId`; blank/whitespace values normalize to null, while nonblank values remain supported. Liquibase migration `011-make-installation-id-nullable.yaml` makes the persisted session field nullable. Focused integration coverage verifies login without installation identity across web/TUI/desktop platforms, mobile metadata preservation when supplied, refresh, logout/revocation, session limits, HTTP validation, and STOMP `CONNECT` without installation identity. The identity-critical login transaction no longer performs installation-ID normalization because session creation and session-limit enforcement do not depend on that metadata.
+
+## Operational logging
+
+COMPLETE.
+
+Operational logging is implemented with correlation/trace context, selective service-level `@OperationalLog` instrumentation, explicit domain/security events, secret avoidance, and configuration-driven size-based rolling file retention. The default active file size is 10MB with 50 retained rolled files; archives are compressed. Operational logging remains distinct from a future full audit/event-history system.
 
 ## Next implementation area
 
-Operational logging implementation: implement the existing logging policy in the application, including meaningful business/application and useful security/authentication events at service boundaries, correlation/trace context, secret avoidance, and configurable size-based rolling file retention. This is operational logging, not a full audit/event-history system.
+TUI client development: build the first client as a thin consumer of the stable server authentication, session, HTTP messaging, and STOMP/WebSocket contracts. The TUI must not introduce a separate authentication/session model or manufacture an installation identity merely to authenticate.
 
 ## Later / deferred
 
