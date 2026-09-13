@@ -7,6 +7,7 @@ import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
+import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
@@ -62,10 +63,14 @@ class SecurityIntegrationTest {
     private UserProfileRepo userProfileRepo;
 
     @Autowired
+    private FriendRequestRepo friendRequestRepo;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();
         userProfileRepo.deleteAll();
         userRepo.deleteAll();

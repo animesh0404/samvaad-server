@@ -1,5 +1,7 @@
 package com.samvaad.samvaad_server.exception;
 
+import com.samvaad.samvaad_server.friendrequest.FriendRequestConflictException;
+import com.samvaad.samvaad_server.friendrequest.FriendRequestNotFoundException;
 import com.samvaad.samvaad_server.user.EmailAlreadyExistsException;
 import com.samvaad.samvaad_server.user.InvalidUsernameException;
 import com.samvaad.samvaad_server.user.UserAlreadyExistsException;
@@ -29,6 +31,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidUsernameException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleInvalidUsername(InvalidUsernameException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(FriendRequestNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleFriendRequestNotFound(FriendRequestNotFoundException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(FriendRequestConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleFriendRequestConflict(FriendRequestConflictException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 

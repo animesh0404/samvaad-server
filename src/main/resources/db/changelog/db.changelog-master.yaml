@@ -15,3 +15,5 @@ databaseChangeLog:
       file: db/changelog/changes/007-seed-initial-admin.yaml
   - include:
       file: db/changelog/changes/008-user-email-case-insensitive-unique.yaml
+  - include:
+      file: db/changelog/changes/009-create-friend-requests.yaml

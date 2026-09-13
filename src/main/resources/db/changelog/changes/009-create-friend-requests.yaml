@@ -1,0 +1,70 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-create-friend-requests
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: friend_requests
+            columns:
+              - column:
+                  name: request_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: sender_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: recipient_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: responded_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: friend_requests
+            baseColumnNames: sender_user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_friend_requests_sender
+        - addForeignKeyConstraint:
+            baseTableName: friend_requests
+            baseColumnNames: recipient_user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_friend_requests_recipient
+        - sql:
+            # PostgreSQL partial unique index: at most one PENDING request per
+            # unordered user pair, regardless of direction.
+            sql: CREATE UNIQUE INDEX uq_friend_requests_pending_pair ON friend_requests (LEAST(sender_user_id, recipient_user_id), GREATEST(sender_user_id, recipient_user_id)) WHERE status = 'PENDING'
