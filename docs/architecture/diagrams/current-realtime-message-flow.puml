@@ -1,0 +1,53 @@
+@startuml
+actor ClientA
+actor ClientB
+participant "STOMP /ws" as WS
+participant "StompAuthInterceptor" as AUTH
+participant "ChatController" as CHAT
+participant "MessageService" as MSG
+database PostgreSQL as DB
+participant "Simple Broker" as BROKER
+
+ClientA -> WS: CONNECT Authorization: Bearer JWT
+WS -> AUTH: CONNECT
+AUTH -> DB: validate persisted session
+DB --> AUTH: valid session
+AUTH --> WS: AuthenticatedUser
+
+ClientA -> WS: SUBSCRIBE /topic/conversations/{id}
+WS -> AUTH: participant check
+AUTH -> DB: conversation membership
+DB --> AUTH: participant
+AUTH --> WS: subscription allowed
+
+ClientB -> WS: CONNECT Authorization: Bearer JWT
+WS -> AUTH: CONNECT
+AUTH -> DB: validate persisted session
+DB --> AUTH: valid session
+AUTH --> WS: AuthenticatedUser
+ClientB -> WS: SUBSCRIBE /topic/conversations/{id}
+WS -> AUTH: participant check
+AUTH -> DB: conversation membership
+DB --> AUTH: participant
+AUTH --> WS: subscription allowed
+
+ClientA -> WS: SEND /app/chat.send
+WS -> CHAT: ChatSendRequest
+CHAT -> MSG: sendMessageToConversation()
+MSG -> DB: friendship + idempotency + sequence + persist
+DB --> MSG: committed Message
+MSG --> CHAT: persisted MessageDto
+CHAT -> BROKER: broadcast MessageDto
+BROKER --> ClientA: /topic/conversations/{id}
+BROKER --> ClientB: /topic/conversations/{id}
+
+note over AUTH
+Unknown and non-participant
+subscriptions are rejected identically.
+end note
+
+note over CHAT,DB
+Broadcast occurs only after
+successful persistence.
+end note
+@enduml

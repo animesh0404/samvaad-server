@@ -2,40 +2,42 @@
 
 ## Status
 
-Accepted; design locked for the first realtime implementation slice. No realtime transport is implemented yet.
+Accepted and implemented for Realtime V1.
 
 ## Context
 
-Phases 1–5 established authentication/session validation, friendship authorization, direct-message persistence, idempotency, and HTTP conversation/message reads. The next implementation area is realtime delivery. The realtime design should add a transport without creating a second messaging business-logic path.
+Phases 1–5 established authentication/session validation, friendship authorization, direct-message persistence, idempotency, and HTTP conversation/message reads. Realtime delivery adds a transport without creating a second messaging business-logic path.
 
 ## Decision
 
-Samvaad will use **WebSocket with STOMP** for realtime messaging, using Spring's WebSocket/STOMP support.
+Samvaad uses **WebSocket with STOMP** through Spring's WebSocket/STOMP support.
 
 ### Transport and destinations
 
 - WebSocket endpoint: `/ws`
-- Client-to-server application destination prefix: `/app`
+- Client-to-server application prefix: `/app`
 - Direct-message command: `/app/chat.send`
 - Conversation broadcast destination: `/topic/conversations/{conversationId}`
 
-The first realtime slice is intentionally limited to conversation message delivery.
-
 ### Authentication
 
-STOMP `CONNECT` carries the existing Samvaad access JWT. The server validates the JWT and its persisted session using the same server-authoritative identity model as HTTP authentication. No separate WebSocket login mechanism is introduced.
+STOMP `CONNECT` carries the existing Samvaad access JWT in the native `Authorization` header as `Bearer <JWT>`. The server validates the JWT and persisted session using the same server-authoritative identity/session rules as HTTP authentication. No separate WebSocket login mechanism exists.
 
-The authenticated STOMP connection is associated with the authenticated `userId` and `sessionId`.
+The authenticated STOMP connection is associated with the authenticated `userId` and `sessionId` through an `AuthenticatedUser` principal.
+
+The WebSocket HTTP handshake is permitted through the servlet security chain because authentication is performed at STOMP `CONNECT`; handshake access alone does not authorize application messaging.
 
 ### Authorization
 
-Conversation subscriptions and message commands are participant-authorized. A client may subscribe to a conversation destination only when authenticated and authorized as a participant of that conversation. A `chat.send` command must likewise be authenticated and authorized for the target conversation.
+Conversation subscriptions and message commands are participant-authorized. A client may subscribe to a conversation destination only when authenticated and authorized as a participant. A `chat.send` command is authenticated and authorized for its target conversation by the existing messaging service.
 
-Domain authorization remains in the messaging/domain service layer rather than being duplicated in the transport layer.
+Unknown and non-participant conversation subscriptions are rejected identically so subscription attempts do not reveal conversation existence.
+
+Domain authorization remains in the messaging/domain service layer rather than being duplicated as business logic in the transport layer.
 
 ### Message command and event
 
-The client sends only the data required to request a message operation, conceptually:
+The client sends only:
 
 ```json
 {
@@ -47,28 +49,21 @@ The client sends only the data required to request a message operation, conceptu
 
 The client does not supply authoritative `senderUserId`, `sequenceNumber`, or `serverTimestamp`.
 
-The realtime handler reuses the existing message business operation and persistence invariants. A message is broadcast only after successful persistence. The broadcast represents the server-authoritative persisted message, including its server-generated identity, sequence, timestamp, and request ID.
+The realtime handler delegates to the existing message business operation. Persistence, friendship authorization, sequencing, timestamp generation, and request-ID idempotency remain shared with HTTP messaging.
+
+A message is broadcast only after successful persistence. The broadcast contains the server-authoritative persisted `MessageDto`.
 
 ### Broker
 
-The first implementation uses Spring's simple broker. No Redis, Kafka, RabbitMQ, or external broker is introduced by this slice. Broker replacement remains a later deployment/scaling decision.
+Realtime V1 uses Spring's simple in-memory broker. Redis, Kafka, RabbitMQ, broker relay, and other external brokers are not part of this slice.
 
-### Reuse of existing messaging logic
+### Reliability boundary
 
-HTTP and STOMP are transports into the same message business logic. The realtime implementation must not create a parallel persistence, sequencing, friendship-authorization, or idempotency implementation.
+Broadcast-after-commit is sufficient for the first single-instance slice but is not crash-safe across process failure because there is no outbox. Crash recovery, replay, and horizontal-delivery guarantees remain future work.
 
-Conceptually:
+## Implemented Realtime V1 slice
 
-```text
-HTTP controller ─────┐
-                     ├──> message service ──> persistence
-STOMP handler ───────┘                 │
-                                       └──> broadcast after commit
-```
-
-## First implementation slice
-
-The first realtime vertical slice will prove:
+The implementation proves:
 
 1. WebSocket endpoint availability.
 2. STOMP `CONNECT` authentication using the existing access JWT/session model.
@@ -77,17 +72,15 @@ The first realtime vertical slice will prove:
 5. Authenticated participant message send through the existing messaging business logic.
 6. Persistence before broadcast.
 7. Delivery of the persisted message event to connected conversation subscribers.
-
-Two connected clients representing the two existing conversation participants should be sufficient to demonstrate the end-to-end flow.
+8. Idempotent replay through the shared message service.
+9. No persistence/broadcast for failed sends.
 
 ## Explicitly deferred
-
-This ADR does not design or implement:
 
 - reconnect/missed-event synchronization
 - offline queues
 - persistent read state/read receipts
-- typing or presence
+- typing/presence
 - delivery receipts
 - push notifications
 - message edits/deletes/replies
@@ -96,10 +89,8 @@ This ADR does not design or implement:
 - end-to-end encryption
 - a general event bus
 
-These remain separate future slices unless explicitly brought into scope.
-
 ## Consequences
 
-Realtime delivery becomes a transport concern layered over the existing server-authoritative messaging model. The same authorization, sequence, timestamp, and idempotency invariants continue to apply regardless of whether a message enters through HTTP or STOMP.
+Realtime delivery is a transport concern layered over the existing server-authoritative messaging model. The same authorization, sequence, timestamp, and idempotency invariants apply whether a message enters through HTTP or STOMP.
 
-The first realtime implementation can therefore remain small while leaving room for later broker, synchronization, and messaging lifecycle work.
+The first realtime implementation remains small while leaving broker, synchronization, reliability, and later messaging lifecycle work for separate slices.

@@ -1,125 +1,61 @@
 # Testing Guide
 
-This document describes the testing approach, test structure, and verification commands used in the Samvaad backend server.
-
----
+This document describes the testing approach and verification commands used in the Samvaad backend server.
 
 ## Testing Approach
 
-The test suite in `src/test` is organized into distinct testing layers:
+### Unit tests
 
-### 1. Unit Tests (Isolated Logic & Mappers)
+Messaging service tests verify friend authorization, self-message rejection, authorization-before-conversation-creation, conversation race handling, request-ID replay/conflict behavior, sequencing, participant-only reads, pagination, and message cursor behavior. Realtime-related unit coverage also verifies conversation participant checks and shared message-service behavior.
 
-Unit tests run quickly without Spring application context or external services. They verify deterministic domain transformations and isolated service behavior:
+### Web layer tests
 
-- **`UserMapperTest`** (`src/test/java/com/samvaad/samvaad_server/user/UserMapperTest.java`): Tests bidirectional mapping between `UserDto` and `User` entities.
-- **`UserProfileMapperTest`** (`src/test/java/com/samvaad/samvaad_server/user/userprofile/UserProfileMapperTest.java`): Tests partial profile updates from `UserProfileUpdateDto` onto existing `UserProfile` entities.
-- **`AuthenticationServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/AuthenticationServiceTest.java`): Tests credential verification, login behavior, session-capacity handling, token generation, and blocked-login event publication in isolation.
-- **`RefreshTokenServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/RefreshTokenServiceTest.java`): Tests refresh-token validation and rotation behavior in isolation.
-- **`SessionServiceTest`** (`src/test/java/com/samvaad/samvaad_server/session/SessionServiceTest.java`): Tests session creation and active-session counting behavior.
-- **Messaging service tests**: Verify friend authorization, self-message rejection, authorization-before-conversation-creation, conversation creation/race handling, request-ID replay/conflict behavior, message sequencing, participant-only conversation reads, pagination validation, and message cursor behavior.
+HTTP controller tests verify routing, status codes, validation, authentication context, serialization, and messaging service delegation.
 
-### 2. Web Layer Tests (MockMvc & Controller Isolation)
+### Integration & concurrency tests
 
-Controller tests verify endpoint routing, HTTP status codes, request/response JSON serialization, validation, and service interactions in isolation:
+Spring Boot/Testcontainers integration tests verify PostgreSQL persistence, Liquibase migrations, authentication/session behavior, relationship behavior, direct-message invariants, conversation/message reads, and realtime behavior.
 
-- **`UserProfileControllerTest`** (`src/test/java/com/samvaad/samvaad_server/user/userprofile/UserProfileControllerTest.java`): Tests the profile PATCH endpoint with standalone MockMvc.
-- **`AuthControllerTest`** (`src/test/java/com/samvaad/samvaad_server/auth/AuthControllerTest.java`): Tests the login and refresh HTTP endpoints, request validation, response serialization, and service delegation.
-- **Messaging controller tests**: Verify direct-message request validation, authentication context usage, `201` creation vs `200` idempotent replay, `409` request-ID conflicts, conversation-list pagination forwarding/validation, and message-read parameter handling.
+`RealtimeIntegrationTest` currently contains 9 tests covering:
 
-### 3. Integration & Concurrency Tests (Testcontainers & Spring Boot)
+- successful STOMP `CONNECT`
+- missing/invalid access token rejection
+- revoked-session rejection
+- authenticated participant send and broadcast
+- server-authoritative message fields with HTTP-read cross-check
+- idempotent replay
+- non-participant subscription rejection
+- unknown-conversation subscription rejection
+- failed send with no persisted/broadcast message
 
-Integration tests verify the Spring Boot context, JPA mappings, Liquibase migrations, persistence behavior, and concurrency-sensitive behavior against PostgreSQL:
-
-- **`SamvaadServerApplicationTests`** (`src/test/java/com/samvaad/samvaad_server/SamvaadServerApplicationTests.java`): Boots the Spring context with Testcontainers PostgreSQL and verifies application initialization.
-- **`RefreshTokenIntegrationTest`**: Verifies persisted refresh-token behavior across the HTTP/service boundary, including rotation and invalidation of the old token.
-- **`RefreshTokenConcurrencyIntegrationTest`**: Exercises concurrent refresh attempts against the same session/token state.
-- **`LoginConcurrencyIntegrationTest`**: Exercises concurrent login attempts and verifies the five-session capacity is enforced transactionally; blocked-login events are also verified.
-- **Messaging integration tests**: Verify friend-gated sending, conversation uniqueness, ordered message sequences, request-ID idempotency, database uniqueness constraints, unauthorized access behavior, conversation-list scoping/order, conversation read authorization, message cursor pagination, empty results, and invalid pagination.
-- **`TestcontainersConfiguration`** (`src/test/java/com/samvaad/samvaad_server/TestcontainersConfiguration.java`): Configures the PostgreSQL Testcontainer used by the integration tests.
-
-### 4. Development Runtime Test Harness
-
-- **`TestSamvaadServerApplication`** (`src/test/java/com/samvaad/samvaad_server/TestSamvaadServerApplication.java`): Executable test application entry point that runs `SamvaadServerApplication` with Testcontainers, allowing developers to run the server with an ephemeral database.
-
----
+The full suite also verifies that existing HTTP behavior remains passing after the realtime transport was added.
 
 ## What the Tests Currently Establish
 
-The current suite provides automated evidence for the implemented user/profile, authentication/session, relationship, direct-messaging write, and conversation/message read foundations, including:
+The automated suite provides evidence for the implemented user/profile, authentication/session, relationship, direct-messaging write, conversation/message read, and Realtime V1 foundations.
 
-- user/profile mapping and controller behavior
-- BCrypt-backed credential verification
-- login success/failure behavior
-- persisted session creation
-- five-active-session capacity enforcement
-- concurrent login serialization around session capacity
-- blocked-login event publication
-- JWT access-token generation
-- refresh-token hashing
-- refresh-token rotation
-- rejection of expired/revoked/old refresh tokens
-- concurrent refresh behavior
-- Spring Boot + PostgreSQL + Liquibase context initialization
-- exact username discovery behavior
-- friend-request lifecycle and ownership authorization
-- direct-message friend authorization and self-message rejection
-- direct-message authorization-before-conversation-creation regression coverage
-- normalized direct-conversation uniqueness
-- atomic conversation/first-message persistence
-- server timestamps and monotonic per-conversation message sequencing
-- request-ID idempotent replay and foreign request-ID conflict handling
-- database-backed conversation/message uniqueness invariants
-- authenticated conversation listing scoped to the caller's participant conversations
-- conversation-list recent-activity ordering and deterministic tie-breaking
-- conversation offset/limit validation and non-aligned offset handling
-- participant-only message reads
-- message sequence-cursor pagination and ascending ordering
-- unknown-conversation `404` vs non-participant `403`
-- empty read results and invalid pagination behavior
+Realtime V1 specifically establishes that authentication uses the existing JWT/session model, participant subscriptions are authorized, STOMP sends reuse the existing message business logic, persistence precedes broadcast, idempotent replay does not create a second message, and failed sends do not produce a persisted/broadcast message.
 
-The suite does **not** establish that the full planned Samvaad system is implemented. Realtime transport, read state, message mutations, replies, reconnect/offline synchronization, blocking/unfriend/mute/archive, and other later conversation lifecycle features remain outside the implemented slices.
-
----
+The suite does **not** establish the full planned messaging system. Reconnect/missed-event synchronization, offline queues, persistent read state, typing/presence, delivery receipts, push notifications, message mutations/replies, relationship controls, horizontal scaling/external brokers, and end-to-end encryption remain outside the implemented slices.
 
 ## Running Tests
 
-Tests are executed using the Gradle wrapper (`./gradlew`):
-
-### Run the Full Test Suite
 ```bash
 ./gradlew test
-```
-
-### Run a Specific Test Class
-```bash
-./gradlew test --tests com.samvaad.samvaad_server.auth.AuthenticationServiceTest
-```
-
-### Run Tests in a Specific Package
-```bash
-./gradlew test --tests "com.samvaad.samvaad_server.auth.*"
-```
-
-### Run Full Verification (Compilation + Tests + Checks)
-```bash
 ./gradlew check
 ```
 
----
+A specific test class can be run with:
 
-## Test Reports
-
-After running tests, Gradle generates standard HTML test reports located at:
-```
-build/reports/tests/test/index.html
+```bash
+./gradlew test --tests com.samvaad.samvaad_server.messaging.RealtimeIntegrationTest
 ```
 
----
+`git diff --check` should also be clean before an implementation commit.
 
 ## Related Documentation
 
-- [Local Development Setup](setup.md) — Local environment and database execution options.
-- [Current Implementation State](../architecture/current-state.md) — Current architectural layers and entities.
-- [Current Security Posture](../security/current-security-posture.md) — Implemented security controls and remaining gaps.
-- [Documentation Map](../README.md) — Full repository documentation index.
+- [Local Development Setup](setup.md)
+- [Current Implementation State](../architecture/current-state.md)
+- [Current Security Posture](../security/current-security-posture.md)
+- [Documentation Map](../README.md)

@@ -8,32 +8,36 @@ This repository contains the backend server service. The client interface is dev
 
 ## Current Status
 
-The project is in active backend development. **Phase 1 — Authentication & Authorization**, **Phase 2 — Exact Username Discovery**, **Phase 3 — Friend Request Vertical Slice**, **Phase 4 — Direct Messaging Vertical Slice**, and **Phase 5 — Conversation/Message Reads & Listing** are complete and tested.
+The project is in active backend development. **Phases 1–5 and Realtime V1 are complete and tested.**
 
 Currently implemented:
 
-- **User and Profile Slice**: User creation (`POST /api/users`), authenticated user lookup, profile retrieval, and self-service profile updates. Profile PATCH distinguishes omitted fields, non-null values, and explicit `null` values.
+- **User and Profile Slice**: User creation (`POST /api/users`), authenticated user lookup, profile retrieval, and self-service profile updates.
 - **User Administration**: ADMIN-only user listing and hard deletion.
 - **Authentication & Sessions**: Login with username or email and password, persisted sessions, session-bound JWT access tokens, rotating refresh tokens, five-active-session enforcement, and logout/session revocation.
 - **Account Self-Service**: Users can change their own email and password. Username is immutable after creation.
-- **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`) with case-insensitive matching and a restricted discovery DTO containing only `userId` and `username`.
+- **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`).
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
-- **Friendship**: An accepted friend-request row represents the friendship, with an internal `areFriends(a, b)` relationship check used by direct messaging authorization.
-- **Direct Messaging**: Authenticated friends can send plain-text messages through `POST /api/conversations/direct/messages`. Friendship authorization is checked before conversation lookup/creation; direct conversations are unique per unordered user pair, first-message creation is atomic, messages receive server sequence/timestamp values, and client request UUIDs provide idempotent replay handling.
-- **Conversation Reads**: Authenticated participants can list their direct conversations through `GET /api/conversations/direct`, ordered by recent activity with offset/limit pagination.
-- **Message Reads**: Authenticated conversation participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages`, ordered by server sequence with an exclusive `afterSequence` cursor and limit.
+- **Friendship**: An accepted friend-request row represents the friendship; `areFriends(a,b)` is used by direct messaging authorization.
+- **Direct Messaging**: Authenticated friends can send plain-text messages through HTTP. Direct conversations are unique per unordered user pair; messages receive server sequence/timestamp values and client request UUIDs provide idempotent replay handling.
+- **Conversation Reads**: Participants can list direct conversations through `GET /api/conversations/direct` with offset/limit pagination and recent-activity ordering.
+- **Message Reads**: Participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages` using the exclusive `afterSequence` cursor.
+- **Realtime Messaging V1**: WebSocket + STOMP transport at `/ws`, authenticated STOMP `CONNECT` using the existing access JWT/session model, participant-only conversation subscriptions, `/app/chat.send`, `/topic/conversations/{conversationId}`, reuse of the existing message persistence/idempotency/authorization logic, and broadcast only after successful persistence. The first slice uses Spring's in-memory simple broker.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
-### Not Yet Implemented
+### Not Yet Implemented / Deferred
 
-- Realtime transport and delivery (STOMP/WebSocket).
-- Read state, message mutation, replies, reconnect/offline synchronization, and related messaging infrastructure.
-- User blocking, unfriend, archiving, or mute preferences.
+- Reconnect/missed-event synchronization and offline queues.
+- Persistent read state/read receipts.
+- Typing/presence, delivery receipts, and push notifications.
+- Message editing/deletion/replies.
+- Blocking, unfriend, archiving, and mute preferences.
+- Horizontal scaling/external brokers, a general event bus, and end-to-end encryption.
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
-See the architecture, API, security, roadmap, and ADR documents under `docs/` for detailed implementation snapshots and locked design decisions.
+See `docs/` for implementation snapshots and locked decisions.
 
 ---
 
@@ -44,28 +48,25 @@ See the architecture, API, security, roadmap, and ADR documents under `docs/` fo
 - **Build Tool**: Gradle 9.7.0
 - **Database**: PostgreSQL 18
 - **Database Migrations**: Liquibase
+- **Realtime**: Spring WebSocket/STOMP with simple broker
 - **Testing**: JUnit 5, Mockito, Spring MockMvc, Testcontainers PostgreSQL
 
 ---
 
 ## Local Development
 
-Start PostgreSQL with Docker Compose and run the application:
-
 ```bash
 docker compose up -d
 ./gradlew bootRun
 ```
 
-Or use the Testcontainers development mode:
+Or:
 
 ```bash
 ./gradlew bootTestRun
 ```
 
 See `docs/development/setup.md` for complete environment details.
-
----
 
 ## Build & Test Commands
 
@@ -74,10 +75,6 @@ See `docs/development/setup.md` for complete environment details.
 ./gradlew test
 ./gradlew check
 ```
-
-See `docs/development/testing.md` for testing conventions and suite organization.
-
----
 
 ## Documentation
 
@@ -98,4 +95,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Realtime messaging transport**: STOMP/WebSocket delivery is the next major messaging area; read state, mutation, reply, offline/reconnect, and relationship-control work remain later/deferred until explicitly scoped.
+**Realtime follow-on work**: reconnect/missed-event synchronization and persistent read state are the next natural messaging concerns. Message mutation, replies, relationship controls, and horizontal scaling remain separately deferred.

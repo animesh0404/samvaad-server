@@ -2,25 +2,17 @@
 
 ## Username discovery
 
-Implemented endpoint:
-
-`GET /api/users/lookup?username={username}`
-
-Authentication is required. Matching is exact and case-insensitive. Missing or blank input returns `400`; an unknown username returns `404`. The response is restricted to discovery-safe identity fields (`userId` and `username`) and does not expose email, password/hash, role, sessions, tokens, or internal security metadata.
-
-Self-lookup is allowed. Friendship is not required for lookup.
+`GET /api/users/lookup?username={username}` is authenticated, exact, case-insensitive, and returns only discovery-safe identity fields.
 
 ## Friend-request relationship
 
-Friend-request lifecycle is implemented separately under `/api/friend-requests`. An accepted request represents the friendship used by direct messaging authorization. Friend-gated profile visibility is not activated by Phase 3.
+Friend-request lifecycle is implemented under `/api/friend-requests`. An accepted request represents the friendship used by direct messaging authorization. Friend-gated profile visibility remains deferred.
 
 ## Direct messaging
 
-### Send message
+### HTTP send
 
 `POST /api/conversations/direct/messages`
-
-Request body:
 
 ```json
 {
@@ -30,34 +22,80 @@ Request body:
 }
 ```
 
-Authentication is required. The caller identity comes from the authenticated server context; sender identity is not accepted from the request body. The recipient is resolved by exact, case-insensitive username lookup. The two users must be accepted friends, and self-messaging is rejected.
+The caller identity comes from server authentication. Accepted friendship is required; self-messaging is rejected. The service owns conversation creation, message sequence/timestamp, and request-ID idempotency.
 
-Friendship authorization is evaluated before conversation lookup or creation. An unauthorized send therefore cannot create conversation state as a side effect of the rejected request. After authorization, the endpoint finds or creates the single direct conversation for the unordered participant pair and persists the first/subsequent message atomically. Message content is plain text. The server supplies the message timestamp and monotonic conversation sequence number. `requestId` is a client-provided UUID used for idempotency: the original owner replay receives the existing message with `200`, while foreign reuse returns `409`.
-
-A newly persisted message returns `201`. Validation failures return `400`; unauthenticated requests return `401`; non-friends or self-messages return `403`; an unknown recipient returns `404`; conflicting request UUID reuse returns `409`.
-
-### List direct conversations
+### HTTP conversation list
 
 `GET /api/conversations/direct?limit=20&offset=0`
 
-Authentication is required. The response is a JSON array of conversation DTOs with `conversationId`, `otherParticipantUserId`, `otherParticipantUsername`, `lastSequenceNumber`, and `updatedAt`.
+Participant-only. `limit` is 1–100; `offset` is non-negative. Results use recent `updatedAt` descending and `conversationId` ascending as deterministic tiebreaker.
 
-`limit` defaults to `20` and must be between `1` and `100`. `offset` defaults to `0` and must be non-negative. Invalid pagination returns `400`; non-numeric request parameters are handled as Spring `400` responses. Conversations are ordered by recent `updatedAt` descending, with `conversationId` ascending as a deterministic tiebreaker.
-
-The caller sees only conversations where they are one of the two participants. The other participant's current username is resolved for the response; it is `null` if that user has been admin-deleted.
-
-### Read conversation messages
+### HTTP message read
 
 `GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20`
 
-Authentication is required and the caller must be a participant in the conversation. `afterSequence` defaults to `0`, must be non-negative, and is an exclusive sequence cursor. `limit` defaults to `20` and must be between `1` and `100`. Results are ordered by ascending server-assigned `sequenceNumber`.
+Participant-only. `afterSequence` is a non-negative exclusive server sequence cursor; `limit` is 1–100. Results are ascending by server sequence. Unknown conversation is `404`; known non-participant is `403`.
 
-An unknown conversation returns `404`. A known conversation requested by a non-participant returns `403`. Invalid pagination returns `400`; non-numeric request parameters are handled as Spring `400` responses.
+## Realtime messaging — STOMP/WebSocket V1
 
-Message reads do not re-check friendship. Current authorization is based on conversation participation because unfriend/block lifecycle does not yet exist.
+### WebSocket endpoint
 
-Conversation/message reads are HTTP-only in this slice. Realtime delivery, read state, message mutations, replies, and offline/reconnect behavior remain outside the implemented scope.
+`/ws`
+
+The HTTP handshake is allowed through the servlet security chain so STOMP can perform token authentication. Application authentication occurs on the STOMP `CONNECT` frame.
+
+### CONNECT authentication
+
+Send the existing access token as:
+
+```text
+Authorization: Bearer <access-jwt>
+```
+
+The server validates the JWT and persisted session using the same identity/session rules as HTTP authentication. No separate WebSocket login exists.
+
+### Conversation subscription
+
+Subscribe to:
+
+```text
+/topic/conversations/{conversationId}
+```
+
+The authenticated caller must be a participant. Unknown and non-participant destinations are rejected identically so subscription attempts do not reveal conversation existence.
+
+### Send message
+
+Send to:
+
+```text
+/app/chat.send
+```
+
+Payload:
+
+```json
+{
+  "conversationId": "...",
+  "content": "hello",
+  "requestId": "client-generated-uuid"
+}
+```
+
+The client does not provide sender identity, sequence number, or server timestamp. The STOMP handler delegates to the existing `MessageService`, so friendship authorization, sequencing, timestamps, persistence, and request-ID idempotency remain shared with HTTP messaging.
+
+After successful persistence, the server broadcasts the persisted `MessageDto` to:
+
+```text
+/topic/conversations/{conversationId}
+```
+
+Failed sends are not broadcast. Replays use the existing idempotency behavior.
+
+### Broker boundary
+
+Realtime V1 uses Spring's in-memory simple broker. Reconnect/missed-event synchronization, read state, message mutation/replies, presence/receipts/notifications, external brokers, horizontal scaling, and offline behavior remain deferred.
 
 ## Profile PATCH
 
-`PATCH /api/users/{userId}/profile` is implemented as a self-only update. Omitted fields remain unchanged, present non-null fields replace the stored value, and explicitly present `null` fields clear the stored value.
+`PATCH /api/users/{userId}/profile` is self-only. Omitted fields remain unchanged, present non-null fields replace values, and explicitly present `null` fields clear values.

@@ -9,12 +9,22 @@ Current implementation phases:
 - Phase 3 — Friend request vertical slice: complete.
 - Phase 4 — Direct messaging vertical slice: complete.
 - Phase 5 — Conversation/message reads and listing: complete.
+- Realtime V1 — STOMP/WebSocket message delivery: complete.
 
-Phase 4 provides the direct-message write path: authenticated accepted friends can send plain-text messages through `POST /api/conversations/direct/messages`. Friendship authorization is evaluated before conversation lookup/creation, so an unauthorized send cannot create conversation state. Conversations are unique per unordered participant pair; creation and first-message persistence are atomic; messages have server timestamps and per-conversation sequence numbers; client request UUIDs provide idempotent replay handling.
+Phase 4 provides the direct-message write path. Phase 5 adds authenticated HTTP conversation/message reads without realtime assumptions.
 
-Phase 5 adds authenticated HTTP reads without introducing realtime transport: users can list their direct conversations with offset/limit pagination and fetch messages for a participant conversation using the per-conversation sequence as an exclusive cursor. Conversation lists are ordered by recent activity (`updatedAt`) with a deterministic conversation-ID tiebreaker; message reads are ordered by ascending sequence number. Read access is participant-only and does not re-check friendship.
+Realtime V1 now provides:
+- WebSocket endpoint `/ws` with STOMP.
+- `/app` application prefix and `/topic` simple broker.
+- `/app/chat.send` with `{conversationId, content, requestId}`.
+- `/topic/conversations/{conversationId}` conversation delivery.
+- STOMP `CONNECT` authentication using the existing access JWT plus persisted session validation through `Authorization: Bearer <JWT>`.
+- Participant-only conversation subscriptions.
+- Sender identity derived from the authenticated STOMP principal.
+- Reuse of the existing message persistence, friendship authorization, sequencing, timestamps, and idempotency logic.
+- Broadcast only after the message service successfully persists/commits the message.
 
-Realtime delivery, read state, message mutations, replies, reconnect/offline synchronization, blocking, unfriend, mute, archive, and other later features remain deferred until explicitly scoped.
+The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, external brokers/horizontal scaling, and end-to-end encryption remain deferred.
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 
