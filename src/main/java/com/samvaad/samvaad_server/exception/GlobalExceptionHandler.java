@@ -2,6 +2,8 @@ package com.samvaad.samvaad_server.exception;
 
 import com.samvaad.samvaad_server.friendrequest.FriendRequestConflictException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestNotFoundException;
+import com.samvaad.samvaad_server.messaging.ConversationNotFoundException;
+import com.samvaad.samvaad_server.messaging.InvalidPaginationException;
 import com.samvaad.samvaad_server.messaging.MessageConflictException;
 import com.samvaad.samvaad_server.user.EmailAlreadyExistsException;
 import com.samvaad.samvaad_server.user.InvalidUsernameException;
@@ -50,6 +52,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MessageConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleMessageConflict(MessageConflictException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(ConversationNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleConversationNotFound(ConversationNotFoundException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPaginationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidPagination(InvalidPaginationException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 
