@@ -15,11 +15,16 @@
 - Exact case-insensitive username discovery via `GET /api/users/lookup?username={username}` with a restricted discovery DTO.
 - Friend-request lifecycle: send, incoming/outgoing pending lists, accept, reject, and sender cancellation.
 - Friend-request states: `PENDING`, `ACCEPTED`, `REJECTED`, `CANCELLED`.
-- An accepted friend-request row represents the friendship; an internal `areFriends(a, b)` query is available for later authorization.
+- An accepted friend-request row represents the friendship; an internal `areFriends(a, b)` query is used by direct messaging authorization.
+- Direct conversation persistence with normalized participant pairs and database-enforced pair uniqueness.
+- Plain-text direct message persistence with server-generated timestamps, monotonic per-conversation sequence numbers, and unique client request UUIDs for idempotency.
+- Atomic conversation creation and first-message persistence; conversation creation races are resolved through database uniqueness and winner retrieval.
+- Authenticated friend-gated message sending via `POST /api/conversations/direct/messages`.
+- Idempotent replay of an already-owned request UUID returns the original message; reuse of a request UUID by another message owner returns `409 Conflict`.
 
 ## Next work
 
-Phase 4: direct messaging vertical slice, using established friendship as the authorization boundary.
+Post-Phase 4 messaging follow-up: conversation/message reads and listing endpoints.
 
 ## Explicitly deferred
 
@@ -33,11 +38,14 @@ Phase 4: direct messaging vertical slice, using established friendship as the au
 - Full audit-policy definition.
 - V1 application-level encryption.
 - Friend-gated profile visibility remains deferred; the Phase 3 friend-request slice did not activate it.
+- Conversation/message reads and listing beyond the Phase 4 send-message endpoint.
+- Message editing/deletion, replies, read state, blocking, unfriend, mute, archive, and other later messaging/social features.
 
 ## Known gaps
 
 - Realtime transport auth and blocked-login delivery behavior.
 - Friend-gated profile visibility.
-- Messaging and message mutations.
+- Conversation/message read and listing APIs.
+- Message mutations and replies.
 - Display-name fallback policy.
 - Stable machine-readable error codes.

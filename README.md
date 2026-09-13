@@ -8,7 +8,7 @@ This repository contains the backend server service. The client interface is dev
 
 ## Current Status
 
-The project is in active backend development. **Phase 1 — Authentication & Authorization**, **Phase 2 — Exact Username Discovery**, and **Phase 3 — Friend Request Vertical Slice** are complete and tested. **Phase 4 — Direct Messaging Vertical Slice** is next.
+The project is in active backend development. **Phase 1 — Authentication & Authorization**, **Phase 2 — Exact Username Discovery**, **Phase 3 — Friend Request Vertical Slice**, and **Phase 4 — Direct Messaging Vertical Slice** are complete and tested.
 
 Currently implemented:
 
@@ -18,20 +18,21 @@ Currently implemented:
 - **Account Self-Service**: Users can change their own email and password. Username is immutable after creation.
 - **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`) with case-insensitive matching and a restricted discovery DTO containing only `userId` and `username`.
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
-- **Friendship**: An accepted friend-request row represents the friendship, with an internal `areFriends(a, b)` relationship check available for later messaging authorization.
+- **Friendship**: An accepted friend-request row represents the friendship, with an internal `areFriends(a, b)` relationship check used by direct messaging authorization.
+- **Direct Messaging**: Authenticated friends can send plain-text messages through `POST /api/conversations/direct/messages`. Direct conversations are unique per unordered user pair, first-message creation is atomic, messages receive server sequence/timestamp values, and client request UUIDs provide idempotent replay handling.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
 ### Not Yet Implemented
 
-- Direct conversations and message persistence.
+- Conversation/message reads and listing endpoints.
 - Realtime transport and delivery (STOMP/WebSocket).
 - Read state, message mutation, replies, reconnect/offline synchronization, and related messaging infrastructure.
 - User blocking, unfriend, archiving, or mute preferences.
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
-See the architecture, API, security, and roadmap documents under `docs/` for detailed implementation snapshots.
+See the architecture, API, security, roadmap, and ADR documents under `docs/` for detailed implementation snapshots and locked design decisions.
 
 ---
 
@@ -96,6 +97,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Phase 4 — Direct Messaging Vertical Slice**.
-
-The next slice will use the established friendship relationship as the authorization boundary for direct messaging. Do not begin later realtime, read-state, mutation, reply, or offline/reconnect work until the direct messaging slice is implemented and tested.
+**Post-Phase 4 messaging slices**: conversation/message reads and listing are the next direct-messaging follow-up; realtime, read-state, mutation, reply, and offline/reconnect work remain later/deferred until explicitly scoped.

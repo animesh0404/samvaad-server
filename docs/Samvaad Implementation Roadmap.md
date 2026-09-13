@@ -44,10 +44,29 @@ Locked Phase 3 decisions:
 - Friend-gated profile reads remain deferred; Phase 3 only establishes the relationship model/helper.
 
 ## Phase 4 — Direct Messaging Vertical Slice
-NEXT.
+COMPLETE.
 
-Use established friendship as the authorization boundary for subsequent direct messaging.
+Implemented:
+- direct conversation persistence for an unordered user pair
+- database-enforced conversation uniqueness
+- friendship authorization using `areFriends(a, b)`
+- self-message rejection
+- atomic conversation creation and first-message persistence
+- plain-text message persistence
+- server-generated message timestamp
+- monotonic per-conversation server sequence number
+- client-provided UUID request idempotency
+- idempotent replay for the original request owner
+- `409 Conflict` for foreign reuse of an existing request UUID
+- authenticated `POST /api/conversations/direct/messages`
+- unit, controller, integration, security, and database-invariant coverage
+
+The Phase 4 slice intentionally does not add separate conversation CRUD or read/listing endpoints.
+
+## Next implementation area
+
+Conversation/message reads and listing are the next direct-messaging follow-up.
 
 ## Later / deferred
 
-Realtime transport, reconnect/offline synchronization, read state, blocking, unfriend, mute, archive, and other later-stage messaging/social features remain outside the completed slices until explicitly scoped.
+Realtime transport, reconnect/offline synchronization, read state, message editing/deletion, replies, blocking, unfriend, mute, archive, and other later-stage messaging/social features remain outside the completed slices until explicitly scoped.
