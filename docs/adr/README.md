@@ -28,3 +28,4 @@ an earlier ADR only by explicitly naming it.
 | [0006](0006-profile-patch-field-presence.md) | Profile PATCH field-presence semantics |
 | [0007](0007-user-provisioning-and-authorization.md) | Admin-provisioned users and V1 authorization boundary |
 | [0008](0008-friend-request-gated-direct-messaging.md) | Friend-request-gated direct messaging |
+| [0009](0009-realtime-stomp-websocket-transport.md) | Realtime STOMP/WebSocket transport |
