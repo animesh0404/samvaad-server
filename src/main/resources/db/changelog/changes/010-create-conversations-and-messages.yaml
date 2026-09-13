@@ -1,0 +1,129 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-create-conversations-and-messages
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: conversations
+            columns:
+              - column:
+                  name: conversation_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: participant_a
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: participant_b
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_sequence_number
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: conversations
+            columnNames: participant_a, participant_b
+            constraintName: uq_conversations_pair
+        - createTable:
+            tableName: messages
+            columns:
+              - column:
+                  name: message_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: conversation_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sender_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sequence_number
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: server_timestamp
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: messages
+            baseColumnNames: conversation_id
+            referencedTableName: conversations
+            referencedColumnNames: conversation_id
+            constraintName: fk_messages_conversation
+        - addForeignKeyConstraint:
+            baseTableName: messages
+            baseColumnNames: sender_user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_messages_sender
+        - addUniqueConstraint:
+            tableName: messages
+            columnNames: conversation_id, sequence_number
+            constraintName: uq_messages_conversation_sequence

@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/users/lookup").authenticated()
                         .requestMatchers("/api/friend-requests/**").authenticated()
+                        .requestMatchers("/api/conversations/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/users/{userId}").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

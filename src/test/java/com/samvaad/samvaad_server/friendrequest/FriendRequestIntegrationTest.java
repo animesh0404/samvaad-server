@@ -24,6 +24,8 @@ import com.samvaad.samvaad_server.TestcontainersConfiguration;
 import com.samvaad.samvaad_server.auth.AuthenticationService;
 import com.samvaad.samvaad_server.auth.dto.LoginRequestDto;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
+import com.samvaad.samvaad_server.messaging.ConversationRepo;
+import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.User;
@@ -58,10 +60,18 @@ class FriendRequestIntegrationTest {
     private FriendRequestService friendRequestService;
 
     @Autowired
+    private ConversationRepo conversationRepo;
+
+    @Autowired
+    private MessageRepo messageRepo;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        messageRepo.deleteAll();
+        conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();
         userProfileRepo.deleteAll();
