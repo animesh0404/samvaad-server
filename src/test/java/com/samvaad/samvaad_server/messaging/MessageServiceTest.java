@@ -243,4 +243,95 @@ class MessageServiceTest {
 
         then(messageRepo).should(never()).saveAndFlush(any());
     }
+
+    @Test
+    void sendsMessageToConversationById() {
+        Conversation existing = conversation();
+        UUID requestId = UUID.randomUUID();
+
+        given(userRepo.findById(alice.getUserId())).willReturn(Optional.of(alice));
+        given(conversationRepo.findById(existing.getConversationId())).willReturn(Optional.of(existing));
+        given(friendRequestService.areFriends(alice.getUserId(), bob.getUserId())).willReturn(true);
+        given(messageRepo.findByRequestId(requestId)).willReturn(Optional.empty());
+        given(messageRepo.saveAndFlush(any(Message.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        SendMessageResult result = messageService.sendMessageToConversation(
+                alice.getUserId(), existing.getConversationId(), "Hello", requestId);
+
+        assertTrue(result.created());
+        assertEquals(1L, result.message().getSequenceNumber());
+        assertEquals(existing.getConversationId(), result.message().getConversationId());
+        assertEquals(alice.getUserId(), result.message().getSenderUserId());
+        then(conversationRepo).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void sendToUnknownConversationThrows() {
+        UUID unknownId = UUID.randomUUID();
+        given(userRepo.findById(alice.getUserId())).willReturn(Optional.of(alice));
+        given(conversationRepo.findById(unknownId)).willReturn(Optional.empty());
+
+        assertThrows(ConversationNotFoundException.class,
+                () -> messageService.sendMessageToConversation(
+                        alice.getUserId(), unknownId, "Hello", UUID.randomUUID()));
+
+        then(messageRepo).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void sendToConversationAsNonParticipantThrows() {
+        Conversation existing = conversation();
+        User carol = new User(UUID.randomUUID());
+        carol.setUsername("carol");
+        carol.setRole(UserRole.USER);
+        given(userRepo.findById(carol.getUserId())).willReturn(Optional.of(carol));
+        given(conversationRepo.findById(existing.getConversationId())).willReturn(Optional.of(existing));
+
+        assertThrows(ForbiddenOperationException.class,
+                () -> messageService.sendMessageToConversation(
+                        carol.getUserId(), existing.getConversationId(), "Hello", UUID.randomUUID()));
+
+        then(friendRequestService).shouldHaveNoInteractions();
+        then(messageRepo).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void sendToConversationWithoutFriendshipThrows() {
+        Conversation existing = conversation();
+        given(userRepo.findById(alice.getUserId())).willReturn(Optional.of(alice));
+        given(conversationRepo.findById(existing.getConversationId())).willReturn(Optional.of(existing));
+        given(friendRequestService.areFriends(alice.getUserId(), bob.getUserId())).willReturn(false);
+
+        assertThrows(ForbiddenOperationException.class,
+                () -> messageService.sendMessageToConversation(
+                        alice.getUserId(), existing.getConversationId(), "Hello", UUID.randomUUID()));
+
+        then(messageRepo).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void replaysOwnedRequestIdInConversation() {
+        Conversation existing = conversation();
+        Message original = new Message();
+        original.setMessageId(UUID.randomUUID());
+        original.setConversation(existing);
+        original.setSender(alice);
+        original.setSequenceNumber(4L);
+        original.setContent("Hello");
+        original.setServerTimestamp(java.time.LocalDateTime.now());
+        original.setRequestId(UUID.randomUUID());
+
+        given(userRepo.findById(alice.getUserId())).willReturn(Optional.of(alice));
+        given(conversationRepo.findById(existing.getConversationId())).willReturn(Optional.of(existing));
+        given(friendRequestService.areFriends(alice.getUserId(), bob.getUserId())).willReturn(true);
+        given(messageRepo.findByRequestId(original.getRequestId())).willReturn(Optional.of(original));
+
+        SendMessageResult result = messageService.sendMessageToConversation(
+                alice.getUserId(), existing.getConversationId(), "Hello", original.getRequestId());
+
+        assertFalse(result.created());
+        assertEquals(original.getMessageId(), result.message().getMessageId());
+        then(messageRepo).should(never()).saveAndFlush(any());
+    }
 }

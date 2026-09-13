@@ -51,11 +51,40 @@ public class MessageService {
 
         Conversation conversation = findOrCreateConversation(senderId, recipient.getUserId());
 
+        return persistMessage(sender, conversation, content, requestId);
+    }
+
+    @Transactional
+    public SendMessageResult sendMessageToConversation(
+            UUID senderId, UUID conversationId, String content, UUID requestId) {
+        User sender = userRepo.findById(senderId)
+                .orElseThrow(() -> new UserNotFoundException(senderId));
+
+        Conversation conversation = conversationRepo.findById(conversationId)
+                .orElseThrow(() -> new ConversationNotFoundException(conversationId));
+
+        if (!conversation.getParticipantA().equals(senderId)
+                && !conversation.getParticipantB().equals(senderId)) {
+            throw new ForbiddenOperationException();
+        }
+
+        UUID otherParticipantId = conversation.getParticipantA().equals(senderId)
+                ? conversation.getParticipantB()
+                : conversation.getParticipantA();
+        if (!friendRequestService.areFriends(senderId, otherParticipantId)) {
+            throw new ForbiddenOperationException();
+        }
+
+        return persistMessage(sender, conversation, content, requestId);
+    }
+
+    private SendMessageResult persistMessage(
+            User sender, Conversation conversation, String content, UUID requestId) {
         Optional<Message> replay = messageRepo.findByRequestId(requestId);
         if (replay.isPresent()) {
             Message existing = replay.get();
             if (!existing.getConversation().getConversationId().equals(conversation.getConversationId())
-                    || !existing.getSender().getUserId().equals(senderId)) {
+                    || !existing.getSender().getUserId().equals(sender.getUserId())) {
                 throw new MessageConflictException("Request ID already used");
             }
             return new SendMessageResult(MessageMapper.toDto(existing), false);

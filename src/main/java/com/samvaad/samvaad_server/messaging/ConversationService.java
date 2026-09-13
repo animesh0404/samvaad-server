@@ -66,6 +66,14 @@ public class ConversationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public boolean isConversationParticipant(UUID callerId, UUID conversationId) {
+        return conversationRepo.findById(conversationId)
+                .map(conversation -> conversation.getParticipantA().equals(callerId)
+                        || conversation.getParticipantB().equals(callerId))
+                .orElse(false);
+    }
+
     private ConversationDto toDto(Conversation conversation, UUID callerId) {
         UUID otherParticipantId = conversation.getParticipantA().equals(callerId)
                 ? conversation.getParticipantB()

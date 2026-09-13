@@ -1,6 +1,7 @@
 package com.samvaad.samvaad_server.messaging;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -226,5 +227,30 @@ class ConversationServiceTest {
 
         then(conversationRepo).shouldHaveNoInteractions();
         then(messageRepo).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void participantCheckIsTrueForBothParticipants() {
+        Conversation conversation = conversationBetween(alice.getUserId(), bob.getUserId());
+        given(conversationRepo.findById(conversation.getConversationId()))
+                .willReturn(Optional.of(conversation));
+
+        assertTrue(conversationService.isConversationParticipant(
+                alice.getUserId(), conversation.getConversationId()));
+        assertTrue(conversationService.isConversationParticipant(
+                bob.getUserId(), conversation.getConversationId()));
+    }
+
+    @Test
+    void participantCheckIsFalseForNonParticipantAndUnknownConversation() {
+        Conversation conversation = conversationBetween(alice.getUserId(), bob.getUserId());
+        given(conversationRepo.findById(conversation.getConversationId()))
+                .willReturn(Optional.of(conversation));
+        UUID unknownId = UUID.randomUUID();
+        given(conversationRepo.findById(unknownId)).willReturn(Optional.empty());
+
+        assertFalse(conversationService.isConversationParticipant(
+                carol.getUserId(), conversation.getConversationId()));
+        assertFalse(conversationService.isConversationParticipant(alice.getUserId(), unknownId));
     }
 }
