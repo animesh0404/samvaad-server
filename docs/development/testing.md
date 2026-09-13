@@ -38,6 +38,12 @@ Realtime V1 specifically establishes that authentication uses the existing JWT/s
 
 The suite does **not** establish the full planned messaging system. Reconnect/missed-event synchronization, offline queues, persistent read state, typing/presence, delivery receipts, push notifications, message mutations/replies, relationship controls, horizontal scaling/external brokers, and end-to-end encryption remain outside the implemented slices.
 
+## Manual Verification
+
+Automated integration coverage is complemented by a local manual smoke test of the realtime path. On 2026-09-13, authenticated Alice and Bob clients connected to `/ws`, completed STOMP `CONNECT`, subscribed to the same conversation topic, and Alice sent a realtime message through `/app/chat.send`. Bob received the resulting server-authoritative message on `/topic/conversations/{conversationId}` without polling. The observed `messageId`, `requestId`, `senderUserId`, sequence number, server timestamp, content, and conversation ID matched across the clients.
+
+The detailed sanitized evidence is recorded in [Realtime V1 Smoke Test](../verification/realtime-smoke-test.md).
+
 ## Running Tests
 
 ```bash
@@ -58,4 +64,5 @@ A specific test class can be run with:
 - [Local Development Setup](setup.md)
 - [Current Implementation State](../architecture/current-state.md)
 - [Current Security Posture](../security/current-security-posture.md)
+- [Realtime V1 Smoke Test](../verification/realtime-smoke-test.md)
 - [Documentation Map](../README.md)
