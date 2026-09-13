@@ -30,6 +30,13 @@ public final class UserMapper {
         return dto;
     }
 
+    public static UserLookupDto toLookupDto(User user) {
+        UserLookupDto dto = new UserLookupDto();
+        dto.setUserId(user.getUserId());
+        dto.setUsername(user.getUsername());
+        return dto;
+    }
+
     public static List<User> toEntity(List<UserDto> userDtos) {
         return userDtos.stream()
                 .map(UserMapper::toEntity)

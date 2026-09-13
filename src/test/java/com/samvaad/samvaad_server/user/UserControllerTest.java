@@ -513,4 +513,66 @@ class UserControllerTest {
                                 """))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void lookupByExactUsernameReturns200() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        UserLookupDto found = new UserLookupDto(UUID.randomUUID(), "alice");
+        given(userService.lookupByUsername(eq("alice"))).willReturn(found);
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(found.getUserId().toString()))
+                .andExpect(jsonPath("$.username").value("alice"))
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.role").doesNotExist());
+
+        then(userService).should().lookupByUsername(eq("alice"));
+    }
+
+    @Test
+    void lookupByUsernameIsCaseInsensitive() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        UserLookupDto found = new UserLookupDto(UUID.randomUUID(), "alice");
+        given(userService.lookupByUsername(eq("ALICE"))).willReturn(found);
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "ALICE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("alice"));
+    }
+
+    @Test
+    void lookupNonexistentUsernameReturns404() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        given(userService.lookupByUsername(eq("ghost")))
+                .willThrow(new UserNotFoundException("ghost"));
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "ghost"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void lookupMissingUsernameReturns400() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        mockMvc.perform(get("/api/users/lookup"))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void lookupBlankUsernameReturns400() throws Exception {
+        authenticateAs(UserRole.USER, UUID.randomUUID());
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "   "))
+                .andExpect(status().isBadRequest());
+
+        then(userService).shouldHaveNoInteractions();
+    }
 }

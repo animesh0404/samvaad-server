@@ -806,4 +806,97 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists());
     }
+
+    @Test
+    void unauthenticatedLookupReturns401() throws Exception {
+        mockMvc.perform(get("/api/users/lookup").param("username", "alice"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void lookupByExactUsernameReturns200() throws Exception {
+        User user = createUser("lookup_alice", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "lookup_alice")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
+                .andExpect(jsonPath("$.username").value("lookup_alice"))
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.role").doesNotExist());
+    }
+
+    @Test
+    void lookupMatchesCaseInsensitively() throws Exception {
+        User user = createUser("lookup_bob", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "LOOKUP_BOB")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
+                .andExpect(jsonPath("$.username").value("lookup_bob"));
+    }
+
+    @Test
+    void lookupSelfReturns200() throws Exception {
+        User user = createUser("lookup_self", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "lookup_self")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()));
+    }
+
+    @Test
+    void lookupPartialUsernameReturns404() throws Exception {
+        User user = createUser("lookup_partial", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "lookup_part")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "ookup_partial")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "lookup_partial_extra")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void lookupNonexistentUsernameReturns404() throws Exception {
+        User user = createUser("lookup_caller", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "ghost")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void lookupMissingUsernameReturns400() throws Exception {
+        User user = createUser("lookup_noparam", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void lookupBlankUsernameReturns400() throws Exception {
+        User user = createUser("lookup_blank", UserRole.USER);
+        String token = loginAs(user).accessToken();
+
+        mockMvc.perform(get("/api/users/lookup").param("username", "   ")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
 }

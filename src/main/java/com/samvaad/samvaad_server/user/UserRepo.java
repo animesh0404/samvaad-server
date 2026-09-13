@@ -16,6 +16,8 @@ public interface UserRepo extends JpaRepository<User, UUID> {
 
     boolean existsByRole(UserRole role);
 
+    Optional<User> findByUsernameIgnoreCase(String username);
+
     List<User> findByEmailIgnoreCase(String email);
 
     @Query("""

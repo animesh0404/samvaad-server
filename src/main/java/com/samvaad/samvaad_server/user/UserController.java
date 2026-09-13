@@ -41,6 +41,14 @@ public class UserController {
         return userService.listUsers();
     }
 
+    @GetMapping("/lookup")
+    public UserLookupDto lookupByUsername(@RequestParam(required = false) String username) {
+        if (username == null || username.isBlank()) {
+            throw new InvalidUsernameException("Username must not be blank");
+        }
+        return userService.lookupByUsername(username);
+    }
+
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID userId) {
         AuthenticatedUser caller = CurrentUser.require();

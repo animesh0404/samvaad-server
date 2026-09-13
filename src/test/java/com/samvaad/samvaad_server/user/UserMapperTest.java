@@ -26,4 +26,19 @@ class UserMapperTest {
         assertEquals("animesh", result.getUsername());
         assertEquals("animesh@example.com", result.getEmail());
     }
+
+    @Test
+    void mapsLookupDtoWithoutPrivateFields() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("alice");
+        user.setEmail("alice@example.com");
+        user.setPasswordHash("$2a$10$hashed");
+        user.setRole(UserRole.ADMIN);
+
+        UserLookupDto result = UserMapper.toLookupDto(user);
+
+        assertEquals(userId, result.getUserId());
+        assertEquals("alice", result.getUsername());
+    }
 }

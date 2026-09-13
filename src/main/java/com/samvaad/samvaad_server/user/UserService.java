@@ -65,6 +65,13 @@ public class UserService {
                 .toList();
     }
 
+    public UserLookupDto lookupByUsername(String username) {
+        User user = userRepo.findByUsernameIgnoreCase(username.trim())
+                .orElseThrow(() -> new UserNotFoundException(username));
+
+        return UserMapper.toLookupDto(user);
+    }
+
     @Transactional
     public void deleteUser(UUID userId) {
         User user = userRepo.findById(userId)

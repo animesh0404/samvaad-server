@@ -351,4 +351,39 @@ class UserServiceTest {
         assertEquals(userId, result.getUserId());
         then(userRepo).should().save(user);
     }
+
+    @Test
+    void lookupByExactUsername() {
+        User user = new User(UUID.randomUUID());
+        user.setUsername("alice");
+        user.setEmail("alice@example.com");
+        user.setRole(UserRole.USER);
+
+        given(userRepo.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(user));
+
+        UserLookupDto result = userService.lookupByUsername("alice");
+
+        assertEquals(user.getUserId(), result.getUserId());
+        assertEquals("alice", result.getUsername());
+    }
+
+    @Test
+    void lookupMatchesCaseInsensitively() {
+        User user = new User(UUID.randomUUID());
+        user.setUsername("alice");
+
+        given(userRepo.findByUsernameIgnoreCase("ALICE")).willReturn(Optional.of(user));
+
+        UserLookupDto result = userService.lookupByUsername("ALICE");
+
+        assertEquals("alice", result.getUsername());
+        then(userRepo).should().findByUsernameIgnoreCase("ALICE");
+    }
+
+    @Test
+    void lookupNonexistentUsernameThrows() {
+        given(userRepo.findByUsernameIgnoreCase("ghost")).willReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.lookupByUsername("ghost"));
+    }
 }
