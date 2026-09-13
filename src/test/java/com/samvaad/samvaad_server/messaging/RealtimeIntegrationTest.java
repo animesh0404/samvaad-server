@@ -258,6 +258,28 @@ class RealtimeIntegrationTest {
     }
 
     @Test
+    void connectSucceedsWithoutInstallationIdentity() throws Exception {
+        User alice = createUser("rt_conn_no_inst");
+        String token = authenticationService.login(
+                new LoginRequestDto(
+                        alice.getUsername(),
+                        "secret123",
+                        null,
+                        ClientPlatform.WEB,
+                        "Test Client",
+                        "1.0.0"),
+                "127.0.0.1",
+                "UserAgent").accessToken();
+        ConnectedClient client = connectClient(token);
+        try {
+            StompSession session = client.session();
+            assertTrue(session.isConnected());
+        } finally {
+            client.close();
+        }
+    }
+
+    @Test
     void missingJwtConnectRejected() {
         ConnectedClient client = null;
         try {

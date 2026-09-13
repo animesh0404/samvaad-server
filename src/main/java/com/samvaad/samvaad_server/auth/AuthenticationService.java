@@ -74,15 +74,17 @@ public class AuthenticationService {
             throw new IncorrectPasswordException("Incorrect password");
         }
 
+        // Optional client/device metadata only: blank/whitespace-only becomes null.
+        // Non-blank values are persisted unchanged. No synthetic IDs are generated.
+        // Normalized here, outside the identity transaction below, because session
+        // creation and session-limit enforcement never depend on installationId.
+        String normalizedInstallationId = normalizeInstallationId(request.getInstallationId());
+
         // Step 3: Enter short atomic transaction
         LoginResult result = transactionTemplate.execute(status -> {
             // Lock User row with PESSIMISTIC_WRITE
             User lockedUser = userRepo.findByIdWithLock(user.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(user.getUserId()));
-
-            // Single normalization boundary: blank/whitespace-only becomes null.
-            // Non-blank values are persisted unchanged. No synthetic IDs are generated.
-            String normalizedInstallationId = normalizeInstallationId(request.getInstallationId());
 
             // Count active sessions
             long activeSessions = sessionService.countActiveSessions(lockedUser);
