@@ -8,7 +8,7 @@ This repository contains the backend server service. The client interface is dev
 
 ## Current Status
 
-The project is in active backend development. **Phases 1–5 and Realtime V1 are complete and tested.**
+The project is in active backend development. **Phases 1–5 and Realtime V1 are complete and tested. Realtime V1 has also been manually verified end-to-end.**
 
 Currently implemented:
 
@@ -22,7 +22,7 @@ Currently implemented:
 - **Direct Messaging**: Authenticated friends can send plain-text messages through HTTP. Direct conversations are unique per unordered user pair; messages receive server sequence/timestamp values and client request UUIDs provide idempotent replay handling.
 - **Conversation Reads**: Participants can list direct conversations through `GET /api/conversations/direct` with offset/limit pagination and recent-activity ordering.
 - **Message Reads**: Participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages` using the exclusive `afterSequence` cursor.
-- **Realtime Messaging V1**: WebSocket + STOMP transport at `/ws`, authenticated STOMP `CONNECT` using the existing access JWT/session model, participant-only conversation subscriptions, `/app/chat.send`, `/topic/conversations/{conversationId}`, reuse of the existing message persistence/idempotency/authorization logic, and broadcast only after successful persistence. The first slice uses Spring's in-memory simple broker.
+- **Realtime Messaging V1**: WebSocket + STOMP transport at `/ws`, authenticated STOMP `CONNECT` using the existing access JWT/session model, participant-only conversation subscriptions, `/app/chat.send`, `/topic/conversations/{conversationId}`, reuse of the existing message persistence/idempotency/authorization logic, and broadcast only after successful persistence. The first slice uses Spring's in-memory simple broker. A manual Alice-to-Bob smoke test has verified live delivery without polling.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
@@ -37,7 +37,7 @@ Currently implemented:
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
-See `docs/` for implementation snapshots and locked decisions.
+See `docs/` for implementation snapshots, locked decisions, and verification records.
 
 ---
 
@@ -89,6 +89,7 @@ The authoritative documentation lives under [`docs/`](docs/):
 - [Security Posture](docs/security/current-security-posture.md)
 - [Architecture Decision Records](docs/adr/)
 - [Developer Guides](docs/development/)
+- [Verification Records](docs/verification/)
 - [Agent Guidelines](AGENTS.md)
 
 ---
