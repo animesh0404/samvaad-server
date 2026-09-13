@@ -22,6 +22,18 @@
 - Authenticated friend-gated message sending via `POST /api/conversations/direct/messages`.
 - Idempotent replay of an already-owned request UUID returns the original message; reuse of a request UUID by another message owner returns `409 Conflict`.
 
+## Architecture diagrams
+
+The current implementation is also captured visually in the PlantUML diagrams under `docs/architecture/diagrams/`:
+
+- `current-authentication-session.puml` — JWT/session validation, persisted sessions, revocation, and endpoint authorization boundary.
+- `current-user-profile.puml` — user/profile persistence model.
+- `current-domain-model.puml` — current User, Profile, Session, FriendRequest, Conversation, and Message domain relationships.
+- `current-data-model.puml` — current PostgreSQL relationship/message tables and key uniqueness invariants.
+- `current-messaging-write-flow.puml` — implemented HTTP direct-message write path and transaction/idempotency flow.
+
+These diagrams describe implemented behavior only; future STOMP/WebSocket transport is intentionally not represented as current architecture.
+
 ## Next work
 
 Post-Phase 4 messaging follow-up: conversation/message reads and listing endpoints.

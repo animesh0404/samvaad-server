@@ -30,11 +30,12 @@ entity user_profiles {
 }
 
 users ||--o| user_profiles : shared user_id
+
 note right of user_profiles
-Current User/Profile persisted model only.
-Authentication and session persistence
-are documented separately.
-Conversations, messages, and realtime transport
-are not implemented.
+Current User/Profile persisted model.
+Authentication/session persistence is documented
+separately. Friend requests, conversations, and
+messages are shown in the current domain/data-model
+diagrams.
 end note
 @enduml

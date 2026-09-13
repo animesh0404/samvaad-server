@@ -1,0 +1,77 @@
+@startuml
+title Current implemented messaging and relationship data model
+
+entity users {
+  * user_id : UUID <<PK>>
+  --
+  username : VARCHAR(32) <<unique>>
+  email : VARCHAR(320)
+  password_hash : VARCHAR(72)
+  role : VARCHAR
+}
+
+entity user_profiles {
+  * user_id : UUID <<PK, FK>>
+  --
+  display_name : VARCHAR(255)
+  bio : TEXT
+  avatar_url : VARCHAR(2048)
+}
+
+entity sessions {
+  * session_id : UUID <<PK>>
+  --
+  user_id : UUID <<FK>>
+  refresh_token_hash : VARCHAR(128) <<unique>>
+  revoked_at : TIMESTAMP
+}
+
+entity friend_requests {
+  * id : UUID <<PK>>
+  --
+  sender_id : UUID <<FK>>
+  recipient_id : UUID <<FK>>
+  status : VARCHAR
+  created_at : TIMESTAMP
+  responded_at : TIMESTAMP
+}
+
+entity conversations {
+  * id : UUID <<PK>>
+  --
+  participant_min : UUID <<FK>>
+  participant_max : UUID <<FK>>
+  last_sequence_number : BIGINT
+}
+
+entity messages {
+  * id : UUID <<PK>>
+  --
+  conversation_id : UUID <<FK>>
+  sender_id : UUID <<FK>>
+  sequence : BIGINT
+  content : TEXT
+  server_timestamp : TIMESTAMP
+  request_id : UUID <<unique>>
+}
+
+users ||--o| user_profiles
+users ||--o{ sessions
+users ||--o{ friend_requests : sender
+users ||--o{ friend_requests : recipient
+users ||--o{ conversations : participant
+users ||--o{ messages : sender
+conversations ||--o{ messages
+
+note bottom of conversations
+Database invariant:
+unique(participant_min, participant_max)
+for the normalized unordered pair.
+end note
+
+note bottom of messages
+Database invariants:
+unique(conversation_id, sequence)
+unique(request_id)
+end note
+@enduml

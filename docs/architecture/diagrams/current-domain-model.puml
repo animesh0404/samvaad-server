@@ -1,0 +1,87 @@
+@startuml
+title Current implemented Samvaad domain relationships
+
+entity User {
+  * userId : UUID
+  --
+  username
+  email
+  role
+}
+
+entity UserProfile {
+  * userId : UUID
+  --
+  displayName
+  bio
+  avatarUrl
+  firstName
+  middleName
+  lastName
+  statusMessage
+}
+
+entity Session {
+  * sessionId : UUID
+  --
+  userId
+  refreshTokenHash
+  expiresAt
+  revokedAt
+}
+
+entity FriendRequest {
+  * requestId : UUID
+  --
+  sender
+  recipient
+  status
+  createdAt
+  respondedAt
+}
+
+entity Conversation {
+  * conversationId : UUID
+  --
+  participantMin
+  participantMax
+  lastSequenceNumber
+}
+
+entity Message {
+  * messageId : UUID
+  --
+  conversationId
+  sender
+  sequence
+  content
+  serverTimestamp
+  requestId
+}
+
+User ||--o| UserProfile : has
+User ||--o{ Session : owns
+User ||--o{ FriendRequest : sends
+User ||--o{ FriendRequest : receives
+User ||--o{ Conversation : participates
+Conversation ||--o{ Message : contains
+User ||--o{ Message : sends
+
+note right of FriendRequest
+An ACCEPTED friend-request row is the friendship.
+The internal areFriends(a,b) relationship check
+is used by direct-message authorization.
+end note
+
+note right of Conversation
+Exactly one direct conversation exists per
+unordered participant pair at the database level.
+Phase 4 creates it only on an authorized send.
+end note
+
+note right of Message
+requestId is unique for durable idempotency.
+sequence is monotonic within a conversation.
+serverTimestamp is assigned by the server.
+end note
+@enduml

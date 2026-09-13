@@ -1,0 +1,39 @@
+@startuml
+title Current implemented direct-message write flow
+
+actor Client
+participant "Spring Security" as Security
+participant "MessageController" as Controller
+participant "MessageService" as Service
+database "PostgreSQL" as DB
+
+Client -> Security : POST /api/conversations/direct/messages
+Security -> Security : validate JWT + persisted session
+Security -> Controller : authenticated user context
+Controller -> Service : sendMessage(username, content, requestId)
+Service -> DB : resolve recipient
+Service -> DB : verify accepted friendship
+Service -> DB : find/create normalized conversation
+Service -> DB : allocate next sequence
+Service -> DB : persist message with server timestamp
+DB --> Service : persisted message
+Service --> Controller : message DTO
+Controller --> Client : 201 Created
+
+note over Service,DB
+Request UUID idempotency:
+- same owner + same requestId -> existing message (200)
+- foreign owner + same requestId -> 409 Conflict
+
+Conversation creation and first-message persistence
+are transactional. Database uniqueness resolves
+conversation creation races.
+end note
+
+note over Client,DB
+This is the current HTTP write slice only.
+Conversation/message reads, STOMP/WebSocket realtime
+delivery, read state, mutations, replies, and
+reconnect/offline synchronization are not implemented.
+end note
+@enduml
