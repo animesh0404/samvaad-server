@@ -134,14 +134,13 @@ class MessageServiceTest {
     void nonFriendCannotSend() {
         given(userRepo.findById(alice.getUserId())).willReturn(Optional.of(alice));
         given(userRepo.findByUsernameIgnoreCase("bob")).willReturn(Optional.of(bob));
-        given(conversationRepo.findLockedByParticipants(normalizedPair()[0], normalizedPair()[1]))
-                .willReturn(Optional.of(conversation()));
         given(friendRequestService.areFriends(alice.getUserId(), bob.getUserId())).willReturn(false);
 
         assertThrows(ForbiddenOperationException.class,
                 () -> messageService.sendMessage(alice.getUserId(), "bob", "Hello", UUID.randomUUID()));
 
-        then(messageRepo).should(never()).saveAndFlush(any());
+        then(conversationRepo).shouldHaveNoInteractions();
+        then(messageRepo).shouldHaveNoInteractions();
     }
 
     @Test
@@ -152,8 +151,9 @@ class MessageServiceTest {
         assertThrows(ForbiddenOperationException.class,
                 () -> messageService.sendMessage(alice.getUserId(), "alice", "Hello", UUID.randomUUID()));
 
-        then(conversationRepo).should(never()).saveAndFlush(any());
-        then(messageRepo).should(never()).saveAndFlush(any());
+        then(friendRequestService).shouldHaveNoInteractions();
+        then(conversationRepo).shouldHaveNoInteractions();
+        then(messageRepo).shouldHaveNoInteractions();
     }
 
     @Test

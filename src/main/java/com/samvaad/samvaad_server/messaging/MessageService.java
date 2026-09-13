@@ -45,11 +45,11 @@ public class MessageService {
             throw new ForbiddenOperationException();
         }
 
-        Conversation conversation = findOrCreateConversation(senderId, recipient.getUserId());
-
         if (!friendRequestService.areFriends(senderId, recipient.getUserId())) {
             throw new ForbiddenOperationException();
         }
+
+        Conversation conversation = findOrCreateConversation(senderId, recipient.getUserId());
 
         Optional<Message> replay = messageRepo.findByRequestId(requestId);
         if (replay.isPresent()) {
