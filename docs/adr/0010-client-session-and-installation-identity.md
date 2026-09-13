@@ -36,9 +36,9 @@ rather than making installation a mandatory parent identity for sessions.
 
 ## Current implementation boundary
 
-The current implementation still requires an `installationId` in the login/session-creation contract and persists it as session metadata. This is a transitional implementation detail, not the architectural identity boundary established by this ADR.
+The installation-ID/session refactor is complete. `POST /api/auth/login` accepts a missing or null `installationId`; blank or whitespace values are normalized to null at the authentication service boundary. When supplied with a nonblank value, the identifier is retained as session metadata. The persisted `sessions.installation_id` column is nullable via Liquibase migration `011-make-installation-id-nullable.yaml`.
 
-Before client development, the installation-ID/session contract must be audited and refactored so clients that do not naturally have an installation concept are not forced to invent one. The implementation and API documentation must then be reconciled together.
+Authentication remains user-plus-persisted-session based. Clients that do not naturally have an installation concept can authenticate without inventing one, while clients that already have installation/device metadata may continue to send it.
 
 ## Consequences
 
@@ -46,8 +46,8 @@ Before client development, the installation-ID/session contract must be audited 
 - A user can have multiple independent authenticated sessions without an installation hierarchy being required.
 - Client-specific metadata can evolve without changing the authentication model.
 - Mobile clients can adopt installation identity when their lifecycle and future push/device-management requirements justify it.
-- Web, TUI, and portable desktop clients can authenticate without manufacturing an artificial installation identity after the transitional contract is removed.
-- Existing implementation and API contracts must not be documented as already refactored; the migration is a separate implementation task.
+- Web, TUI, and portable desktop clients can authenticate without manufacturing an artificial installation identity.
+- Existing clients that still send a nonblank installation identifier remain compatible.
 
 ## Relationship to ADR 0003
 

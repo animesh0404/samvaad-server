@@ -53,9 +53,13 @@ Implementation boundary: the HTTP and STOMP transports enter the same message bu
 
 ## Pre-client architecture cleanup
 
-NEXT.
+COMPLETE.
 
-Audit and refactor the current installation-ID/session contract so authentication remains session-based and installation identity becomes optional client/device metadata where appropriate. The goal is to avoid forcing web, TUI, or portable desktop clients to invent an installation identity while retaining a natural installation concept for mobile clients where useful. Reconcile the login/session implementation and API documentation after the refactor.
+The installation-ID/session contract was audited and refactored so authentication remains session-based and installation identity is optional client/device metadata. `POST /api/auth/login` now accepts clients that omit `installationId`; blank/whitespace values normalize to null, while nonblank values remain supported. Liquibase migration `011-make-installation-id-nullable.yaml` makes the persisted session field nullable. A focused happy-path smoke test verified login without `installationId`, an authenticated follow-up request, and backward-compatible login with `installationId`.
+
+## Next implementation area
+
+Operational logging implementation: implement the existing logging policy in the application, including meaningful business/application and useful security/authentication events at service boundaries, correlation/trace context, secret avoidance, and configurable size-based rolling file retention. This is operational logging, not a full audit/event-history system.
 
 ## Later / deferred
 

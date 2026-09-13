@@ -14,7 +14,7 @@ Currently implemented:
 
 - **User and Profile Slice**: User creation (`POST /api/users`), authenticated user lookup, profile retrieval, and self-service profile updates.
 - **User Administration**: ADMIN-only user listing and hard deletion.
-- **Authentication & Sessions**: Login with username or email and password, persisted sessions, session-bound JWT access tokens, rotating refresh tokens, five-active-session enforcement, and logout/session revocation.
+- **Authentication & Sessions**: Login with username or email and password, persisted sessions, session-bound JWT access tokens, rotating refresh tokens, five-active-session enforcement, and logout/session revocation. `installationId` is optional client/device metadata; clients without an installation concept do not need to manufacture one.
 - **Account Self-Service**: Users can change their own email and password. Username is immutable after creation.
 - **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`).
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
@@ -96,4 +96,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Realtime follow-on work**: reconnect/missed-event synchronization and persistent read state are the next natural messaging concerns. Message mutation, replies, relationship controls, and horizontal scaling remain separately deferred.
+**Operational logging implementation**: implement the already-defined logging policy in the application, covering meaningful business/application and useful security/authentication events at appropriate service boundaries, with correlation/trace context and rolling file retention. This is separate from a future full audit/event-history system. Realtime follow-on work and other deferred messaging features remain later concerns.

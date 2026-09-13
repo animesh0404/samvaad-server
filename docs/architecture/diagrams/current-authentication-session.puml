@@ -16,7 +16,7 @@ entity sessions {
   user_id : UUID <<FK>>
   refresh_token_hash : VARCHAR(128) <<unique, not null>>
   refresh_token_expires_at : TIMESTAMP
-  installation_id : VARCHAR(255)
+  installation_id : VARCHAR(255) <<nullable>>
   client_platform : VARCHAR(16)
   client_name : VARCHAR(255)
   client_version : VARCHAR(64)
@@ -37,6 +37,10 @@ POST /api/auth/login
   -> persisted session allocation
   -> session-bound JWT
 
+installationId is optional login/session metadata.
+Missing/null/blank values result in no installation metadata;
+nonblank values remain supported.
+
 POST /api/auth/refresh
   -> validate persisted session
   -> rotate refresh-token hash
@@ -55,7 +59,7 @@ Access token lifetime: 1 day
 Refresh expiry: 30 days sliding
 Maximum active sessions: 5
 
-Realtime transport authentication and delivery
-remain deferred.
+Realtime transport is implemented separately through
+STOMP/WebSocket; see the realtime architecture documentation.
 end note
 @enduml

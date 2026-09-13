@@ -126,11 +126,11 @@ uses `403` rather than `404`.
 The authentication boundary is the user plus persisted session. Installation
 identity is a separate client/device concern and is governed by ADR 0010.
 
-A session may carry client, device, or installation metadata, but installation
-identity is not fundamental to authentication. The current implementation still
-requires an `installationId` during login/session creation; that requirement is
-transitional and must be audited/refactored before client development so clients
-without a natural installation lifecycle do not have to invent one.
+`installationId` is optional during login/session creation. Missing, null, blank,
+or whitespace-only values result in no installation metadata being stored. A
+nonblank value is retained as optional session metadata. The database column
+`sessions.installation_id` is nullable following Liquibase migration
+`011-make-installation-id-nullable.yaml`.
 
 ## Spring Boot default user
 
@@ -163,7 +163,6 @@ password has no effect on Samvaad API authentication.
 - realtime delivery of blocked-login security notifications
 - final JWT signing algorithm, production key storage, and key rotation
 - first-login enforcement for changing the seeded administrator's known default password
-- installation-ID/session contract audit and refactor as described by ADR 0010
 
 ## Consequences
 
