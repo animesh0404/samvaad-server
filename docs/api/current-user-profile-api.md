@@ -16,7 +16,7 @@ Friend-request lifecycle is implemented separately under `/api/friend-requests`.
 
 ## Direct messaging
 
-Implemented endpoint:
+### Send message
 
 `POST /api/conversations/direct/messages`
 
@@ -36,7 +36,27 @@ Friendship authorization is evaluated before conversation lookup or creation. An
 
 A newly persisted message returns `201`. Validation failures return `400`; unauthenticated requests return `401`; non-friends or self-messages return `403`; an unknown recipient returns `404`; conflicting request UUID reuse returns `409`.
 
-Conversation/message reads and listing, realtime delivery, read state, mutations, replies, and offline/reconnect behavior are outside this slice.
+### List direct conversations
+
+`GET /api/conversations/direct?limit=20&offset=0`
+
+Authentication is required. The response is a JSON array of conversation DTOs with `conversationId`, `otherParticipantUserId`, `otherParticipantUsername`, `lastSequenceNumber`, and `updatedAt`.
+
+`limit` defaults to `20` and must be between `1` and `100`. `offset` defaults to `0` and must be non-negative. Invalid pagination returns `400`; non-numeric request parameters are handled as Spring `400` responses. Conversations are ordered by recent `updatedAt` descending, with `conversationId` ascending as a deterministic tiebreaker.
+
+The caller sees only conversations where they are one of the two participants. The other participant's current username is resolved for the response; it is `null` if that user has been admin-deleted.
+
+### Read conversation messages
+
+`GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20`
+
+Authentication is required and the caller must be a participant in the conversation. `afterSequence` defaults to `0`, must be non-negative, and is an exclusive sequence cursor. `limit` defaults to `20` and must be between `1` and `100`. Results are ordered by ascending server-assigned `sequenceNumber`.
+
+An unknown conversation returns `404`. A known conversation requested by a non-participant returns `403`. Invalid pagination returns `400`; non-numeric request parameters are handled as Spring `400` responses.
+
+Message reads do not re-check friendship. Current authorization is based on conversation participation because unfriend/block lifecycle does not yet exist.
+
+Conversation/message reads are HTTP-only in this slice. Realtime delivery, read state, message mutations, replies, and offline/reconnect behavior remain outside the implemented scope.
 
 ## Profile PATCH
 

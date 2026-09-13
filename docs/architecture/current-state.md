@@ -21,6 +21,11 @@
 - Atomic conversation creation and first-message persistence; conversation creation races are resolved through database uniqueness and winner retrieval.
 - Authenticated friend-gated message sending via `POST /api/conversations/direct/messages`; friendship authorization is performed before conversation lookup/creation.
 - Idempotent replay of an already-owned request UUID returns the original message; reuse of a request UUID by another message owner returns `409 Conflict`.
+- Authenticated direct conversation listing via `GET /api/conversations/direct` with offset/limit pagination, recent-activity ordering, and deterministic conversation-ID tiebreaking.
+- Participant-only message reads via `GET /api/conversations/direct/{conversationId}/messages` using an exclusive per-conversation sequence cursor and ascending sequence ordering.
+- Conversation read authorization is participant-only; friendship is not re-checked for reads because participation is the current access boundary.
+- Unknown conversation reads return `404`; known non-participant reads return `403`; invalid pagination returns `400`.
+- Conversation DTOs resolve the other participant's current username and allow it to be `null` when that user has been admin-deleted.
 
 ## Architecture diagrams
 
@@ -31,12 +36,13 @@ The current implementation is also captured visually in the PlantUML diagrams un
 - `current-domain-model.puml` — current User, Profile, Session, FriendRequest, Conversation, and Message domain relationships.
 - `current-data-model.puml` — current PostgreSQL relationship/message tables and key uniqueness invariants.
 - `current-messaging-write-flow.puml` — implemented HTTP direct-message write path and transaction/idempotency flow.
+- `current-messaging-read-flow.puml` — implemented HTTP conversation-list and participant-only message-read flows, including pagination semantics.
 
 These diagrams describe implemented behavior only; future STOMP/WebSocket transport is intentionally not represented as current architecture.
 
 ## Next work
 
-Post-Phase 4 messaging follow-up: conversation/message reads and listing endpoints.
+Realtime messaging transport and delivery using STOMP/WebSocket.
 
 ## Explicitly deferred
 
@@ -45,19 +51,17 @@ Post-Phase 4 messaging follow-up: conversation/message reads and listing endpoin
 - Exact JWT signing/key-management policy.
 - Realtime transport authentication and delivery protocol.
 - Reconnect/offline synchronization protocol.
-- Pagination cursors.
+- General pagination cursors.
 - Rate limiting.
 - Full audit-policy definition.
 - V1 application-level encryption.
 - Friend-gated profile visibility remains deferred; the Phase 3 friend-request slice did not activate it.
-- Conversation/message reads and listing beyond the Phase 4 send-message endpoint.
-- Message editing/deletion, replies, read state, blocking, unfriend, mute, archive, and other later messaging/social features.
+- Read state, message editing/deletion, replies, blocking, unfriend, mute, archive, and other later messaging/social features.
 
 ## Known gaps
 
 - Realtime transport auth and blocked-login delivery behavior.
 - Friend-gated profile visibility.
-- Conversation/message read and listing APIs.
-- Message mutations and replies.
 - Display-name fallback policy.
 - Stable machine-readable error codes.
+- A dedicated conversation recency field if future requirements make JPA `updatedAt` insufficient.

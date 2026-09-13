@@ -21,12 +21,15 @@
 - Self-messaging is rejected.
 - Direct conversation uniqueness and message sequence/request-ID uniqueness are backed by database constraints.
 - Client request UUID replay is idempotent only for the original sender/conversation; foreign reuse is rejected with `409`.
+- Conversation listing requires authentication and scopes results to conversations in which the caller is a participant.
+- Message reads require authentication and participant authorization; a known non-participant receives `403` and an unknown conversation receives `404`.
+- Message reads use server-owned sequence numbers for ordering/cursor progression; clients cannot choose message sequence values.
+- Read endpoints validate pagination bounds and reject invalid values with `400` rather than silently clamping them.
 
 ## Deferred / future
 
-- Friend-gated profile visibility.
 - Realtime transport authentication and delivery.
-- Conversation/message read and listing authorization beyond the send-message slice.
+- Friend-gated profile visibility.
 - Read state, message mutations, replies, reconnect/offline synchronization.
 - Blocking, unfriend, mute, archive, and related relationship controls.
 - Rate limiting.

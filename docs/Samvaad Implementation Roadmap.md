@@ -62,12 +62,30 @@ Implemented:
 - authenticated `POST /api/conversations/direct/messages`
 - unit, controller, integration, security, and database-invariant coverage
 
-The Phase 4 slice intentionally does not add separate conversation CRUD or read/listing endpoints.
+## Phase 5 — Conversation/Message Reads & Listing
+COMPLETE.
+
+Implemented:
+- `GET /api/conversations/direct?limit=20&offset=0` for authenticated users to list their direct conversations
+- conversation-list ordering by recent `updatedAt` descending with `conversationId` ascending as deterministic tiebreaker
+- offset/limit validation with `limit` restricted to 1–100 and non-negative offset
+- `GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20` for participant-only message reads
+- exclusive message sequence cursor (`afterSequence`) with ascending sequence ordering
+- message-read validation with `limit` restricted to 1–100 and non-negative cursor
+- `404` for an unknown conversation and `403` for a known conversation whose caller is not a participant
+- nullable `otherParticipantUsername` when the other user has been admin-deleted
+- unit, controller, and Testcontainers integration coverage for authentication, scoping, ordering, pagination, empty results, and invalid parameters
+
+Design notes:
+- Conversation lists use offset/limit because the current model has no dedicated stable single-column conversation cursor.
+- Message reads use the existing monotonic per-conversation sequence as a message-specific cursor; no general pagination framework is introduced.
+- Conversation-list recency currently uses JPA-audited `updatedAt`, which is refreshed by the existing message write path through the conversation sequence mutation. A dedicated `last_message_at` field can be revisited if read/list requirements grow.
+- Conversation-list pagination uses the existing Spring Data derived-query approach and handles non-aligned offsets by over-fetching within the selected page and dropping the required head rows.
 
 ## Next implementation area
 
-Conversation/message reads and listing are the next direct-messaging follow-up.
+Realtime messaging transport and delivery (STOMP/WebSocket).
 
 ## Later / deferred
 
-Realtime transport, reconnect/offline synchronization, read state, message editing/deletion, replies, blocking, unfriend, mute, archive, and other later-stage messaging/social features remain outside the completed slices until explicitly scoped.
+Read state, message editing/deletion, replies, reconnect/offline synchronization, blocking, unfriend, mute, archive, and other later-stage messaging/social features remain outside the completed slices until explicitly scoped.

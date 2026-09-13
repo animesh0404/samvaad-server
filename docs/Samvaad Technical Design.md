@@ -1,6 +1,6 @@
 # Samvaad — Technical Design
 
-> **Status:** High-level server architecture is recorded. V1 user/authentication and relationship boundaries are aligned with ADRs 0007 and 0008.
+> **Status:** High-level server architecture is recorded. V1 user/authentication and relationship boundaries are aligned with ADRs 0007 and 0008. Direct messaging persistence and HTTP read slices are implemented through Phase 5.
 > **Focus:** Backend/domain/protocol/persistence/concurrency.
 > **Rule:** Architectural invariants are fixed by ADRs; low-level mechanics are decided when the implementation creates a concrete need.
 
@@ -166,6 +166,9 @@ Conceptual identity:
 conversationId
 participantA
 participantB
+lastSequenceNumber
+createdAt
+updatedAt
 ```
 
 For uniqueness, normalize the participant pair:
@@ -175,6 +178,8 @@ For uniqueness, normalize the participant pair:
 ```
 
 and enforce uniqueness in the database.
+
+The current HTTP read slice uses `updatedAt` as the conversation-list recency field and `conversationId` as a deterministic tiebreaker.
 
 ---
 
@@ -216,6 +221,8 @@ deletedAt
 
 The exact physical schema may differ.
 
+The implemented HTTP read path uses `sequenceNumber` as the exclusive `afterSequence` cursor and returns messages in ascending sequence order.
+
 ---
 
 # 3. Database Invariants
@@ -253,8 +260,8 @@ Conceptually:
 ```text
 BEGIN
 
+authorize friendship
 find/create conversation
-check friendship authorization
 validate message
 persist message
 
@@ -273,7 +280,7 @@ requestId → accepted result/message
 
 ## 3.7 Read monotonicity
 
-The server must never accept a read position that moves backwards.
+The server must never accept a read position that moves backwards. The Phase 5 message-read API uses the existing per-conversation sequence as an exclusive read cursor, but persistent read state itself is not yet implemented.
 
 ## 3.8 Delete terminality
 
@@ -436,9 +443,37 @@ The previously defined message lifecycle remains in force: server-controlled seq
 
 ---
 
-# 10. Authentication Architecture
+# 10. HTTP Read APIs
 
-## 10.1 Login
+The current read slice is intentionally HTTP-only and does not imply realtime delivery.
+
+## 10.1 Conversation listing
+
+```text
+GET /api/conversations/direct?limit=20&offset=0
+```
+
+The authenticated caller receives only direct conversations in which they participate. Results are ordered by `updatedAt DESC`, then `conversationId ASC`. `limit` is 1–100 and `offset` is non-negative.
+
+## 10.2 Message listing
+
+```text
+GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20
+```
+
+The caller must participate in the conversation. The conversation is resolved first (`404` if absent), then participant authorization is checked (`403` if the caller is not a participant). `afterSequence` is an exclusive, non-negative sequence cursor and results are ordered by ascending `sequenceNumber`.
+
+Message reads do not re-check friendship in this slice because unfriend/block lifecycle does not exist yet.
+
+## 10.3 Pagination boundary
+
+Conversation lists use offset/limit because the current conversation model does not expose a dedicated stable single-column cursor. Message reads use the existing monotonic per-conversation sequence because it is already a stable ordering primitive. No general pagination-cursor framework is introduced.
+
+---
+
+# 11. Authentication Architecture
+
+## 11.1 Login
 
 ```text
 LOGIN(username-or-email, password)
@@ -452,7 +487,7 @@ issue JWT access token
 issue refresh token
 ```
 
-## 10.2 Refresh
+## 11.2 Refresh
 
 ```text
 refresh token
@@ -471,7 +506,7 @@ access token  = 1 day
 refresh token = 30-day sliding expiry
 ```
 
-## 10.3 Logout
+## 11.3 Logout
 
 ```text
 current session → revoked
@@ -481,9 +516,9 @@ Other sessions remain active.
 
 ---
 
-# 11. Protocol Direction
+# 12. Protocol Direction
 
-The realtime/message protocol will be finalized after the user/auth and friendship slices exist.
+The realtime/message protocol will be finalized after the user/auth, friendship, and HTTP read slices exist.
 
 High-level flow:
 
@@ -498,14 +533,16 @@ accept
     ↓
 friendship
     ↓
-profile visibility + conversation/message protocol
+HTTP conversation/message reads
+    ↓
+realtime conversation/message protocol
 ```
 
 Do not freeze every future command/event before the relevant vertical slice is implemented.
 
 ---
 
-# 12. Implementation-Time Decisions
+# 13. Implementation-Time Decisions
 
 The following remain implementation-time choices unless a later ADR changes that:
 
@@ -514,16 +551,17 @@ The following remain implementation-time choices unless a later ADR changes that
 - exact JWT claims/signing/key-management details
 - socket/WebSocket library and framing
 - exact friend-request endpoint payloads
-- sequence allocation implementation
-- exact pagination cursor
+- realtime authentication and subscription authorization mechanics
 - retry/reconnect/missed-event recovery
 - rate limiting
 - observability strategy
 - deployment topology
 
+The implemented message-read cursor is intentionally sequence-based; a future general cursor framework is not required by the current slice.
+
 ---
 
-# 13. Technical Invariants
+# 14. Technical Invariants
 
 1. Server is authoritative.
 2. Authenticated identity comes from session context.
@@ -541,9 +579,11 @@ The following remain implementation-time choices unless a later ADR changes that
 14. A request UUID cannot create two messages.
 15. Server sequence numbers determine message order.
 16. Client time is never authoritative.
-17. Read position never moves backwards.
+17. Read position never moves backwards once persistent read state exists.
 18. Delete is terminal.
 19. Message history is permanent.
 20. Client validation never replaces server validation.
 21. Session revocation invalidates its active authenticated connection.
 22. Refresh-token rotation is session-scoped and old refresh tokens are rejected after successful rotation.
+23. Conversation/message read APIs return only data authorized for the authenticated participant.
+24. Message-read pagination advances by the server-owned per-conversation sequence.

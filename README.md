@@ -8,7 +8,7 @@ This repository contains the backend server service. The client interface is dev
 
 ## Current Status
 
-The project is in active backend development. **Phase 1 — Authentication & Authorization**, **Phase 2 — Exact Username Discovery**, **Phase 3 — Friend Request Vertical Slice**, and **Phase 4 — Direct Messaging Vertical Slice** are complete and tested.
+The project is in active backend development. **Phase 1 — Authentication & Authorization**, **Phase 2 — Exact Username Discovery**, **Phase 3 — Friend Request Vertical Slice**, **Phase 4 — Direct Messaging Vertical Slice**, and **Phase 5 — Conversation/Message Reads & Listing** are complete and tested.
 
 Currently implemented:
 
@@ -20,12 +20,13 @@ Currently implemented:
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
 - **Friendship**: An accepted friend-request row represents the friendship, with an internal `areFriends(a, b)` relationship check used by direct messaging authorization.
 - **Direct Messaging**: Authenticated friends can send plain-text messages through `POST /api/conversations/direct/messages`. Friendship authorization is checked before conversation lookup/creation; direct conversations are unique per unordered user pair, first-message creation is atomic, messages receive server sequence/timestamp values, and client request UUIDs provide idempotent replay handling.
+- **Conversation Reads**: Authenticated participants can list their direct conversations through `GET /api/conversations/direct`, ordered by recent activity with offset/limit pagination.
+- **Message Reads**: Authenticated conversation participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages`, ordered by server sequence with an exclusive `afterSequence` cursor and limit.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
 ### Not Yet Implemented
 
-- Conversation/message reads and listing endpoints.
 - Realtime transport and delivery (STOMP/WebSocket).
 - Read state, message mutation, replies, reconnect/offline synchronization, and related messaging infrastructure.
 - User blocking, unfriend, archiving, or mute preferences.
@@ -97,4 +98,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Post-Phase 4 messaging slices**: conversation/message reads and listing are the next direct-messaging follow-up; realtime, read-state, mutation, reply, and offline/reconnect work remain later/deferred until explicitly scoped.
+**Realtime messaging transport**: STOMP/WebSocket delivery is the next major messaging area; read state, mutation, reply, offline/reconnect, and relationship-control work remain later/deferred until explicitly scoped.

@@ -17,7 +17,7 @@ Unit tests run quickly without Spring application context or external services. 
 - **`AuthenticationServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/AuthenticationServiceTest.java`): Tests credential verification, login behavior, session-capacity handling, token generation, and blocked-login event publication in isolation.
 - **`RefreshTokenServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/RefreshTokenServiceTest.java`): Tests refresh-token validation and rotation behavior in isolation.
 - **`SessionServiceTest`** (`src/test/java/com/samvaad/samvaad_server/session/SessionServiceTest.java`): Tests session creation and active-session counting behavior.
-- **Messaging service tests**: Verify friend authorization, self-message rejection, authorization-before-conversation-creation, conversation creation/race handling, request-ID replay/conflict behavior, and message sequencing.
+- **Messaging service tests**: Verify friend authorization, self-message rejection, authorization-before-conversation-creation, conversation creation/race handling, request-ID replay/conflict behavior, message sequencing, participant-only conversation reads, pagination validation, and message cursor behavior.
 
 ### 2. Web Layer Tests (MockMvc & Controller Isolation)
 
@@ -25,7 +25,7 @@ Controller tests verify endpoint routing, HTTP status codes, request/response JS
 
 - **`UserProfileControllerTest`** (`src/test/java/com/samvaad/samvaad_server/user/userprofile/UserProfileControllerTest.java`): Tests the profile PATCH endpoint with standalone MockMvc.
 - **`AuthControllerTest`** (`src/test/java/com/samvaad/samvaad_server/auth/AuthControllerTest.java`): Tests the login and refresh HTTP endpoints, request validation, response serialization, and service delegation.
-- **Messaging controller tests**: Verify direct-message request validation, authentication context usage, `201` creation vs `200` idempotent replay, and `409` request-ID conflicts.
+- **Messaging controller tests**: Verify direct-message request validation, authentication context usage, `201` creation vs `200` idempotent replay, `409` request-ID conflicts, conversation-list pagination forwarding/validation, and message-read parameter handling.
 
 ### 3. Integration & Concurrency Tests (Testcontainers & Spring Boot)
 
@@ -35,7 +35,7 @@ Integration tests verify the Spring Boot context, JPA mappings, Liquibase migrat
 - **`RefreshTokenIntegrationTest`**: Verifies persisted refresh-token behavior across the HTTP/service boundary, including rotation and invalidation of the old token.
 - **`RefreshTokenConcurrencyIntegrationTest`**: Exercises concurrent refresh attempts against the same session/token state.
 - **`LoginConcurrencyIntegrationTest`**: Exercises concurrent login attempts and verifies the five-session capacity is enforced transactionally; blocked-login events are also verified.
-- **Messaging integration tests**: Verify friend-gated sending, conversation uniqueness, ordered message sequences, request-ID idempotency, database uniqueness constraints, and unauthorized access behavior.
+- **Messaging integration tests**: Verify friend-gated sending, conversation uniqueness, ordered message sequences, request-ID idempotency, database uniqueness constraints, unauthorized access behavior, conversation-list scoping/order, conversation read authorization, message cursor pagination, empty results, and invalid pagination.
 - **`TestcontainersConfiguration`** (`src/test/java/com/samvaad/samvaad_server/TestcontainersConfiguration.java`): Configures the PostgreSQL Testcontainer used by the integration tests.
 
 ### 4. Development Runtime Test Harness
@@ -46,7 +46,7 @@ Integration tests verify the Spring Boot context, JPA mappings, Liquibase migrat
 
 ## What the Tests Currently Establish
 
-The current suite provides automated evidence for the implemented user/profile, authentication/session, relationship, and initial direct-messaging foundation, including:
+The current suite provides automated evidence for the implemented user/profile, authentication/session, relationship, direct-messaging write, and conversation/message read foundations, including:
 
 - user/profile mapping and controller behavior
 - BCrypt-backed credential verification
@@ -70,6 +70,13 @@ The current suite provides automated evidence for the implemented user/profile, 
 - server timestamps and monotonic per-conversation message sequencing
 - request-ID idempotent replay and foreign request-ID conflict handling
 - database-backed conversation/message uniqueness invariants
+- authenticated conversation listing scoped to the caller's participant conversations
+- conversation-list recent-activity ordering and deterministic tie-breaking
+- conversation offset/limit validation and non-aligned offset handling
+- participant-only message reads
+- message sequence-cursor pagination and ascending ordering
+- unknown-conversation `404` vs non-participant `403`
+- empty read results and invalid pagination behavior
 
 The suite does **not** establish that the full planned Samvaad system is implemented. Realtime transport, read state, message mutations, replies, reconnect/offline synchronization, blocking/unfriend/mute/archive, and other later conversation lifecycle features remain outside the implemented slices.
 

@@ -1,0 +1,53 @@
+@startuml
+
+title Current Messaging Read Flow
+
+actor Client
+participant "ConversationController" as Controller
+participant "CurrentUser" as CurrentUser
+participant "ConversationService" as Service
+database "ConversationRepo" as ConversationRepo
+database "MessageRepo" as MessageRepo
+database "UserRepo" as UserRepo
+
+== List conversations ==
+Client -> Controller: GET /api/conversations/direct\nlimit, offset
+Controller -> CurrentUser: require()
+CurrentUser --> Controller: authenticated userId
+Controller -> Service: listConversations(userId, limit, offset)
+Service -> ConversationRepo: find participant conversations\nordered by updatedAt DESC, conversationId ASC
+ConversationRepo --> Service: conversations page
+loop each conversation
+  Service -> UserRepo: find other participant
+  UserRepo --> Service: User or absent
+end
+Service --> Controller: ConversationDto[]
+Controller --> Client: 200 OK
+
+== Read messages ==
+Client -> Controller: GET /api/conversations/direct/{id}/messages\nafterSequence, limit
+Controller -> CurrentUser: require()
+CurrentUser --> Controller: authenticated userId
+Controller -> Service: getMessages(userId, conversationId, afterSequence, limit)
+Service -> ConversationRepo: find conversation
+alt conversation absent
+  ConversationRepo --> Service: empty
+  Service --> Controller: 404
+else conversation exists
+  ConversationRepo --> Service: conversation
+  Service -> Service: verify caller is participant
+  alt not participant
+    Service --> Controller: 403
+  else participant
+    Service -> MessageRepo: find messages where sequence > afterSequence\nordered ASC, limited
+    MessageRepo --> Service: messages
+    Service --> Controller: MessageDto[]
+    Controller --> Client: 200 OK
+  end
+end
+
+note over Controller,Service
+HTTP-only read path. No STOMP/WebSocket transport is involved.
+end note
+
+@enduml
