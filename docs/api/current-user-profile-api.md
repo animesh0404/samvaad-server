@@ -112,8 +112,8 @@ The same email, including a case-only variation, is a successful no-op and retur
 `200` with the current `UserDto`. The submitted representation is preserved when
 an actual change is made.
 
-Email changes do not revoke existing sessions or JWTs. The changed email can be
-used as the login identifier immediately.
+Email changes do not revoke existing sessions or JWTs. The changed email can
+be used as the login identifier immediately.
 
 Email verification/OTP is not part of this V1 operation; its lifecycle remains
 a separate security decision.
@@ -188,13 +188,23 @@ three states are represented and applied distinctly.
 
 ## User discovery
 
-### `GET /api/users/search?username={username}`
+### `GET /api/users/lookup?username={username}`
 
 **Authenticated users.** Performs exact username discovery for the messaging
 relationship flow.
 
-The response must use a restricted discovery DTO. It must not expose password
-information, session information, or private account data.
+Behavior:
+
+- matching is case-insensitive and exact
+- partial, prefix, substring, and fuzzy matching are not performed
+- missing or blank `username` returns `400 Bad Request`
+- an unknown username returns `404 Not Found`
+- self-lookup is allowed
+- no friendship relationship or conversation state is created by lookup
+
+The response uses a restricted `UserLookupDto` containing only `userId` and
+`username`. It does not expose email, password/hash, role, session/token state,
+or other private account/security metadata.
 
 Email is not used as the V1 messaging discovery key.
 
@@ -207,7 +217,7 @@ implemented before direct-chat transport.
 The intended lifecycle is:
 
 ```text
-search user
+lookup user
    ↓
 send friend request
    ↓
@@ -229,6 +239,6 @@ The repository currently implements the Phase 1 account/authentication boundary:
 login, refresh, logout and session revocation, JWT/session validation,
 admin-only provisioning, profile authorization, admin user listing and deletion,
 and self-service email and password changes, including the accepted profile PATCH
-field-presence semantics. The initial ADMIN is seeded by Liquibase rather than
-application startup. User discovery, friendship, direct messaging, and realtime
-transport remain pending.
+field-presence semantics. Exact username discovery is also implemented at
+`GET /api/users/lookup?username={username}`. Friendship, direct messaging, and
+realtime transport remain pending.

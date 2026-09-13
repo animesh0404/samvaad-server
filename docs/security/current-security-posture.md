@@ -33,14 +33,21 @@ See ADRs 0003 and 0005 and the original design documents for rationale.
   setup, not a production secret-management design.
 - JPA auditing exists, but the current actor is the fixed value `"system"`;
   this is not authenticated-user attribution.
+- Authorization is enforced for the current HTTP account/user operations,
+  including ADMIN-only provisioning/listing/deletion, self-only account mutations,
+  and authenticated exact username discovery.
+- `POST /api/auth/logout` revokes the current persisted session, and revoked
+  sessions subsequently fail authenticated requests and refresh attempts.
+- Username discovery returns only `userId` and `username`; email, credentials,
+  role, session state, and token material are not exposed by the discovery DTO.
 
 ## Remaining gaps and implications
 
-Authentication/session issuance and refresh-token rotation are implemented, but
-this does not mean the complete planned security boundary is finished.
-Authorization enforcement, logout/session revocation, and the remaining
-authentication lifecycle behavior still need to be completed where required by
-ADR 0003.
+The implemented HTTP authentication/session boundary includes authorization,
+logout/session revocation, and the current account lifecycle. The complete
+planned security boundary is not finished because realtime transport
+authentication/delivery, production JWT key management, rate limiting, and other
+hardening remain pending.
 
 Do not claim profile/message encryption or E2EE. When application-level
 encryption is designed, introduce it at a deliberate boundary without

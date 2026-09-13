@@ -17,7 +17,7 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
 - `User` persistence exists with `userId`, username, email, and password hash.
 - The current `UserService.createUser` flow creates a `UserProfile` for each newly created user, and that profile shares the user's identifier.
 - Profile fields include names, display name, bio, avatar URL, and status message.
-- User provisioning (`POST /api/users`, ADMIN-only), user lookup, profile GET, and profile PATCH endpoints exist.
+- User provisioning (`POST /api/users`, ADMIN-only), exact username lookup, profile GET, and profile PATCH endpoints exist.
 - API DTOs are mapped separately from JPA entities.
 - The current auditor reports `"system"` as the actor.
 - Authentication login is implemented at `POST /api/auth/login` with BCrypt password verification, persisted sessions, session-bound JWT access tokens, and refresh tokens.
@@ -37,6 +37,7 @@ state. See [the ADR index](../adr/README.md) for concise decision summaries.
 - `PATCH /api/users/{userId}/email` provides self-service email change. Email is case-insensitively unique, duplicate email returns `409`, and existing sessions remain valid.
 - `PATCH /api/users/{userId}/password` provides self-service password change. The current password is required and verified; the new password is BCrypt-hashed and existing sessions remain valid.
 - Profile PATCH distinguishes omitted fields from explicitly present `null` values: omitted fields remain unchanged, non-null values replace existing values, and explicit `null` clears the corresponding field.
+- `GET /api/users/lookup?username={username}` provides authenticated exact username discovery. Matching is case-insensitive and exact; missing/blank input returns `400`, unknown usernames return `404`, and the response contains only `userId` and `username`.
 
 Maintained source diagrams:
 
@@ -45,9 +46,7 @@ Maintained source diagrams:
 
 ## Next planned work
 
-The current account/authentication boundary is implemented and is ready to move to
-user discovery. The next product slice is exact username discovery for
-authenticated users, followed by the friend-request vertical slice.
+The current account/authentication boundary and exact username discovery are implemented and are ready to move to the friend-request vertical slice.
 
 The planned realtime protocol skeleton (CONNECT → LOGIN → LOGIN_SUCCESS) is still
 pending; the current authentication endpoints are HTTP endpoints rather than the

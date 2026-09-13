@@ -1,7 +1,7 @@
 # Samvaad — Implementation Roadmap
 
 > **Status:** High-level design is recorded; the V1 user/authentication and friend-request boundaries are locked.
-> **Next phase:** Complete the user/auth boundary, then implement the friend-request vertical slice, then begin direct messaging.
+> **Next phase:** Implement the friend-request vertical slice, then begin direct messaging.
 > **Working philosophy:** Keep the server authoritative, keep V1 small, and decide low-level implementation details when the relevant slice creates a concrete need.
 
 ---
@@ -10,7 +10,7 @@
 
 The original high-level design phase is **COMPLETE**.
 
-The repository now contains the Phase 1 HTTP authentication/session and user/account boundary: login, refresh, logout/revocation, admin provisioning, profile authorization, admin listing/deletion, self-service email/password changes, and the accepted profile PATCH field-presence semantics. The next product slice is authenticated user discovery followed by friend requests.
+The repository now contains the Phase 1 HTTP authentication/session and user/account boundary: login, refresh, logout/revocation, admin provisioning, profile authorization, admin listing/deletion, self-service email/password changes, accepted profile PATCH field-presence semantics, and exact username discovery. The next product slice is authenticated friend requests.
 
 ---
 
@@ -87,6 +87,8 @@ Implemented and tested:
 - immutable username
 - no generic admin edit-user endpoint
 - profile PATCH field-presence semantics: omitted fields remain unchanged, non-null values replace existing values, and explicit `null` clears the field
+- `GET /api/users/lookup?username={username}` exact, case-insensitive username discovery for authenticated users
+- restricted username-discovery response containing only `userId` and `username`
 
 ### Acceptance
 
@@ -112,20 +114,25 @@ admin can list/delete users
 
 # 5. Phase 2 — User Discovery
 
-**STATUS: PENDING**
+**STATUS: COMPLETE**
 
 Goal: authenticated users can find another user by exact username before sending a friend request.
 
-Implement:
+Implemented:
 
-- exact username lookup
-- restricted discovery DTO
-- authorization requiring an authenticated session
-- no password/session/private credential fields in discovery responses
+- `GET /api/users/lookup?username={username}`
+- exact username matching only; no partial, prefix, substring, or fuzzy search
+- case-insensitive username matching
+- restricted discovery DTO containing `userId` and `username` only
+- authentication required
+- self-lookup allowed
+- unknown username → `404 Not Found`
+- missing or blank username → `400 Bad Request`
+- no friendship relationship or conversation state is created by lookup
 
 ### Acceptance
 
-A valid authenticated user can resolve a known username, while an unknown username produces a stable not-found result without creating any relationship or conversation state.
+A valid authenticated user can resolve a known username, including a case-variant or their own username, while an unknown or non-exact username produces a stable not-found result without creating any relationship or conversation state.
 
 ---
 
@@ -163,7 +170,7 @@ Implement:
 - accept request
 - reject request
 - cancel pending request
-- uniqueness/duplicate-request rules
+- uniqueness/duplicate request rules
 - server-side authorization
 - future-compatible relationship representation
 
@@ -340,7 +347,7 @@ The initial relationship slice also excludes blocking, unfriend, mute, and archi
 
 # 17. Immediate Next Step
 
-Phase 1 account/auth implementation is complete. Move to Phase 2: exact username discovery. Do not begin direct messaging until this chain is implemented and tested:
+Phase 1 account/auth implementation and Phase 2 exact username discovery are complete. Move to Phase 3: the friend-request vertical slice. Do not begin direct messaging until this chain is implemented and tested:
 
 ```text
 Liquibase-seeded ADMIN
@@ -357,7 +364,7 @@ user updates own profile/email/password
       ↓
 admin can list/delete users ✓
       ↓
-exact username discovery
+exact username discovery ✓
       ↓
 friend request
       ↓
