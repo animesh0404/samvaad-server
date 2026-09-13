@@ -3,6 +3,7 @@ package com.samvaad.samvaad_server.auth;
 import com.samvaad.samvaad_server.auth.dto.LoginResponseDto;
 import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import org.slf4j.Logger;
@@ -25,6 +26,7 @@ public class RefreshTokenService {
         this.tokenService = tokenService;
     }
 
+    @OperationalLog("auth.refresh")
     @Transactional
     public LoginResponseDto refresh(String rawRefreshToken) {
         String presentedHash = tokenService.hashRefreshToken(rawRefreshToken);

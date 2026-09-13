@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
 import com.samvaad.samvaad_server.user.User;
@@ -37,6 +38,7 @@ public class MessageService {
         this.friendRequestService = friendRequestService;
     }
 
+    @OperationalLog("message.send")
     @Transactional
     public SendMessageResult sendMessage(UUID senderId, String username, String content, UUID requestId) {
         User sender = userRepo.findById(senderId)
@@ -61,6 +63,7 @@ public class MessageService {
         return persistMessage(sender, conversation, content, requestId);
     }
 
+    @OperationalLog("message.sendToConversation")
     @Transactional
     public SendMessageResult sendMessageToConversation(
             UUID senderId, UUID conversationId, String content, UUID requestId) {

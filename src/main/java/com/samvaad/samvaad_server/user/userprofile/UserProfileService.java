@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.user.userprofile;
 
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ public class UserProfileService {
         return UserProfileMapper.toDto(profile);
     }
 
+    @OperationalLog("profile.update")
     @Transactional
     public UserProfileDto updateProfile(UUID userId, UserProfileUpdateDto updateDto) {
         UserProfile profile = userProfileRepo.findById(userId)

@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.session;
 
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,7 @@ public class SessionService {
         return sessionRepo.save(session);
     }
 
+    @OperationalLog("session.revoke")
     @Transactional
     public void revokeSession(UUID sessionId, RevocationReason reason) {
         Optional<Session> session = sessionRepo.findById(sessionId);

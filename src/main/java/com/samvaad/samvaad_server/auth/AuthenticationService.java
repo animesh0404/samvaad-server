@@ -7,6 +7,7 @@ import com.samvaad.samvaad_server.auth.exception.BadCredentialsException;
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.auth.exception.SessionLimitExceededException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionService;
 import com.samvaad.samvaad_server.user.User;
@@ -50,6 +51,7 @@ public class AuthenticationService {
         this.transactionTemplate = transactionTemplate;
     }
 
+    @OperationalLog("auth.login")
     public LoginResponseDto login(LoginRequestDto request, String ipAddress, String userAgent) {
         // Step 1: User lookup (OUTSIDE transaction, read-only)
         User user = userRepo.findByIdentifier(request.getIdentifier().trim())

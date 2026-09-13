@@ -8,6 +8,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
@@ -28,6 +29,7 @@ public class FriendRequestService {
         this.userRepo = userRepo;
     }
 
+    @OperationalLog("friendRequest.send")
     @Transactional
     public FriendRequestDto sendRequest(UUID senderId, String username) {
         User sender = userRepo.findById(senderId)
@@ -70,6 +72,7 @@ public class FriendRequestService {
         }
     }
 
+    @OperationalLog("friendRequest.accept")
     @Transactional
     public FriendRequestDto acceptRequest(UUID callerId, UUID requestId) {
         FriendRequest request = loadPendingAsRecipient(callerId, requestId);
@@ -82,6 +85,7 @@ public class FriendRequestService {
         return dto;
     }
 
+    @OperationalLog("friendRequest.reject")
     @Transactional
     public FriendRequestDto rejectRequest(UUID callerId, UUID requestId) {
         FriendRequest request = loadPendingAsRecipient(callerId, requestId);
@@ -94,6 +98,7 @@ public class FriendRequestService {
         return dto;
     }
 
+    @OperationalLog("friendRequest.cancel")
     @Transactional
     public FriendRequestDto cancelRequest(UUID callerId, UUID requestId) {
         FriendRequest request = friendRequestRepo.findByIdWithLock(requestId)

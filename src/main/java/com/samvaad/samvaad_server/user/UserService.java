@@ -1,6 +1,7 @@
 package com.samvaad.samvaad_server.user;
 
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
+import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -38,6 +39,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @OperationalLog("user.create")
     @Transactional
     public UserDto createUser(CreateUserRequestDto request) {
 
@@ -78,6 +80,7 @@ public class UserService {
         return UserMapper.toLookupDto(user);
     }
 
+    @OperationalLog("user.delete")
     @Transactional
     public void deleteUser(UUID userId) {
         User user = userRepo.findById(userId)
@@ -89,6 +92,7 @@ public class UserService {
         log.info("User deleted userId={} username={}", userId, user.getUsername());
     }
 
+    @OperationalLog("user.changeEmail")
     @Transactional
     public UserDto changeEmail(UUID userId, String email) {
         User user = userRepo.findByIdWithLock(userId)
@@ -117,6 +121,7 @@ public class UserService {
         }
     }
 
+    @OperationalLog("user.changePassword")
     @Transactional
     public UserDto changePassword(UUID userId, String currentPassword, String newPassword) {
         User user = userRepo.findByIdWithLock(userId)
