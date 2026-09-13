@@ -1,6 +1,8 @@
 package com.samvaad.samvaad_server.session;
 
 import com.samvaad.samvaad_server.user.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +12,8 @@ import java.util.UUID;
 
 @Service
 public class SessionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     public static final int MAX_ACTIVE_SESSIONS = 5;
 
@@ -65,6 +69,11 @@ public class SessionService {
             s.setRevokedAt(LocalDateTime.now());
             s.setRevocationReason(reason);
             sessionRepo.save(s);
+            UUID revokedUserId = s.getUser() != null ? s.getUser().getUserId() : null;
+            log.info("Session revoked sessionId={} userId={} reason={}",
+                    sessionId, revokedUserId, reason);
+        } else {
+            log.debug("Session revoke no-op sessionId={}", sessionId);
         }
     }
 }

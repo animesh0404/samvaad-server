@@ -14,10 +14,14 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import com.samvaad.samvaad_server.auth.exception.InvalidAccessTokenException;
 import com.samvaad.samvaad_server.auth.token.AccessTokenClaims;
 import com.samvaad.samvaad_server.auth.token.TokenService;
+import com.samvaad.samvaad_server.common.logging.TraceIds;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.session.Session;
@@ -40,6 +44,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     private final SessionRepo sessionRepo;
     private final ConversationService conversationService;
 
+    private static final Logger log = LoggerFactory.getLogger(StompAuthInterceptor.class);
+
     public StompAuthInterceptor(
             TokenService tokenService,
             SessionRepo sessionRepo,
@@ -56,12 +62,45 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         if (accessor == null) {
             return message;
         }
+        // Scoped to this inbound message; cleared in afterSendCompletion below.
+        // MDC is not expected to propagate into asynchronous broker delivery;
+        // persisted-message logging stays at the synchronous MessageService point.
+        MDC.put(TraceIds.MDC_KEY, TraceIds.resolveOrGenerate(
+                firstNativeHeader(accessor, TraceIds.REQUEST_ID_HEADER),
+                firstNativeHeader(accessor, TraceIds.TRACE_ID_HEADER)));
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-            accessor.setUser(authenticate(accessor));
+            try {
+                accessor.setUser(authenticate(accessor));
+            } catch (InvalidAccessTokenException e) {
+                List<String> header = accessor.getNativeHeader(AUTHORIZATION_HEADER);
+                log.warn("STOMP CONNECT authentication failed authHeaderPresent={}",
+                        header != null && !header.isEmpty());
+                throw e;
+            }
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-            authorizeSubscription(accessor);
+            try {
+                authorizeSubscription(accessor);
+            } catch (ForbiddenOperationException e) {
+                log.warn("STOMP SUBSCRIBE authorization denied destination={}",
+                        accessor.getDestination());
+                throw e;
+            }
         }
         return message;
+    }
+
+    @Override
+    public void afterSendCompletion(
+            Message<?> message, MessageChannel channel, boolean sent, Exception ex) {
+        MDC.remove(TraceIds.MDC_KEY);
+    }
+
+    private String firstNativeHeader(StompHeaderAccessor accessor, String name) {
+        List<String> values = accessor.getNativeHeader(name);
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.get(0);
     }
 
     private UsernamePasswordAuthenticationToken authenticate(StompHeaderAccessor accessor) {

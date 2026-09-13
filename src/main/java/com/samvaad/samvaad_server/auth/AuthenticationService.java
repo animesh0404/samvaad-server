@@ -12,6 +12,8 @@ import com.samvaad.samvaad_server.session.SessionService;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.UserRepo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import java.util.UUID;
 
 @Service
 public class AuthenticationService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthenticationService.class);
 
     private final UserRepo userRepo;
     private final PasswordEncoder passwordEncoder;
@@ -49,14 +53,22 @@ public class AuthenticationService {
     public LoginResponseDto login(LoginRequestDto request, String ipAddress, String userAgent) {
         // Step 1: User lookup (OUTSIDE transaction, read-only)
         User user = userRepo.findByIdentifier(request.getIdentifier().trim())
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+                .orElseThrow(() -> {
+                    log.warn("Login failed: unknown identifier identifier={} ipAddress={}",
+                            request.getIdentifier().trim(), ipAddress);
+                    return new BadCredentialsException("Invalid credentials");
+                });
 
         if (user.getPasswordHash() == null) {
+            log.warn("Login failed: missing credentials userId={} ipAddress={}",
+                    user.getUserId(), ipAddress);
             throw new BadCredentialsException("Invalid credentials");
         }
 
         // Step 2: BCrypt verification (OUTSIDE transaction and OUTSIDE database lock)
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            log.warn("Login failed: incorrect password userId={} ipAddress={}",
+                    user.getUserId(), ipAddress);
             throw new IncorrectPasswordException("Incorrect password");
         }
 
@@ -116,6 +128,8 @@ public class AuthenticationService {
         });
 
         // Step 4: Map LoginResult to LoginResponseDto
+        log.info("Login succeeded userId={} sessionId={} clientPlatform={} ipAddress={}",
+                user.getUserId(), result.sessionId(), request.getClientPlatform(), ipAddress);
         return new LoginResponseDto(
                 result.accessToken(),
                 result.refreshToken(),

@@ -11,3 +11,8 @@ spring:
 samvaad:
   auth:
     jwt-secret: ${SAMVAAD_JWT_SECRET}
+  logging:
+    file:
+      name: logs/samvaad.log
+      max-size: 10MB
+      max-history: 50

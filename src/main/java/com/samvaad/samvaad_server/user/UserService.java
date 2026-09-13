@@ -4,6 +4,8 @@ import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepo userRepo;
     private final UserProfileService userProfileService;
@@ -38,6 +42,7 @@ public class UserService {
     public UserDto createUser(CreateUserRequestDto request) {
 
         if (userRepo.existsByUsername(request.getUsername())) {
+            log.warn("User creation conflict username={}", request.getUsername());
             throw new UserAlreadyExistsException(request.getUsername());
         }
 
@@ -49,6 +54,7 @@ public class UserService {
 
         userProfileService.createProfile(savedUser);
 
+        log.info("User created userId={} username={}", savedUser.getUserId(), savedUser.getUsername());
         return UserMapper.toDto(savedUser);
     }
 
@@ -80,6 +86,7 @@ public class UserService {
         sessionRepo.deleteByUserId(userId);
         userProfileRepo.deleteById(userId);
         userRepo.deleteById(userId);
+        log.info("User deleted userId={} username={}", userId, user.getUsername());
     }
 
     @Transactional
@@ -88,20 +95,24 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
         if (user.getEmail() != null && user.getEmail().equalsIgnoreCase(email)) {
+            log.debug("Email change no-op userId={}", userId);
             return UserMapper.toDto(user);
         }
 
         boolean takenByAnother = userRepo.findByEmailIgnoreCase(email).stream()
                 .anyMatch(holder -> !holder.getUserId().equals(userId));
         if (takenByAnother) {
+            log.warn("Email change conflict userId={}", userId);
             throw new EmailAlreadyExistsException(email);
         }
 
         user.setEmail(email);
         try {
             User savedUser = userRepo.saveAndFlush(user);
+            log.info("Email changed userId={}", userId);
             return UserMapper.toDto(savedUser);
         } catch (DataIntegrityViolationException e) {
+            log.warn("Email change conflict userId={}", userId);
             throw new EmailAlreadyExistsException(email);
         }
     }
@@ -112,11 +123,13 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            log.warn("Password change failed: incorrect password userId={}", userId);
             throw new IncorrectPasswordException("Incorrect password");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         User savedUser = userRepo.save(user);
+        log.info("Password changed userId={}", userId);
         return UserMapper.toDto(savedUser);
     }
 }

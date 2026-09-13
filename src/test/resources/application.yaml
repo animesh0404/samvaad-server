@@ -1,3 +1,9 @@
 samvaad:
   auth:
     jwt-secret: test-secret-key-that-is-at-least-32-bytes-long
+  logging:
+    file:
+      # Keep test runs out of the repository working tree (build/ is gitignored).
+      name: build/logs/test-samvaad.log
+      max-size: 10MB
+      max-history: 5

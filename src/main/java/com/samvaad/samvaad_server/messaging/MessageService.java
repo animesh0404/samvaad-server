@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
@@ -16,6 +18,8 @@ import com.samvaad.samvaad_server.user.UserRepo;
 
 @Service
 public class MessageService {
+
+    private static final Logger log = LoggerFactory.getLogger(MessageService.class);
 
     private final ConversationRepo conversationRepo;
     private final MessageRepo messageRepo;
@@ -42,10 +46,13 @@ public class MessageService {
                 .orElseThrow(() -> new UserNotFoundException(username));
 
         if (recipient.getUserId().equals(senderId)) {
+            log.warn("Message send denied: self-message senderId={}", senderId);
             throw new ForbiddenOperationException();
         }
 
         if (!friendRequestService.areFriends(senderId, recipient.getUserId())) {
+            log.warn("Message send denied: not friends senderId={} recipientId={}",
+                    senderId, recipient.getUserId());
             throw new ForbiddenOperationException();
         }
 
@@ -65,6 +72,8 @@ public class MessageService {
 
         if (!conversation.getParticipantA().equals(senderId)
                 && !conversation.getParticipantB().equals(senderId)) {
+            log.warn("Message send denied: not a participant senderId={} conversationId={}",
+                    senderId, conversationId);
             throw new ForbiddenOperationException();
         }
 
@@ -72,6 +81,8 @@ public class MessageService {
                 ? conversation.getParticipantB()
                 : conversation.getParticipantA();
         if (!friendRequestService.areFriends(senderId, otherParticipantId)) {
+            log.warn("Message send denied: not friends senderId={} conversationId={}",
+                    senderId, conversationId);
             throw new ForbiddenOperationException();
         }
 
@@ -85,8 +96,13 @@ public class MessageService {
             Message existing = replay.get();
             if (!existing.getConversation().getConversationId().equals(conversation.getConversationId())
                     || !existing.getSender().getUserId().equals(sender.getUserId())) {
+                log.warn("Message send conflict: requestId reused requestId={} senderId={} conversationId={}",
+                        requestId, sender.getUserId(), conversation.getConversationId());
                 throw new MessageConflictException("Request ID already used");
             }
+            log.debug("Message send replay requestId={} messageId={} conversationId={} senderId={} sequence={} createdNew=false",
+                    requestId, existing.getMessageId(), conversation.getConversationId(),
+                    sender.getUserId(), existing.getSequenceNumber());
             return new SendMessageResult(MessageMapper.toDto(existing), false);
         }
 
@@ -102,8 +118,14 @@ public class MessageService {
 
         try {
             Message saved = messageRepo.saveAndFlush(message);
+            // Identifiers and sizes only; message content is never logged.
+            log.info("Message sent messageId={} conversationId={} senderId={} sequence={} requestId={} contentLength={} createdNew=true",
+                    saved.getMessageId(), conversation.getConversationId(), sender.getUserId(),
+                    saved.getSequenceNumber(), requestId, content != null ? content.length() : 0);
             return new SendMessageResult(MessageMapper.toDto(saved), true);
         } catch (DataIntegrityViolationException e) {
+            log.warn("Message send conflict: requestId reused requestId={} senderId={} conversationId={}",
+                    requestId, sender.getUserId(), conversation.getConversationId());
             throw new MessageConflictException("Request ID already used");
         }
     }
@@ -114,14 +136,19 @@ public class MessageService {
 
         Optional<Conversation> existing = conversationRepo.findLockedByParticipants(participantA, participantB);
         if (existing.isPresent()) {
+            log.debug("Conversation reused conversationId={}", existing.get().getConversationId());
             return existing.get();
         }
 
         try {
-            return conversationRepo.saveAndFlush(Conversation.between(senderId, recipientId));
+            Conversation created = conversationRepo.saveAndFlush(Conversation.between(senderId, recipientId));
+            log.debug("Conversation created conversationId={}", created.getConversationId());
+            return created;
         } catch (DataIntegrityViolationException e) {
-            return conversationRepo.findLockedByParticipants(participantA, participantB)
+            Conversation recovered = conversationRepo.findLockedByParticipants(participantA, participantB)
                     .orElseThrow(() -> e);
+            log.debug("Conversation reused conversationId={}", recovered.getConversationId());
+            return recovered;
         }
     }
 }

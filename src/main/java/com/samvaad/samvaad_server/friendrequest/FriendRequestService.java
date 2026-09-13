@@ -12,9 +12,13 @@ import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.UserRepo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class FriendRequestService {
+
+    private static final Logger log = LoggerFactory.getLogger(FriendRequestService.class);
 
     private final FriendRequestRepo friendRequestRepo;
     private final UserRepo userRepo;
@@ -33,14 +37,19 @@ public class FriendRequestService {
                 .orElseThrow(() -> new UserNotFoundException(username));
 
         if (recipient.getUserId().equals(senderId)) {
+            log.warn("Friend request denied: self-request senderId={}", senderId);
             throw new ForbiddenOperationException();
         }
 
         if (!friendRequestRepo.findPendingBetween(senderId, recipient.getUserId()).isEmpty()) {
+            log.warn("Friend request conflict: already pending senderId={} recipientId={}",
+                    senderId, recipient.getUserId());
             throw new FriendRequestConflictException("Friend request already pending");
         }
 
         if (friendRequestRepo.existsAcceptedBetween(senderId, recipient.getUserId())) {
+            log.warn("Friend request conflict: already friends senderId={} recipientId={}",
+                    senderId, recipient.getUserId());
             throw new FriendRequestConflictException("Already friends");
         }
 
@@ -51,8 +60,12 @@ public class FriendRequestService {
 
         try {
             FriendRequest saved = friendRequestRepo.saveAndFlush(request);
+            log.info("Friend request sent requestId={} senderId={} recipientId={}",
+                    saved.getRequestId(), senderId, recipient.getUserId());
             return FriendRequestMapper.toDto(saved);
         } catch (DataIntegrityViolationException e) {
+            log.warn("Friend request conflict: already pending senderId={} recipientId={}",
+                    senderId, recipient.getUserId());
             throw new FriendRequestConflictException("Friend request already pending");
         }
     }
@@ -64,7 +77,9 @@ public class FriendRequestService {
         request.setStatus(FriendRequestStatus.ACCEPTED);
         request.setRespondedAt(LocalDateTime.now());
 
-        return FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        FriendRequestDto dto = FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        log.info("Friend request accepted requestId={} callerId={}", requestId, callerId);
+        return dto;
     }
 
     @Transactional
@@ -74,7 +89,9 @@ public class FriendRequestService {
         request.setStatus(FriendRequestStatus.REJECTED);
         request.setRespondedAt(LocalDateTime.now());
 
-        return FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        FriendRequestDto dto = FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        log.info("Friend request rejected requestId={} callerId={}", requestId, callerId);
+        return dto;
     }
 
     @Transactional
@@ -83,17 +100,22 @@ public class FriendRequestService {
                 .orElseThrow(() -> new FriendRequestNotFoundException(requestId));
 
         if (!request.getSender().getUserId().equals(callerId)) {
+            log.warn("Friend request cancel denied requestId={} callerId={}", requestId, callerId);
             throw new ForbiddenOperationException();
         }
 
         if (request.getStatus() != FriendRequestStatus.PENDING) {
+            log.warn("Friend request cancel conflict requestId={} callerId={} status={}",
+                    requestId, callerId, request.getStatus());
             throw new FriendRequestConflictException("Friend request is no longer pending");
         }
 
         request.setStatus(FriendRequestStatus.CANCELLED);
         request.setRespondedAt(LocalDateTime.now());
 
-        return FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        FriendRequestDto dto = FriendRequestMapper.toDto(friendRequestRepo.save(request));
+        log.info("Friend request cancelled requestId={} callerId={}", requestId, callerId);
+        return dto;
     }
 
     public List<FriendRequestDto> listIncoming(UUID callerId) {
@@ -121,10 +143,13 @@ public class FriendRequestService {
                 .orElseThrow(() -> new FriendRequestNotFoundException(requestId));
 
         if (!request.getRecipient().getUserId().equals(callerId)) {
+            log.warn("Friend request decision denied requestId={} callerId={}", requestId, callerId);
             throw new ForbiddenOperationException();
         }
 
         if (request.getStatus() != FriendRequestStatus.PENDING) {
+            log.warn("Friend request decision conflict requestId={} callerId={} status={}",
+                    requestId, callerId, request.getStatus());
             throw new FriendRequestConflictException("Friend request is no longer pending");
         }
 

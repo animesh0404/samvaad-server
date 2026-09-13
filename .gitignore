@@ -39,6 +39,8 @@ out/
 ## Environment file
 .env
 .envrc
+## Operational logs (see docs/development/logging.md)
+logs/
 ## Local API testing (Postman)
 .postman/
 postman/
