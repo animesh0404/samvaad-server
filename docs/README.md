@@ -9,7 +9,7 @@ Current implementation phases:
 - Phase 3 — Friend request vertical slice: complete.
 - Phase 4 — Direct messaging vertical slice: complete.
 
-Phase 4 currently provides the first direct-message write path: authenticated accepted friends can send plain-text messages through `POST /api/conversations/direct/messages`. Conversations are unique per unordered participant pair; creation and first-message persistence are atomic; messages have server timestamps and per-conversation sequence numbers; client request UUIDs provide idempotent replay handling.
+Phase 4 currently provides the first direct-message write path: authenticated accepted friends can send plain-text messages through `POST /api/conversations/direct/messages`. Friendship authorization is evaluated before conversation lookup/creation, so an unauthorized send cannot create conversation state. Conversations are unique per unordered participant pair; creation and first-message persistence are atomic; messages have server timestamps and per-conversation sequence numbers; client request UUIDs provide idempotent replay handling.
 
 The next implementation area is conversation/message reads and listing. Realtime delivery, read state, message mutations, replies, reconnect/offline synchronization, blocking, unfriend, mute, archive, and other later features remain deferred until explicitly scoped.
 

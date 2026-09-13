@@ -19,7 +19,7 @@ Currently implemented:
 - **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`) with case-insensitive matching and a restricted discovery DTO containing only `userId` and `username`.
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
 - **Friendship**: An accepted friend-request row represents the friendship, with an internal `areFriends(a, b)` relationship check used by direct messaging authorization.
-- **Direct Messaging**: Authenticated friends can send plain-text messages through `POST /api/conversations/direct/messages`. Direct conversations are unique per unordered user pair, first-message creation is atomic, messages receive server sequence/timestamp values, and client request UUIDs provide idempotent replay handling.
+- **Direct Messaging**: Authenticated friends can send plain-text messages through `POST /api/conversations/direct/messages`. Friendship authorization is checked before conversation lookup/creation; direct conversations are unique per unordered user pair, first-message creation is atomic, messages receive server sequence/timestamp values, and client request UUIDs provide idempotent replay handling.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 

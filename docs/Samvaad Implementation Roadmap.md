@@ -50,6 +50,7 @@ Implemented:
 - direct conversation persistence for an unordered user pair
 - database-enforced conversation uniqueness
 - friendship authorization using `areFriends(a, b)`
+- authorization is evaluated before any conversation lookup/creation, so unauthorized sends cannot create conversation state
 - self-message rejection
 - atomic conversation creation and first-message persistence
 - plain-text message persistence

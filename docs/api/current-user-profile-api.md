@@ -32,7 +32,7 @@ Request body:
 
 Authentication is required. The caller identity comes from the authenticated server context; sender identity is not accepted from the request body. The recipient is resolved by exact, case-insensitive username lookup. The two users must be accepted friends, and self-messaging is rejected.
 
-The endpoint finds or creates the single direct conversation for the unordered participant pair and persists the first/subsequent message atomically. Message content is plain text. The server supplies the message timestamp and monotonic conversation sequence number. `requestId` is a client-provided UUID used for idempotency: the original owner replay receives the existing message with `200`, while foreign reuse returns `409`.
+Friendship authorization is evaluated before conversation lookup or creation. An unauthorized send therefore cannot create conversation state as a side effect of the rejected request. After authorization, the endpoint finds or creates the single direct conversation for the unordered participant pair and persists the first/subsequent message atomically. Message content is plain text. The server supplies the message timestamp and monotonic conversation sequence number. `requestId` is a client-provided UUID used for idempotency: the original owner replay receives the existing message with `200`, while foreign reuse returns `409`.
 
 A newly persisted message returns `201`. Validation failures return `400`; unauthenticated requests return `401`; non-friends or self-messages return `403`; an unknown recipient returns `404`; conflicting request UUID reuse returns `409`.
 

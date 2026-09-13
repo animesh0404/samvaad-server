@@ -19,7 +19,7 @@
 - Direct conversation persistence with normalized participant pairs and database-enforced pair uniqueness.
 - Plain-text direct message persistence with server-generated timestamps, monotonic per-conversation sequence numbers, and unique client request UUIDs for idempotency.
 - Atomic conversation creation and first-message persistence; conversation creation races are resolved through database uniqueness and winner retrieval.
-- Authenticated friend-gated message sending via `POST /api/conversations/direct/messages`.
+- Authenticated friend-gated message sending via `POST /api/conversations/direct/messages`; friendship authorization is performed before conversation lookup/creation.
 - Idempotent replay of an already-owned request UUID returns the original message; reuse of a request UUID by another message owner returns `409 Conflict`.
 
 ## Architecture diagrams

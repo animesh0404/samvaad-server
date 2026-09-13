@@ -17,7 +17,7 @@ Unit tests run quickly without Spring application context or external services. 
 - **`AuthenticationServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/AuthenticationServiceTest.java`): Tests credential verification, login behavior, session-capacity handling, token generation, and blocked-login event publication in isolation.
 - **`RefreshTokenServiceTest`** (`src/test/java/com/samvaad/samvaad_server/auth/RefreshTokenServiceTest.java`): Tests refresh-token validation and rotation behavior in isolation.
 - **`SessionServiceTest`** (`src/test/java/com/samvaad/samvaad_server/session/SessionServiceTest.java`): Tests session creation and active-session counting behavior.
-- **Messaging service tests**: Verify friend authorization, self-message rejection, conversation creation/race handling, request-ID replay/conflict behavior, and message sequencing.
+- **Messaging service tests**: Verify friend authorization, self-message rejection, authorization-before-conversation-creation, conversation creation/race handling, request-ID replay/conflict behavior, and message sequencing.
 
 ### 2. Web Layer Tests (MockMvc & Controller Isolation)
 
@@ -64,6 +64,7 @@ The current suite provides automated evidence for the implemented user/profile, 
 - exact username discovery behavior
 - friend-request lifecycle and ownership authorization
 - direct-message friend authorization and self-message rejection
+- direct-message authorization-before-conversation-creation regression coverage
 - normalized direct-conversation uniqueness
 - atomic conversation/first-message persistence
 - server timestamps and monotonic per-conversation message sequencing
