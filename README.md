@@ -19,6 +19,7 @@ Currently implemented:
 - **User Discovery**: Authenticated exact username lookup (`GET /api/users/lookup?username=...`).
 - **Friend Requests**: Authenticated send, incoming/outgoing pending lists, recipient accept/reject, sender cancellation, duplicate/reverse-direction protection, and re-request after rejected/cancelled requests.
 - **Friendship**: An accepted friend-request row represents the friendship; `areFriends(a,b)` is used by direct messaging authorization.
+- **Friends List API**: Authenticated `GET /api/friends` returns the caller's accepted friends as safe `userId`/`username` representations, ordered by username ascending. The caller is derived from the authenticated principal; no separate Friendship table/entity is used.
 - **Direct Messaging**: Authenticated friends can send plain-text messages through HTTP. Direct conversations are unique per unordered user pair; messages receive server sequence/timestamp values and client request UUIDs provide idempotent replay handling.
 - **Conversation Reads**: Participants can list direct conversations through `GET /api/conversations/direct` with offset/limit pagination and recent-activity ordering.
 - **Message Reads**: Participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages` using the exclusive `afterSequence` cursor.
@@ -84,6 +85,7 @@ The authoritative documentation lives under [`docs/`](docs/):
 - [Implementation Roadmap](docs/Samvaad%20Implementation%20Roadmap.md)
 - [Architecture Current State](docs/architecture/current-state.md)
 - [User & Profile API Contract](docs/api/current-user-profile-api.md)
+- [Friends API Contract](docs/api/friends-api.md)
 - [Security Posture](docs/security/current-security-posture.md)
 - [Architecture Decision Records](docs/adr/)
 - [Developer Guides](docs/development/)
