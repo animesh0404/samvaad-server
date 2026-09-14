@@ -46,7 +46,10 @@ The detailed sanitized evidence is recorded in [Realtime V1 Smoke Test](../verif
 
 ## Running Tests
 
+Backend test commands run from `server/`:
+
 ```bash
+cd server
 ./gradlew test
 ./gradlew check
 ```
@@ -54,6 +57,7 @@ The detailed sanitized evidence is recorded in [Realtime V1 Smoke Test](../verif
 A specific test class can be run with:
 
 ```bash
+cd server
 ./gradlew test --tests com.samvaad.samvaad_server.messaging.RealtimeIntegrationTest
 ```
 

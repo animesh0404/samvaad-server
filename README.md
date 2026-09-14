@@ -2,7 +2,21 @@
 
 Samvaad is a server-first messaging system built around server-authoritative state, simple invariants, and explicit contracts.
 
-This repository contains the backend server service. The client interface is developed as a separate consumer of stable server APIs and does not dictate server design.
+This repository is a monorepo. The backend server service lives under `server/`. Shared documentation lives under `docs/` at the repository root. The client interface is developed as a separate consumer of stable server APIs and does not dictate server design.
+
+Repository layout:
+
+```text
+samvaad-server/
+├── docs/
+├── server/      # self-contained Spring Boot backend (Gradle build, src/, compose.yaml)
+├── README.md
+├── AGENTS.md
+├── .gitignore
+└── .gitattributes
+```
+
+Backend commands below run from `server/`.
 
 ---
 
@@ -55,6 +69,7 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 ## Local Development
 
 ```bash
+cd server
 docker compose up -d
 ./gradlew bootRun
 ```
@@ -62,6 +77,7 @@ docker compose up -d
 Or:
 
 ```bash
+cd server
 ./gradlew bootTestRun
 ```
 
@@ -70,6 +86,7 @@ See `docs/development/setup.md` for complete environment details.
 ## Build & Test Commands
 
 ```bash
+cd server
 ./gradlew build -x test
 ./gradlew test
 ./gradlew check

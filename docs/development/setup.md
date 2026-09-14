@@ -2,16 +2,20 @@
 
 This guide details how to configure and run the Samvaad backend server locally.
 
+The backend lives under `server/`. Run backend commands from `server/`
+(`cd server && ./gradlew ...`). The local `.env` stays at the repository
+root; the tracked example is `server/.env.example`.
+
 ---
 
 ## Prerequisites & Environment
 
 The versions and tools below are derived directly from the repository configuration:
 
-- **Java**: 25 (specified via `java.toolchain.languageVersion = JavaLanguageVersion.of(25)` in `build.gradle`)
-- **Build Tool**: Gradle 9.7.0 (using the included `./gradlew` wrapper)
+- **Java**: 25 (specified via `java.toolchain.languageVersion = JavaLanguageVersion.of(25)` in `server/build.gradle`)
+- **Build Tool**: Gradle 9.7.0 (using the included wrapper; run `./gradlew` from `server/`)
 - **Framework**: Spring Boot 4.1.1
-- **Database**: PostgreSQL 18 (configured via Docker Compose in `compose.yaml`)
+- **Database**: PostgreSQL 18 (configured via Docker Compose in `server/compose.yaml`)
 - **Container Runtime**: Docker (required for Docker Compose or Testcontainers)
 - **Local environment loading**: `direnv` (used to load the local `.env` file)
 
@@ -19,11 +23,15 @@ The versions and tools below are derived directly from the repository configurat
 
 The application requires `SAMVAAD_JWT_SECRET` for the JWT signing configuration. The real local secret must not be committed.
 
-Create the local environment file from the committed example:
+Create the local environment file at the repository root from the committed
+example (run from the repository root):
 
 ```bash
-cp .env.example .env
+cp server/.env.example .env
 ```
+
+The existing local `.env` stays at the repository root. Do not create a
+second `.env` under `server/`.
 
 Generate a development secret:
 
@@ -37,7 +45,7 @@ Put the generated value in `.env`:
 SAMVAAD_JWT_SECRET=<your-local-secret>
 ```
 
-Samvaad uses `direnv` to load `.env` automatically when entering the repository. The repository's `.envrc` contains the `dotenv` directive.
+Samvaad uses `direnv` to load `.env` automatically when entering the repository. The repository-root `.envrc` contains the `dotenv` directive, so the variables remain available when running backend commands under `server/`.
 
 If `direnv` is not already integrated with Bash, add its hook and reload the shell:
 
@@ -58,7 +66,7 @@ Verify that the variable is loaded without printing the secret:
 test -n "$SAMVAAD_JWT_SECRET" && echo "JWT secret loaded" || echo "JWT secret missing"
 ```
 
-`.env` and `.envrc` are local-only and are excluded by `.gitignore`. `.env.example` is safe to commit and must contain only a placeholder value.
+`.env` and `.envrc` live at the repository root, are local-only, and are excluded by `.gitignore`. `server/.env.example` is safe to commit and must contain only a placeholder value.
 
 ---
 
@@ -66,7 +74,7 @@ test -n "$SAMVAAD_JWT_SECRET" && echo "JWT secret loaded" || echo "JWT secret mi
 
 ### Using Docker Compose
 
-The repository includes a `compose.yaml` file defining the local PostgreSQL development instance:
+The backend includes a `server/compose.yaml` file defining the local PostgreSQL development instance:
 
 - **Image**: `postgres:18`
 - **Container Name**: `samvaad-postgres`
@@ -76,19 +84,21 @@ The repository includes a `compose.yaml` file defining the local PostgreSQL deve
 - **Exposed Port**: `5432:5432`
 - **Volume**: `samvaad-postgres-data` (persisted locally)
 
-Start the database in the background:
+Start the database in the background (from `server/`):
 ```bash
+cd server
 docker compose up -d
 ```
 
-Stop the database:
+Stop the database (from `server/`):
 ```bash
+cd server
 docker compose down
 ```
 
 ### Application Datasource Settings
 
-The application connects to the local PostgreSQL instance via configuration in `src/main/resources/application.yaml`:
+The application connects to the local PostgreSQL instance via configuration in `server/src/main/resources/application.yaml`:
 
 ```yaml
 spring:
@@ -102,7 +112,7 @@ spring:
       ddl-auto: validate
 ```
 
-Liquibase runs on startup (`src/main/resources/db/changelog/db.changelog-master.yaml`) to automatically execute changelogs and bring the database schema up to date before Hibernate validates entity mappings.
+Liquibase runs on startup (`server/src/main/resources/db/changelog/db.changelog-master.yaml`) to automatically execute changelogs and bring the database schema up to date before Hibernate validates entity mappings.
 
 ---
 
@@ -116,11 +126,13 @@ When running against the Compose-managed PostgreSQL database:
 
 1. Ensure the PostgreSQL container is active:
    ```bash
+   cd server
    docker compose up -d
    ```
 2. Ensure `SAMVAAD_JWT_SECRET` is loaded as described above.
 3. Start the Spring Boot application:
    ```bash
+   cd server
    ./gradlew bootRun
    ```
 
@@ -131,6 +143,7 @@ The application starts by default on port `8080`.
 Spring Boot includes development-time Testcontainers support. You can launch the application along with a containerized PostgreSQL database in a single command, without starting Docker Compose:
 
 ```bash
+cd server
 ./gradlew bootTestRun
 ```
 
@@ -144,22 +157,26 @@ Use the Gradle wrapper to build and verify the project:
 
 - **Compile and assemble artifacts (skipping tests)**:
   ```bash
+  cd server
   ./gradlew build -x test
   ```
   *(or `./gradlew assemble`)*
 
 - **Run all automated tests**:
   ```bash
+  cd server
   ./gradlew test
   ```
 
 - **Run full verification (tests and quality checks)**:
   ```bash
+  cd server
   ./gradlew check
   ```
 
 - **Clean build directory**:
   ```bash
+  cd server
   ./gradlew clean
   ```
 
