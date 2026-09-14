@@ -9,6 +9,7 @@
 - Self-service email/password changes and profile PATCH semantics.
 - Exact case-insensitive username discovery.
 - Friend-request lifecycle and accepted-request-as-friendship model.
+- Authenticated friends list read through `GET /api/friends`, derived from accepted friend-request relationships.
 - Direct conversation persistence with normalized participant pairs and database uniqueness.
 - Plain-text direct messages with server timestamps, monotonic per-conversation sequences, and request-ID idempotency.
 - Atomic conversation/first-message creation and database-backed concurrency invariants.
@@ -27,6 +28,12 @@
   - persistence before broadcast
 - Installation identity is optional session metadata: login accepts a missing `installationId`, blank/whitespace values normalize to null, and nonblank values remain supported.
 - Operational logging policy covering meaningful business/application and security/authentication events, correlation/trace context, secret avoidance, and bounded rolling file retention.
+
+## Friends list architecture
+
+`GET /api/friends` is a read projection of the existing friendship model. The service queries `FriendRequest` rows in `ACCEPTED` state where the authenticated user is either sender or recipient, resolves the opposite user as the friend, maps to the existing safe `UserLookupDto` representation, filters self, and sorts by username ascending.
+
+The API does not introduce a separate Friendship entity/table or an alternate relationship state. Authentication derives the caller from the server principal, so the endpoint cannot be used to retrieve another user's friend list by supplying a user ID.
 
 ## Client/session identity: current state
 
