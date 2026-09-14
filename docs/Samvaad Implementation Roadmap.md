@@ -51,6 +51,14 @@ Implemented:
 
 Implementation boundary: the HTTP and STOMP transports enter the same message business logic. The STOMP layer does not maintain separate persistence, sequencing, friendship, or idempotency rules.
 
+## Friends List API
+
+COMPLETE.
+
+Implemented authenticated `GET /api/friends` using the existing accepted-FriendRequest-as-friendship model. The endpoint derives the caller from the authenticated principal, returns the other party from each accepted request, excludes non-accepted relationship states and self, exposes only the safe `userId`/`username` representation, and orders results by username ascending. No separate Friendship entity/table was introduced.
+
+See [Friends API Contract](api/friends-api.md).
+
 ## Pre-client architecture cleanup
 
 COMPLETE.
