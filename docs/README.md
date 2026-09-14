@@ -11,6 +11,8 @@ Current implementation phases:
 - Phase 5 — Conversation/message reads and listing: complete.
 - Realtime V1 — STOMP/WebSocket message delivery: complete and manually verified end-to-end.
 
+Current server capabilities also include the completed **Friends List API** (`GET /api/friends`), which exposes the authenticated user's accepted friends using the existing accepted-FriendRequest-as-friendship model. See [Friends API Contract](api/friends-api.md).
+
 Phase 4 provides the direct-message write path. Phase 5 adds authenticated HTTP conversation/message reads without realtime assumptions.
 
 Realtime V1 now provides:
