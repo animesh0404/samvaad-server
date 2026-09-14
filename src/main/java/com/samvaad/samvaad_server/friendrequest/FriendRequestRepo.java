@@ -51,4 +51,18 @@ public interface FriendRequestRepo extends JpaRepository<FriendRequest, UUID> {
     default boolean existsAcceptedBetween(UUID firstUserId, UUID secondUserId) {
         return existsByStatusBetween(FriendRequestStatus.ACCEPTED, firstUserId, secondUserId);
     }
+
+    @EntityGraph(attributePaths = {"sender", "recipient"})
+    @Query("""
+        SELECT f FROM FriendRequest f
+        WHERE f.status = :status
+          AND (f.sender.userId = :userId OR f.recipient.userId = :userId)
+    """)
+    List<FriendRequest> findByStatusInvolving(
+            @Param("status") FriendRequestStatus status,
+            @Param("userId") UUID userId);
+
+    default List<FriendRequest> findAcceptedInvolving(UUID userId) {
+        return findByStatusInvolving(FriendRequestStatus.ACCEPTED, userId);
+    }
 }

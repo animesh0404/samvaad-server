@@ -1,6 +1,7 @@
 package com.samvaad.samvaad_server.friendrequest;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.user.User;
+import com.samvaad.samvaad_server.user.UserLookupDto;
+import com.samvaad.samvaad_server.user.UserMapper;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.UserRepo;
 import org.slf4j.Logger;
@@ -141,6 +144,17 @@ public class FriendRequestService {
 
     public boolean areFriends(UUID firstUserId, UUID secondUserId) {
         return friendRequestRepo.existsAcceptedBetween(firstUserId, secondUserId);
+    }
+
+    public List<UserLookupDto> listFriends(UUID callerId) {
+        return friendRequestRepo.findAcceptedInvolving(callerId).stream()
+                .map(request -> request.getSender().getUserId().equals(callerId)
+                        ? request.getRecipient()
+                        : request.getSender())
+                .filter(friend -> !friend.getUserId().equals(callerId))
+                .map(UserMapper::toLookupDto)
+                .sorted(Comparator.comparing(UserLookupDto::getUsername))
+                .toList();
     }
 
     private FriendRequest loadPendingAsRecipient(UUID callerId, UUID requestId) {
