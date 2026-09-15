@@ -44,3 +44,13 @@ logs/
 ## Local API testing (Postman)
 .postman/
 postman/
+
+### Node / Angular (web-admin/) ###
+node_modules/
+dist/
+.angular/
+test-results/
+playwright-report/
+blob-report/
+playwright/.auth/
+playwright/.cache/

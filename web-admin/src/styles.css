@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* Samvaad web admin base styles. Component styling uses Tailwind utilities. */
+
+body {
+  background-color: var(--color-slate-100);
+  color: var(--color-slate-900);
+}

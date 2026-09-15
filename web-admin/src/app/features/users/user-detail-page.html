@@ -1,0 +1,123 @@
+<a routerLink="/users" class="text-sm underline">← Back to users</a>
+
+@if (loading()) {
+  <p class="mt-4 text-sm text-slate-600" aria-live="polite">Loading user…</p>
+} @else if (error(); as message) {
+  <p
+    role="alert"
+    class="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+  >
+    {{ message }}
+  </p>
+} @else if (user(); as user) {
+  <div class="mt-4 flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-semibold">{{ user.username }}</h1>
+    <span class="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium">{{ user.role }}</span>
+  </div>
+
+  @if (notice(); as message) {
+    <p role="status" class="mt-4 rounded border border-slate-300 bg-white px-3 py-2 text-sm">
+      {{ message }}
+    </p>
+  }
+
+  <section aria-label="Account" class="mt-4 rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="text-sm font-medium text-slate-600">Account</h2>
+    <dl class="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-slate-500">User ID</dt>
+        <dd class="font-mono text-xs">{{ user.userId }}</dd>
+      </div>
+      <div>
+        <dt class="text-slate-500">Username</dt>
+        <dd>{{ user.username }}</dd>
+      </div>
+      <div>
+        <dt class="text-slate-500">Email</dt>
+        <dd>{{ user.email ?? '—' }}</dd>
+      </div>
+      <div>
+        <dt class="text-slate-500">Role</dt>
+        <dd>{{ user.role }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-label="Profile" class="mt-4 rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="text-sm font-medium text-slate-600">Profile (read-only)</h2>
+    @if (profile(); as profile) {
+      <dl class="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt class="text-slate-500">Display name</dt>
+          <dd>{{ profile.displayName ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">First name</dt>
+          <dd>{{ profile.firstName ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Middle name</dt>
+          <dd>{{ profile.middleName ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Last name</dt>
+          <dd>{{ profile.lastName ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Status message</dt>
+          <dd>{{ profile.statusMessage ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Avatar URL</dt>
+          <dd class="break-all">{{ profile.avatarUrl ?? '—' }}</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-slate-500">Bio</dt>
+          <dd>{{ profile.bio ?? '—' }}</dd>
+        </div>
+      </dl>
+    } @else {
+      <p class="mt-2 text-sm text-slate-600">No profile record for this user.</p>
+    }
+  </section>
+
+  <section aria-label="Danger zone" class="mt-4 rounded-lg border border-red-300 bg-white p-5">
+    <h2 class="text-sm font-medium text-red-800">Danger zone</h2>
+    @if (!confirmingDelete()) {
+      <button
+        type="button"
+        (click)="askDelete()"
+        [disabled]="isSelf()"
+        [title]="isSelf() ? 'You cannot delete your own account' : 'Delete ' + user.username"
+        class="mt-2 rounded border border-red-700 px-3 py-1.5 text-sm text-red-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
+      >
+        Delete this user
+      </button>
+      @if (isSelf()) {
+        <p class="mt-1 text-sm text-slate-600">You cannot delete your own administrator account.</p>
+      }
+    } @else {
+      <p class="mt-2 text-sm text-red-800">
+        Delete user “{{ user.username }}” permanently? This cannot be undone.
+      </p>
+      <div class="mt-2 flex gap-2">
+        <button
+          type="button"
+          (click)="confirmDelete()"
+          [disabled]="deleting()"
+          class="rounded bg-red-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+        >
+          {{ deleting() ? 'Deleting…' : 'Delete permanently' }}
+        </button>
+        <button
+          type="button"
+          (click)="cancelDelete()"
+          [disabled]="deleting()"
+          class="rounded border border-slate-300 px-3 py-1.5 text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    }
+  </section>
+}

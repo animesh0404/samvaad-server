@@ -1,0 +1,26 @@
+<h1 class="text-2xl font-semibold">Dashboard</h1>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2">
+  <section aria-label="Users" class="rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="text-sm font-medium text-slate-600">Registered users</h2>
+    @if (loading()) {
+      <p class="mt-2 text-3xl font-semibold text-slate-400" aria-live="polite">…</p>
+    } @else if (error(); as message) {
+      <p role="alert" class="mt-2 text-sm text-red-700">{{ message }}</p>
+    } @else {
+      <p class="mt-2 text-3xl font-semibold" aria-live="polite">{{ userCount() }}</p>
+    }
+    <div class="mt-4 flex gap-2 text-sm">
+      <a routerLink="/users" class="rounded bg-slate-900 px-3 py-1.5 text-white">Manage users</a>
+      <a routerLink="/users/new" class="rounded border border-slate-300 px-3 py-1.5">Create user</a>
+    </div>
+  </section>
+
+  <section aria-label="Backend" class="rounded-lg border border-slate-200 bg-white p-5">
+    <h2 class="text-sm font-medium text-slate-600">Backend</h2>
+    <p class="mt-2 text-sm text-slate-700">
+      This panel is a thin client over the existing Samvaad server APIs. User administration,
+      authentication, and authorization remain enforced server-side.
+    </p>
+  </section>
+</div>
