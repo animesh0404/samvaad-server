@@ -32,4 +32,14 @@ The first realtime slice uses Spring's in-memory simple broker and is intentiona
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 
+## Web admin and deployment direction
+
+The next client implementation area is the web admin panel. Its locked technology direction is Angular + TypeScript + Tailwind CSS, without Bootstrap or a required Angular Material component system. The admin panel remains a thin consumer of the stable Samvaad server contracts.
+
+The intended deployment model is to build the Angular application into static assets and package those assets into the Spring Boot executable JAR. Running the JAR therefore serves the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application. Docker remains an additional deployment/distribution path and is intended to support a containerized Samvaad application alongside PostgreSQL through Compose.
+
+The JAR must also support externally provisioned PostgreSQL through externalized deployment configuration. Public HTTPS is intended to terminate at a TLS-capable reverse proxy, tunnel, or managed edge in front of the application; certificate management is not a mandatory responsibility of the JAR.
+
+See ADRs 0011–0013 for the durable decisions and explicit deferred implementation details.
+
 See the implementation roadmap, architecture/security documents, API contract, and ADRs for the current state and locked decisions.

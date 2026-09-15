@@ -58,6 +58,8 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 
 ## Technology Stack
 
+### Backend
+
 - **Java**: 25
 - **Framework**: Spring Boot 4.1.1
 - **Build Tool**: Gradle 9.7.0
@@ -65,6 +67,27 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 - **Database Migrations**: Liquibase
 - **Realtime**: Spring WebSocket/STOMP with simple broker
 - **Testing**: JUnit 5, Mockito, Spring MockMvc, Testcontainers PostgreSQL
+
+### Web Admin
+
+The web admin panel's locked technology direction is **Angular + TypeScript + Tailwind CSS**. Bootstrap is not used, and Angular Material is not a required component system for the initial admin panel. The admin panel remains a thin client of the stable Samvaad server contracts.
+
+The intended delivery model is to package the Angular production build into the Spring Boot executable JAR so one JAR can serve the web admin, REST API, and WebSocket endpoint through embedded Tomcat.
+
+---
+
+## Deployment Direction
+
+Two deployment modes are intended:
+
+1. **Standalone JAR** — run the executable JAR directly and connect it to an externally provisioned PostgreSQL instance using externalized deployment configuration.
+2. **Docker Compose** — run a containerized Samvaad application together with the Compose-managed PostgreSQL instance.
+
+Docker is therefore a distribution/deployment option, not a hard runtime requirement for the application JAR.
+
+For public/VPS deployments, HTTPS is intended to terminate at a TLS-capable reverse proxy, tunnel, or managed edge in front of the application. The Samvaad JAR remains behind that edge and must support REST and WebSocket traffic through the proxy. The concrete provider, certificate automation, and VPS installation/update workflow remain future implementation work.
+
+See ADRs 0011–0013 for the locked architecture decisions and their explicit deferred details.
 
 ## Local Development
 
@@ -113,4 +136,6 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**TUI client development**: build the first client as a thin consumer of the stable server authentication, session, HTTP messaging, and STOMP/WebSocket contracts. The TUI must not introduce a separate authentication/session model or manufacture an installation identity merely to authenticate.
+**Web admin panel**: establish the Angular + Tailwind application foundation and build the first admin UI slices as a thin consumer of the stable server authentication, user-administration, and other existing API contracts.
+
+The later packaging/deployment work will integrate the Angular production build into the Spring Boot JAR and validate the standalone-JAR and Docker deployment paths.

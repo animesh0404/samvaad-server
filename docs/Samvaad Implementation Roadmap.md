@@ -71,9 +71,31 @@ COMPLETE.
 
 Operational logging is implemented with correlation/trace context, selective service-level `@OperationalLog` instrumentation, explicit domain/security events, secret avoidance, and configuration-driven size-based rolling file retention. The default active file size is 10MB with 50 retained rolled files; archives are compressed. Operational logging remains distinct from a future full audit/event-history system.
 
-## Next implementation area
+## Web Admin Panel
 
-TUI client development: build the first client as a thin consumer of the stable server authentication, session, HTTP messaging, and STOMP/WebSocket contracts. The TUI must not introduce a separate authentication/session model or manufacture an installation identity merely to authenticate.
+NEXT.
+
+Locked architecture direction:
+- Angular + TypeScript.
+- Tailwind CSS for styling/layout.
+- No Bootstrap.
+- No required Angular Material component system.
+- Thin client over the existing server contracts.
+
+The first implementation slice should establish the Angular project structure and basic admin application shell without prematurely introducing global state-management infrastructure.
+
+## Application Packaging & Deployment
+
+PLANNED after the initial web-admin implementation matures.
+
+Locked deployment direction:
+- Angular production assets are packaged into the Spring Boot executable JAR.
+- `java -jar ...` serves the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
+- The JAR remains capable of connecting to an externally provisioned PostgreSQL instance through externalized configuration.
+- Docker provides an additional containerized deployment path, including a Compose-managed Samvaad application plus PostgreSQL.
+- Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
+
+Implementation work still to decide includes Angular/Gradle integration, Docker image/Compose production details, release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
 
 ## Later / deferred
 

@@ -30,3 +30,6 @@ an earlier ADR only by explicitly naming it.
 | [0008](0008-friend-request-gated-direct-messaging.md) | Friend-request-gated direct messaging |
 | [0009](0009-realtime-stomp-websocket-transport.md) | Realtime STOMP/WebSocket transport |
 | [0010](0010-client-session-and-installation-identity.md) | Client session and installation identity |
+| [0011](0011-web-admin-panel-technology-and-ui-styling.md) | Web admin panel technology and UI styling |
+| [0012](0012-web-admin-packaging-and-deployment-model.md) | Web admin packaging and deployment model |
+| [0013](0013-tls-termination-at-deployment-edge.md) | TLS termination at the deployment edge |

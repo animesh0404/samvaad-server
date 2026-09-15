@@ -43,6 +43,26 @@ Admin web UI, normal web clients, TUI clients, and portable desktop executables 
 
 See ADR 0010 for the durable client/session and installation-identity decision.
 
+## Web admin architecture: locked direction
+
+The web admin panel is a client of the existing Samvaad server contracts. The selected UI stack is Angular + TypeScript with Tailwind CSS for styling/layout. Bootstrap is not used and Angular Material is not a required component system for the initial admin panel. No global state-management framework is mandated at this stage.
+
+See ADR 0011 for the durable web-admin technology decision.
+
+## Application packaging and deployment: locked direction
+
+The intended application delivery artifact is a Spring Boot executable JAR containing the Angular production static assets. Running the JAR with `java -jar ...` is intended to serve the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
+
+The JAR remains independently deployable against an externally provisioned PostgreSQL database through externalized configuration. Docker is an additional deployment/distribution path and is intended to support a containerized Samvaad application together with PostgreSQL through Compose.
+
+See ADR 0012 for the durable packaging/deployment decision.
+
+## Public HTTPS architecture: locked direction
+
+Public HTTPS is intended to terminate at the deployment edge in front of the Samvaad application. A TLS-capable reverse proxy, tunnel, or managed edge forwards traffic to the application. The application must support operation behind such an edge, including REST and WebSocket traffic. The specific reverse proxy/tunnel provider, certificate authority, domain, and forwarded-header configuration remain implementation decisions.
+
+See ADR 0013 for the durable TLS termination decision.
+
 ## Architecture diagrams
 
 - `current-authentication-session.puml` — JWT/session validation and authorization boundary.
@@ -71,6 +91,12 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - dedicated conversation recency field if `updatedAt` later proves insufficient
 - friend-gated profile visibility
 - full audit/event-history policy beyond operational logging
+- final web-admin visual design system and component inventory
+- exact Angular/Gradle build integration
+- Docker production image/Compose profile
+- release publication and one-command VPS installer/update workflow
+- concrete external configuration file generation/lookup mechanism
+- concrete TLS/reverse-proxy/tunnel provider and certificate automation
 
 ## Known V1 limitation
 

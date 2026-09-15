@@ -202,3 +202,33 @@ Operational file logs use configuration-driven size-based rolling, compressed ar
 12. STOMP `CONNECT` uses the existing access JWT plus persisted session validation.
 13. The simple broker is an in-memory V1 choice, not the horizontal-scaling architecture.
 14. Authentication is session-based; installation identity is optional client/device metadata.
+
+# 13. Web Admin Client Architecture
+
+The web admin panel is a thin client of the Samvaad server. Its locked technology direction is Angular + TypeScript with Tailwind CSS for styling and layout. Bootstrap is not used and Angular Material is not a required component system for the initial admin panel.
+
+The admin panel must consume the existing authentication, user-administration, and other server contracts rather than introducing a parallel backend or identity/session model. No global state-management framework is mandated until concrete application complexity requires one.
+
+See ADR 0011.
+
+# 14. Application Packaging and Deployment
+
+The intended production artifact is a Spring Boot executable JAR containing the Angular production static assets. The application build will produce those frontend assets and package them into the application's static resources; the exact Angular/Gradle integration remains an implementation detail.
+
+Running the resulting JAR with `java -jar ...` is intended to serve the web admin, REST API, and WebSocket endpoint from the same embedded Tomcat instance.
+
+The JAR remains independently deployable against an externally provisioned PostgreSQL database. Deployment-sensitive configuration, including datasource details and secrets, is externalized rather than baked into the artifact.
+
+Docker is an additional distribution/deployment path, not a hard runtime dependency. The intended Compose deployment can run the containerized Samvaad application together with PostgreSQL. The eventual VPS release/installer workflow may download a release artifact or container image, but its concrete mechanism is deferred.
+
+See ADR 0012.
+
+# 15. Public HTTPS Boundary
+
+For public/VPS deployments, TLS is terminated at a deployment edge in front of the Samvaad application. The edge may be a reverse proxy, tunnel, or managed ingress service. The application may therefore continue to listen on an internal HTTP port while public traffic is served over HTTPS.
+
+The deployment edge must support both HTTP API traffic and the WebSocket connection at `/ws`. The application must remain proxy-compatible; its architecture must not require public certificate material to be embedded in the application JAR.
+
+The concrete reverse proxy/tunnel provider, certificate automation, domain/DNS configuration, and forwarded-header settings remain deployment decisions.
+
+See ADR 0013.
