@@ -59,6 +59,14 @@ Implemented authenticated `GET /api/friends` using the existing accepted-FriendR
 
 See [Friends API Contract](api/friends-api.md).
 
+## Administrative User Lifecycle
+
+COMPLETE.
+
+V1 user deletion remains an ADMIN-only hard delete. The implementation locks the target user row and explicitly removes sessions, profile, friend requests, sent messages, conversations involving the user, and messages in those conversations before deleting the user row. Existing database RESTRICT foreign keys remain as backstops; no `ON DELETE CASCADE` migration was introduced.
+
+Successful deletion remains `204 No Content`. A residual concurrent-integrity conflict is mapped to `409 Conflict` with the standard message envelope. Successful deletion logging is registered after transaction commit so a rolled-back transaction does not emit the normal INFO success claim.
+
 ## Pre-client architecture cleanup
 
 COMPLETE.
@@ -73,20 +81,25 @@ Operational logging is implemented with correlation/trace context, selective ser
 
 ## Web Admin Panel
 
-NEXT.
+COMPLETE — initial implementation slice.
 
-Locked architecture direction:
-- Angular + TypeScript.
-- Tailwind CSS for styling/layout.
-- No Bootstrap.
-- No required Angular Material component system.
-- Thin client over the existing server contracts.
+Implemented:
+- Angular 22 + TypeScript.
+- Tailwind CSS v4.
+- npm dependency management with Node 24 convention via `.nvmrc`.
+- Dashboard and admin shell.
+- User listing, creation, detail, and deletion flows.
+- Existing server authentication/session contracts; login sends `clientPlatform: "WEB"` without an `installationId`.
+- In-memory access/refresh token storage.
+- Reactive access-token refresh on `401` with a single shared refresh operation and one retry.
+- Admin-only login boundary: valid non-admin credentials are rejected at `/login`, auth state is cleared, and no Web Admin session is retained.
+- Unit tests and Playwright browser coverage.
 
-The first implementation slice should establish the Angular project structure and basic admin application shell without prematurely introducing global state-management infrastructure.
+The first implementation slice does not include a WebSocket/STOMP client or production Angular/Gradle packaging. Those remain separate concerns.
 
 ## Application Packaging & Deployment
 
-PLANNED after the initial web-admin implementation matures.
+PLANNED.
 
 Locked deployment direction:
 - Angular production assets are packaged into the Spring Boot executable JAR.

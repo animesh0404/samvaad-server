@@ -28,6 +28,39 @@
   - persistence before broadcast
 - Installation identity is optional session metadata: login accepts a missing `installationId`, blank/whitespace values normalize to null, and nonblank values remain supported.
 - Operational logging policy covering meaningful business/application and security/authentication events, correlation/trace context, secret avoidance, and bounded rolling file retention.
+- Web Admin first implementation slice using Angular + TypeScript + Tailwind CSS, with admin dashboard and user-administration flows.
+
+## User administration and hard deletion
+
+V1 user deletion is an ADMIN-only hard-delete operation. It is implemented as explicit transactional domain cleanup rather than JPA cascade mappings or database `ON DELETE CASCADE` rules.
+
+The deletion flow:
+
+```text
+lock user row
+   ↓
+sessions
+   ↓
+user profile
+   ↓
+friend requests (sender or recipient)
+   ↓
+sent messages
+   ↓
+messages in conversations involving the user
+   ↓
+conversations involving the user
+   ↓
+users row
+   ↓
+transaction flush/commit
+   ↓
+after-commit success log
+```
+
+The target user row is locked pessimistically before cleanup. Existing RESTRICT foreign keys remain database backstops. A residual integrity conflict caused by concurrent activity is translated to `409 Conflict`; ordinary successful deletion remains `204 No Content`.
+
+Deleting the user also deletes conversations involving that user and the messages in those conversations. This is the V1 hard-delete semantic; the other participant's view of those conversations is removed as part of the deletion. Account suspension/pausing remains deferred.
 
 ## Friends list architecture
 
@@ -43,9 +76,15 @@ Admin web UI, normal web clients, TUI clients, and portable desktop executables 
 
 See ADR 0010 for the durable client/session and installation-identity decision.
 
-## Web admin architecture: locked direction
+## Web admin architecture: current implementation
 
-The web admin panel is a client of the existing Samvaad server contracts. The selected UI stack is Angular + TypeScript with Tailwind CSS for styling/layout. Bootstrap is not used and Angular Material is not a required component system for the initial admin panel. No global state-management framework is mandated at this stage.
+The Web Admin is a thin client of the existing Samvaad server contracts. The selected UI stack is Angular 22 + TypeScript with Tailwind CSS v4 for styling/layout. Bootstrap is not used and Angular Material is not a required component system for the initial admin panel. No global state-management framework is mandated.
+
+The implemented admin surface includes a dashboard, user listing, user creation, user detail, and user deletion. Login uses the existing `POST /api/auth/login` contract with `clientPlatform: "WEB"` and no `installationId`. Access/refresh tokens are held in memory only.
+
+The Web Admin enforces an admin-only login boundary: after successful credential authentication, the authenticated user's role is resolved through the existing user lookup. `ADMIN` users establish the Web Admin session; valid non-admin credentials are rejected on the login page, auth state is cleared, and no admin-panel session is retained. Server-side authorization remains authoritative for protected operations.
+
+The current Web Admin slice has no WebSocket/STOMP client. It is an HTTP client of the existing server APIs.
 
 See ADR 0011 for the durable web-admin technology decision.
 
@@ -54,6 +93,8 @@ See ADR 0011 for the durable web-admin technology decision.
 The intended application delivery artifact is a Spring Boot executable JAR containing the Angular production static assets. Running the JAR with `java -jar ...` is intended to serve the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
 
 The JAR remains independently deployable against an externally provisioned PostgreSQL database through externalized configuration. Docker is an additional deployment/distribution path and is intended to support a containerized Samvaad application together with PostgreSQL through Compose.
+
+The Angular/Gradle packaging integration is not yet implemented.
 
 See ADR 0012 for the durable packaging/deployment decision.
 
