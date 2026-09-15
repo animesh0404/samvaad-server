@@ -1,6 +1,11 @@
 package com.samvaad.samvaad_server.user;
 
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
+import com.samvaad.samvaad_server.common.logging.LogCapture;
+import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
+import com.samvaad.samvaad_server.messaging.Conversation;
+import com.samvaad.samvaad_server.messaging.ConversationRepo;
+import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -8,9 +13,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -26,7 +33,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,13 +54,23 @@ class UserServiceTest {
     private SessionRepo sessionRepo;
 
     @Mock
+    private FriendRequestRepo friendRequestRepo;
+
+    @Mock
+    private MessageRepo messageRepo;
+
+    @Mock
+    private ConversationRepo conversationRepo;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepo, userProfileService, userProfileRepo, sessionRepo, passwordEncoder);
+        userService = new UserService(userRepo, userProfileService, userProfileRepo, sessionRepo,
+                friendRequestRepo, messageRepo, conversationRepo, passwordEncoder);
     }
 
     @Test
@@ -130,46 +149,98 @@ class UserServiceTest {
     }
 
     @Test
-    void deleteUserRemovesSessionsProfileAndUser() {
+    void deleteUserRemovesSessionsProfileAndUserInForeignKeySafeOrder() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId);
         user.setUsername("target");
 
-        given(userRepo.findById(userId)).willReturn(Optional.of(user));
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(conversationRepo.findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class)))
+                .willReturn(List.of());
 
         userService.deleteUser(userId);
 
-        then(sessionRepo).should().deleteByUserId(userId);
-        then(userProfileRepo).should().deleteById(userId);
-        then(userRepo).should().deleteById(userId);
+        InOrder order = inOrder(sessionRepo, userProfileRepo, friendRequestRepo, messageRepo,
+                conversationRepo, userRepo);
+        order.verify(sessionRepo).deleteByUserId(userId);
+        order.verify(userProfileRepo).deleteById(userId);
+        order.verify(friendRequestRepo).deleteByParticipantUserId(userId);
+        order.verify(messageRepo).deleteBySenderUserId(userId);
+        order.verify(conversationRepo).findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class));
+        order.verify(userRepo).deleteById(userId);
     }
 
     @Test
     void deleteNonexistentUserThrows() {
         UUID userId = UUID.randomUUID();
 
-        given(userRepo.findById(userId)).willReturn(Optional.empty());
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class, () -> userService.deleteUser(userId));
 
         then(sessionRepo).should(never()).deleteByUserId(any());
         then(userProfileRepo).should(never()).deleteById(any());
+        then(friendRequestRepo).should(never()).deleteByParticipantUserId(any());
+        then(messageRepo).should(never()).deleteBySenderUserId(any());
+        then(conversationRepo).should(never()).findByParticipantAOrParticipantB(any(), any(), any());
         then(userRepo).should(never()).deleteById(any());
     }
 
     @Test
-    void deleteUserWithNoDependencies() {
+    void deleteUserRemovesConversationMessagesBeforeTheirConversations() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("target");
+        UUID conversationId = UUID.randomUUID();
+        Conversation conversation = new Conversation();
+        conversation.setConversationId(conversationId);
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(conversationRepo.findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class)))
+                .willReturn(List.of(conversation));
+
+        userService.deleteUser(userId);
+
+        InOrder order = inOrder(messageRepo, conversationRepo);
+        order.verify(messageRepo).deleteByConversationConversationId(conversationId);
+        order.verify(conversationRepo).deleteById(conversationId);
+    }
+
+    @Test
+    void deleteUserFlushConflictThrowsDeletionConflictWithoutSuccessLog() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId);
         user.setUsername("target");
 
-        given(userRepo.findById(userId)).willReturn(Optional.of(user));
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(conversationRepo.findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class)))
+                .willReturn(List.of());
+        willThrow(new DataIntegrityViolationException("fk race")).given(userRepo).flush();
 
-        userService.deleteUser(userId);
+        try (LogCapture logs = new LogCapture(UserService.class)) {
+            assertThrows(UserDeletionConflictException.class, () -> userService.deleteUser(userId));
+            assertTrue(logs.text().contains("User deletion conflict"),
+                    "expected conflict warning, got:\n" + logs.text());
+            assertTrue(!logs.text().contains("User deleted userId="),
+                    "success must not be logged on failure, got:\n" + logs.text());
+        }
+    }
 
-        then(sessionRepo).should().deleteByUserId(userId);
-        then(userProfileRepo).should().deleteById(userId);
-        then(userRepo).should().deleteById(userId);
+    @Test
+    void deleteUserLogsSuccessWithoutTransaction() {
+        UUID userId = UUID.randomUUID();
+        User user = new User(userId);
+        user.setUsername("target");
+
+        given(userRepo.findByIdWithLock(userId)).willReturn(Optional.of(user));
+        given(conversationRepo.findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class)))
+                .willReturn(List.of());
+
+        try (LogCapture logs = new LogCapture(UserService.class)) {
+            userService.deleteUser(userId);
+            assertTrue(logs.text().contains("User deleted userId=" + userId),
+                    "expected success log, got:\n" + logs.text());
+        }
     }
 
     @Test

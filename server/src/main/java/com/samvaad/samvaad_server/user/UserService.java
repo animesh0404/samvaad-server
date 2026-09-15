@@ -2,15 +2,22 @@ package com.samvaad.samvaad_server.user;
 
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
+import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
+import com.samvaad.samvaad_server.messaging.Conversation;
+import com.samvaad.samvaad_server.messaging.ConversationRepo;
+import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +31,9 @@ public class UserService {
     private final UserProfileService userProfileService;
     private final UserProfileRepo userProfileRepo;
     private final SessionRepo sessionRepo;
+    private final FriendRequestRepo friendRequestRepo;
+    private final MessageRepo messageRepo;
+    private final ConversationRepo conversationRepo;
     private final PasswordEncoder passwordEncoder;
 
     public UserService(
@@ -31,11 +41,17 @@ public class UserService {
             UserProfileService userProfileService,
             UserProfileRepo userProfileRepo,
             SessionRepo sessionRepo,
+            FriendRequestRepo friendRequestRepo,
+            MessageRepo messageRepo,
+            ConversationRepo conversationRepo,
             PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
         this.userProfileService = userProfileService;
         this.userProfileRepo = userProfileRepo;
         this.sessionRepo = sessionRepo;
+        this.friendRequestRepo = friendRequestRepo;
+        this.messageRepo = messageRepo;
+        this.conversationRepo = conversationRepo;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -83,13 +99,49 @@ public class UserService {
     @OperationalLog("user.delete")
     @Transactional
     public void deleteUser(UUID userId) {
-        User user = userRepo.findById(userId)
+        User user = userRepo.findByIdWithLock(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+        String username = user.getUsername();
 
+        // Explicit dependent cleanup in foreign-key-safe order. The schema
+        // keeps RESTRICT foreign keys as a backstop; no JPA cascades are used.
         sessionRepo.deleteByUserId(userId);
         userProfileRepo.deleteById(userId);
+        friendRequestRepo.deleteByParticipantUserId(userId);
+        messageRepo.deleteBySenderUserId(userId);
+        List<Conversation> conversations =
+                conversationRepo.findByParticipantAOrParticipantB(userId, userId, Pageable.unpaged());
+        for (Conversation conversation : conversations) {
+            // Messages reference their conversation; delete them first.
+            messageRepo.deleteByConversationConversationId(conversation.getConversationId());
+            conversationRepo.deleteById(conversation.getConversationId());
+        }
         userRepo.deleteById(userId);
-        log.info("User deleted userId={} username={}", userId, user.getUsername());
+        try {
+            userRepo.flush();
+        } catch (DataIntegrityViolationException e) {
+            log.warn("User deletion conflict userId={}", userId);
+            throw new UserDeletionConflictException(userId);
+        }
+        logAfterCommit(userId, username);
+    }
+
+    /**
+     * Logs deletion success only after the transaction commits. Logging
+     * inside the method body would claim success even when the commit
+     * subsequently rolls back.
+     */
+    private void logAfterCommit(UUID userId, String username) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    log.info("User deleted userId={} username={}", userId, username);
+                }
+            });
+        } else {
+            log.info("User deleted userId={} username={}", userId, username);
+        }
     }
 
     @OperationalLog("user.changeEmail")

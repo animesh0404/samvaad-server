@@ -8,6 +8,7 @@ import com.samvaad.samvaad_server.messaging.MessageConflictException;
 import com.samvaad.samvaad_server.user.EmailAlreadyExistsException;
 import com.samvaad.samvaad_server.user.InvalidUsernameException;
 import com.samvaad.samvaad_server.user.UserAlreadyExistsException;
+import com.samvaad.samvaad_server.user.UserDeletionConflictException;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -89,6 +90,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UserProfileNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleUserProfileNotFound(UserProfileNotFoundException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(UserDeletionConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleUserDeletionConflict(UserDeletionConflictException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 

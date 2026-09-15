@@ -16,6 +16,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.common.logging.LogCapture;
+import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
+import com.samvaad.samvaad_server.messaging.ConversationRepo;
+import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -41,6 +44,15 @@ class UserServiceLoggingTest {
     private SessionRepo sessionRepo;
 
     @Mock
+    private FriendRequestRepo friendRequestRepo;
+
+    @Mock
+    private MessageRepo messageRepo;
+
+    @Mock
+    private ConversationRepo conversationRepo;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService userService;
@@ -48,7 +60,8 @@ class UserServiceLoggingTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(
-                userRepo, userProfileService, userProfileRepo, sessionRepo, passwordEncoder);
+                userRepo, userProfileService, userProfileRepo, sessionRepo,
+                friendRequestRepo, messageRepo, conversationRepo, passwordEncoder);
     }
 
     private User userWithPassword(UUID userId) {

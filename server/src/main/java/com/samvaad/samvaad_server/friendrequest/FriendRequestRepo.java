@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -65,4 +66,11 @@ public interface FriendRequestRepo extends JpaRepository<FriendRequest, UUID> {
     default List<FriendRequest> findAcceptedInvolving(UUID userId) {
         return findByStatusInvolving(FriendRequestStatus.ACCEPTED, userId);
     }
+
+    @Modifying
+    @Query("""
+        DELETE FROM FriendRequest f
+        WHERE f.sender.userId = :userId OR f.recipient.userId = :userId
+    """)
+    void deleteByParticipantUserId(@Param("userId") UUID userId);
 }
