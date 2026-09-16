@@ -50,3 +50,22 @@ export interface UserProfileDto {
   lastName: string | null;
   statusMessage: string | null;
 }
+
+export interface UserProfileUpdatePayload {
+  displayName?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+  statusMessage?: string | null;
+}
+
+export interface EmailUpdatePayload {
+  email: string;
+}
+
+export interface PasswordUpdatePayload {
+  currentPassword: string;
+  newPassword: string;
+}

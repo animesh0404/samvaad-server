@@ -140,6 +140,11 @@ export class AuthService {
     );
   }
 
+  /** Updates the in-memory current user (e.g. after self-service email change). */
+  setCurrentUser(user: UserDto): void {
+    this.currentUserSignal.set(user);
+  }
+
   /** Clears memory state and routes to login (used when refresh fails). */
   clearAndGoLogin(): void {
     this.clearState();

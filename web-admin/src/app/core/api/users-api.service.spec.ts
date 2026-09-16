@@ -66,4 +66,30 @@ describe('UsersApiService', () => {
     del.flush('');
     backend.verify();
   });
+
+  it('patches profile with ADR 0006 field-presence semantics', () => {
+    const { api, backend } = setup();
+    api.updateProfile('u-1', { displayName: 'Bob', bio: null }).subscribe((p) => expect(p.displayName).toBe('Bob'));
+    const req = backend.expectOne('/api/users/u-1/profile');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ displayName: 'Bob', bio: null });
+    req.flush({ ...PROFILE, displayName: 'Bob', bio: null });
+    backend.verify();
+  });
+
+  it('patches email and password through self-only endpoints', () => {
+    const { api, backend } = setup();
+    api.changeEmail('u-1', { email: 'new@x.com' }).subscribe((u) => expect(u.email).toBe('new@x.com'));
+    const emailReq = backend.expectOne('/api/users/u-1/email');
+    expect(emailReq.request.method).toBe('PATCH');
+    expect(emailReq.request.body).toEqual({ email: 'new@x.com' });
+    emailReq.flush({ ...USER, email: 'new@x.com' });
+
+    api.changePassword('u-1', { currentPassword: 'old', newPassword: 'new' }).subscribe((u) => expect(u.userId).toBe('u-1'));
+    const pwReq = backend.expectOne('/api/users/u-1/password');
+    expect(pwReq.request.method).toBe('PATCH');
+    expect(pwReq.request.body).toEqual({ currentPassword: 'old', newPassword: 'new' });
+    pwReq.flush(USER);
+    backend.verify();
+  });
 });

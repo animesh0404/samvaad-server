@@ -9,6 +9,45 @@ const ADMIN_USER = process.env['E2E_ADMIN_USER'] ?? 'admin';
 const ADMIN_PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'admin123';
 const BASE_API = 'http://localhost:8080';
 
+/**
+ * Tracks API tokens created via `request` within the current test so
+ * `afterEach` can revoke them even when the test fails before its
+ * explicit logout. The 5-session limit makes leakage fatal for the
+ * next test, so cleanup must be best-effort and unconditional.
+ */
+const pendingAdminTokens: string[] = [];
+
+function trackAdminToken(token: string | undefined | null) {
+  if (token) {
+    pendingAdminTokens.push(token);
+  }
+}
+
+test.afterEach(async ({ page, request }) => {
+  // Revoke any API sessions created via `request` in this test.
+  const tokens = pendingAdminTokens.splice(0, pendingAdminTokens.length);
+  for (const token of tokens) {
+    try {
+      await request.post(`${BASE_API}/api/auth/logout`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // best-effort: do not fail the test on cleanup
+    }
+  }
+  // Best-effort UI logout for sessions created via `uiLogin`.
+  // `isVisible` with a short timeout avoids hanging when already on /login.
+  try {
+    const logoutBtn = page.getByRole('button', { name: 'Log out' });
+    if (await logoutBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await logoutBtn.click({ timeout: 2000 }).catch(() => {});
+      await page.waitForURL(/\/login$/, { timeout: 2000 }).catch(() => {});
+    }
+  } catch {
+    // ignore
+  }
+});
+
 async function uiLogin(
   page: import('@playwright/test').Page,
   identifier: string,
@@ -64,6 +103,7 @@ test('non-ADMIN credentials are rejected at login without a session', async ({ p
   });
   expect(login.ok()).toBeTruthy();
   const { accessToken } = await login.json();
+  trackAdminToken(accessToken);
   const created = await request.post(`${BASE_API}/api/users`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     data: { username, password: 'e2e-secret-1' },
@@ -78,11 +118,17 @@ test('non-ADMIN credentials are rejected at login without a session', async ({ p
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
 
-  // Revoke the provisioning session so repeated runs do not accumulate
-  // toward the server's five-active-session limit for the admin account.
-  await request.post(`${BASE_API}/api/auth/logout`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  // Explicit logout for the happy path; `afterEach` handles failures.
+  try {
+    await request.post(`${BASE_API}/api/auth/logout`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    // Remove from pending list since we already revoked it.
+    const idx = pendingAdminTokens.indexOf(accessToken);
+    if (idx !== -1) pendingAdminTokens.splice(idx, 1);
+  } catch {
+    // afterEach will retry
+  }
 });
 
 test('invalid credentials show an error and stay on login', async ({ page }) => {
