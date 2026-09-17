@@ -70,3 +70,7 @@ The locked deployment direction is:
 The packaging, production Docker image, release publication, VPS installer/update workflow, external configuration mechanism, and concrete TLS/reverse-proxy provider remain implementation/deployment work.
 
 See the implementation roadmap, architecture/security documents, API contracts, and ADRs for the detailed current state and locked decisions.
+
+## Architecture Review
+
+- [SOLID Architecture Review](architecture/solid-architecture-review.md) — September 2026 baseline assessment for future architectural reassessment.

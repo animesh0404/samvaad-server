@@ -158,6 +158,7 @@ The authoritative documentation lives under [`docs/`](docs/):
 - [Technical Design](docs/Samvaad%20Technical%20Design.md)
 - [Implementation Roadmap](docs/Samvaad%20Implementation%20Roadmap.md)
 - [Architecture Current State](docs/architecture/current-state.md)
+- [SOLID Architecture Review](docs/architecture/solid-architecture-review.md)
 - [User & Profile API Contract](docs/api/current-user-profile-api.md)
 - [Friends API Contract](docs/api/friends-api.md)
 - [Security Posture](docs/security/current-security-posture.md)
