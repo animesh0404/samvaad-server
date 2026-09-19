@@ -1,0 +1,15 @@
+# Keep the Docker build context to what the image actually needs.
+.git/
+.angular/
+.gradle/
+.idea/
+.vscode/
+node_modules/
+build/
+dist/
+logs/
+.env
+.envrc
+*.log
+test-results/
+playwright-report/

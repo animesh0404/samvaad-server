@@ -1,0 +1,41 @@
+# Samvaad deployment stack (ADR 0012): containerized application plus
+# Compose-managed PostgreSQL. The development database in
+# server/compose.yaml is a separate, unrelated stack: this file pins an
+# explicit project name so the two stacks never share a network or volumes.
+name: samvaad
+
+services:
+  app:
+    image: samvaad-server:latest
+    pull_policy: never
+    container_name: samvaad-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/samvaad
+      SPRING_DATASOURCE_USERNAME: samvaad
+      SPRING_DATASOURCE_PASSWORD: samvaad
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:18
+    container_name: samvaad-db
+    environment:
+      POSTGRES_DB: samvaad
+      POSTGRES_USER: samvaad
+      POSTGRES_PASSWORD: samvaad
+    volumes:
+      - samvaad-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U samvaad -d samvaad"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  samvaad-data:
