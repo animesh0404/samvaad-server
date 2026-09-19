@@ -95,7 +95,7 @@ Implemented:
 - Admin-only login boundary: valid non-admin credentials are rejected at `/login`, auth state is cleared, and no Web Admin session is retained.
 - Unit tests (Vitest).
 
-The first implementation slice does not include a WebSocket/STOMP client or production Angular/Gradle packaging. Those remain separate concerns.
+The first implementation slice does not include a WebSocket/STOMP client; production Angular/Gradle packaging is now implemented as a separate deployment concern.
 
 ## Application Packaging & Deployment
 
@@ -115,7 +115,7 @@ Locked deployment direction (unchanged):
 - Docker provides an additional containerized deployment path, including a Compose-managed Samvaad application plus PostgreSQL.
 - Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
 
-Implementation work still to decide includes Docker image/Compose production details, release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
+Implemented Docker deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, and build/start/restart/stop lifecycle scripts. Remaining deployment work is release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
 
 ## Later / deferred
 
