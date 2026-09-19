@@ -51,6 +51,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/friends/**").authenticated()
                         .requestMatchers("/api/conversations/**").authenticated()
                         .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/login", "/profile", "/users", "/users/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/*.js", "/*.css", "/*.png", "/*.ico", "/*.webmanifest").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/users/{userId}").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

@@ -170,6 +170,8 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Application packaging & deployment**: integrate the Angular production build into the Spring Boot executable JAR and validate the standalone-JAR and Docker deployment paths, while preserving the locked TLS-at-edge architecture.
+**Application packaging & deployment (packaging complete)**: the Angular production build is now packaged into the Spring Boot executable JAR (`./gradlew clean bootJar` from `server/`), and one JAR serves the web admin, REST API, and WebSocket endpoint against external PostgreSQL.
+
+Remaining deployment work: Docker production image/Compose profile, release publication, VPS installation/update workflow, external configuration mechanics, and concrete TLS/reverse-proxy setup, while preserving the locked TLS-at-edge architecture.
 
 The later release work will cover publication, VPS installation/update workflow, external configuration mechanics, and concrete TLS/reverse-proxy setup.

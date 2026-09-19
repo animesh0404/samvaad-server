@@ -99,16 +99,23 @@ The first implementation slice does not include a WebSocket/STOMP client or prod
 
 ## Application Packaging & Deployment
 
-PLANNED.
+Angular/Gradle packaging: COMPLETE.
 
-Locked deployment direction:
+Implemented:
+- `bootJar`-scoped Angular production build (plain Gradle `Exec`/`Copy`, no extra plugins; `npm ci` never runs, backend tests stay Node-free).
+- Packaged bundle under `BOOT-INF/classes/static` in the executable JAR.
+- SPA fallback for client-side routes without claiming `/api/**`, `/ws`, or static files.
+- Security permits for the SPA shell and static assets; protected API routes unchanged.
+- Standalone `java -jar ...` serving the web admin, REST API, and WebSocket endpoint against external PostgreSQL.
+
+Locked deployment direction (unchanged):
 - Angular production assets are packaged into the Spring Boot executable JAR.
 - `java -jar ...` serves the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
 - The JAR remains capable of connecting to an externally provisioned PostgreSQL instance through externalized configuration.
 - Docker provides an additional containerized deployment path, including a Compose-managed Samvaad application plus PostgreSQL.
 - Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
 
-Implementation work still to decide includes Angular/Gradle integration, Docker image/Compose production details, release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
+Implementation work still to decide includes Docker image/Compose production details, release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
 
 ## Later / deferred
 

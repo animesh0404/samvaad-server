@@ -88,13 +88,13 @@ The current Web Admin slice has no WebSocket/STOMP client. It is an HTTP client 
 
 See ADR 0011 for the durable web-admin technology decision.
 
-## Application packaging and deployment: locked direction
+## Application packaging and deployment: current implementation
 
-The intended application delivery artifact is a Spring Boot executable JAR containing the Angular production static assets. Running the JAR with `java -jar ...` is intended to serve the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
+The application delivery artifact is a Spring Boot executable JAR containing the Angular production static assets. Running the JAR with `java -jar ...` serves the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
+
+The Gradle packaging (`server/build.gradle`, no extra plugins) builds the Angular production bundle and stages it under `BOOT-INF/classes/static`, wired into `bootJar` only so backend tests stay Node-free. A small `WebAdminController` forwards SPA routes (`/`, `/login`, `/profile`, `/users…`) to `index.html` without claiming `/api/**`, `/ws`, or static files, and `SecurityConfig` permits the SPA shell plus static assets while authenticated API routes keep their existing protection.
 
 The JAR remains independently deployable against an externally provisioned PostgreSQL database through externalized configuration. Docker is an additional deployment/distribution path and is intended to support a containerized Samvaad application together with PostgreSQL through Compose.
-
-The Angular/Gradle packaging integration is not yet implemented.
 
 See ADR 0012 for the durable packaging/deployment decision.
 

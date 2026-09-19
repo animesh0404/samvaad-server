@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; implementation pending.
+Accepted; Angular/Gradle packaging implemented, deployment paths pending.
 
 ## Context
 

@@ -182,6 +182,51 @@ Use the Gradle wrapper to build and verify the project:
 
 ---
 
+## Application Packaging
+
+The deliverable is one executable Spring Boot JAR serving the Web Admin UI,
+the REST API, and the WebSocket/STOMP endpoint from embedded Tomcat
+(ADR 0012). PostgreSQL stays external and is never embedded.
+
+One-time prerequisite (same toolchain as web-admin development):
+
+```bash
+cd web-admin
+nvm use
+npm install
+```
+
+Build the artifact (from `server/`):
+
+```bash
+cd server
+./gradlew clean bootJar
+```
+
+`bootJar` builds the Angular production bundle (`npm run build`, skipped
+when Angular inputs are unchanged; `npm ci` is never run) and stages it
+under `BOOT-INF/classes/static` in
+`server/build/libs/samvaad-server-*.jar`. Backend `./gradlew test` never
+touches Node.
+
+Run it against an externally provisioned PostgreSQL instance:
+
+```bash
+java -jar server/build/libs/samvaad-server-*.jar
+```
+
+`SAMVAAD_JWT_SECRET` must be provided as described above; remaining
+datasource settings come from `application.yaml` (externalized deployment
+configuration remains future work per ADR 0012). The JAR serves `/`
+(login shell), SPA routes (`/login`, `/profile`, `/users…`, including on
+browser refresh), static assets, `/api/**`, and `/ws` on port `8080`.
+
+The `ng serve` + `bootRun` development workflow is unchanged and does not
+serve the packaged UI; use it for day-to-day frontend/backend work and the
+JAR for packaging verification.
+
+---
+
 ## Related Documentation
 
 - [Testing Guide](testing.md) — Testing strategy, layers, and commands.

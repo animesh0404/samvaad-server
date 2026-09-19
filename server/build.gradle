@@ -45,3 +45,48 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Web Admin packaging (ADR 0012): the Angular production bundle is built
+// with the project's own npm toolchain and staged into the executable JAR.
+// Only the `bootJar` path triggers this. Backend tests never touch Node.
+//
+// Prerequisite (one-time, same as web-admin development):
+//   cd ../web-admin && npm install
+// `npm ci` is deliberately NOT run here: node_modules is reused as-is and
+// the build is skipped entirely when Angular inputs are unchanged.
+def webAdminDist = file('../web-admin/dist/web-admin/browser')
+def webAdminStaging = layout.buildDirectory.dir('webAdmin')
+
+tasks.register('buildWebAdmin', Exec) {
+	group = 'build'
+	description = 'Builds the Angular web-admin production bundle (requires node/npm).'
+	workingDir = file('../web-admin')
+	commandLine = ['npm', 'run', 'build']
+	inputs.files(fileTree(dir: '../web-admin/src'))
+	inputs.files(fileTree(dir: '../web-admin/public'))
+	inputs.file('../web-admin/package.json')
+	inputs.file('../web-admin/package-lock.json')
+	inputs.file('../web-admin/angular.json')
+	inputs.file('../web-admin/tsconfig.app.json')
+	inputs.file('../web-admin/tsconfig.json')
+	outputs.dir(webAdminDist)
+}
+
+tasks.register('copyWebAdminAssets', Copy) {
+	group = 'build'
+	description = 'Stages the Angular production bundle for inclusion in the executable JAR.'
+	dependsOn('buildWebAdmin')
+	from(webAdminDist)
+	into(webAdminStaging)
+}
+
+tasks.named('bootJar') {
+	dependsOn('copyWebAdminAssets')
+	// Extra `from` content would land at the archive root, outside the
+	// runtime classpath; and the classpath root itself is not a static
+	// location. Bundle the UI under BOOT-INF/classes/static so Spring MVC
+	// serves index.html and the hashed assets by default.
+	from(webAdminStaging) {
+		into('BOOT-INF/classes/static')
+	}
+}
