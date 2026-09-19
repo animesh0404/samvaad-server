@@ -24,8 +24,9 @@ WORKDIR /build/server
 # directly instead of the wrapper (which would re-download it).
 RUN gradle bootJar -x buildWebAdmin --no-daemon
 
-# Stage 3: runtime.
-FROM eclipse-temurin:25-jre
+# Stage 3: runtime. Alpine-based Temurin JRE: materially smaller with no
+# compatibility cost for this pure-Java application (no JNI dependencies).
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 COPY --from=server-build /build/server/build/libs/samvaad-server-*.jar /app/app.jar
 EXPOSE 8080
