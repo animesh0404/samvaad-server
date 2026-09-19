@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; Angular/Gradle packaging implemented, deployment paths pending.
+Accepted; Angular/Gradle packaging and Docker deployment implemented.
 
 ## Context
 
@@ -25,12 +25,12 @@ The exact Gradle/Angular build integration is an implementation detail and is no
 
 The JAR is the primary deployable application artifact and must remain capable of connecting to an externally provisioned PostgreSQL database. Docker is not a runtime requirement for the application itself.
 
-Docker will additionally provide a reproducible distribution/deployment path. The repository's Docker Compose deployment is intended to be able to bring up the Samvaad application container together with PostgreSQL for installations that want the database lifecycle managed by Compose.
+Docker additionally provides the implemented reproducible distribution/deployment path. The repository's `compose.yaml` brings up the Samvaad application container together with PostgreSQL, with the application image built by `scripts/build.sh` and the lifecycle controlled by `scripts/start.sh`, `scripts/restart.sh`, and `scripts/stop.sh`.
 
 The two supported operational modes are therefore:
 
 - **Standalone JAR:** an operator supplies/configures PostgreSQL and runs the Samvaad executable JAR.
-- **Docker Compose:** an operator uses the containerized Samvaad application together with the Compose-managed PostgreSQL instance.
+- **Docker Compose:** an operator uses the containerized Samvaad application together with the Compose-managed PostgreSQL instance. The runtime image uses the Alpine-based Temurin 25 JRE; the build uses Docker Buildx/BuildKit; `scripts/build.sh` also exports `server/build/samvaad-server.tar.gz` as a portable image artifact.
 
 Application configuration, including database connection details and other deployment-sensitive values, must be externalized from the JAR. Secrets must not be baked into the artifact.
 
@@ -44,8 +44,6 @@ Application configuration, including database connection details and other deplo
 
 ## Explicitly deferred
 
-- Final Angular-to-Gradle build integration mechanics.
-- Final Dockerfile/image base and Compose production profile.
 - Release publication mechanism (for example GitHub Releases or a container registry).
 - One-command VPS installer/update workflow.
 - Final external configuration file generation/lookup mechanism.
