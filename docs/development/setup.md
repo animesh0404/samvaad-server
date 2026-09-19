@@ -216,14 +216,52 @@ java -jar server/build/libs/samvaad-server-*.jar
 ```
 
 `SAMVAAD_JWT_SECRET` must be provided as described above; remaining
-datasource settings come from `application.yaml` (externalized deployment
-configuration remains future work per ADR 0012). The JAR serves `/`
+datasource settings come from `application.yaml` for standalone JAR deployment. The JAR serves `/`
 (login shell), SPA routes (`/login`, `/profile`, `/users…`, including on
 browser refresh), static assets, `/api/**`, and `/ws` on port `8080`.
 
 The `ng serve` + `bootRun` development workflow is unchanged and does not
 serve the packaged UI; use it for day-to-day frontend/backend work and the
 JAR for packaging verification.
+
+---
+
+## Docker Deployment
+
+The repository also provides an implemented Docker deployment path for installations that want the application and PostgreSQL lifecycle managed together.
+
+Build the image and export a portable image artifact from the repository root:
+
+```bash
+./scripts/build.sh
+```
+
+This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local Docker image store, and writes:
+
+```text
+server/build/samvaad-server.tar.gz
+```
+
+The generated `server/build/` directory is ignored by Git. The image remains loaded locally so the deployment scripts can use it directly.
+
+Start the deployment:
+
+```bash
+./scripts/start.sh
+```
+
+On the first start, if the repository-root `.env` does not contain `SAMVAAD_JWT_SECRET`, the script prompts for a secret or generates one automatically when Enter is pressed. The generated/entered secret is stored in `.env` with mode `600`. Existing secrets are reused and are never rotated by restart.
+
+Restart or stop the deployment without rebuilding:
+
+```bash
+./scripts/restart.sh
+./scripts/stop.sh
+```
+
+The Docker Compose deployment uses the `samvaad` project name and a separate PostgreSQL volume/network from the development stack. PostgreSQL is not published to the host by the deployment Compose file.
+
+The Docker runtime image contains the Spring Boot executable JAR and the Java 25 Alpine JRE only; Node, npm, Gradle, source files, and frontend `node_modules` are build-stage content and are not included in the runtime image.
 
 ---
 
