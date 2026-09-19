@@ -7,9 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
-    "test:watch": "ng test --watch",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "test:watch": "ng test --watch"
   },
   "private": true,
   "dependencies": {
@@ -26,7 +24,6 @@
     "@angular/build": "^22.1.8",
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.0",
-    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "jsdom": "^28.0.0",
     "postcss": "^8.5.28",

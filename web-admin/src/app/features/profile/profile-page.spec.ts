@@ -27,6 +27,7 @@ function fakeJwt(sub: string): string {
 }
 
 function setupWithCurrentUser(user: UserDto | null) {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),
@@ -63,6 +64,7 @@ describe('ProfilePage', () => {
   });
 
   it('bootstraps when no current user is present', () => {
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),

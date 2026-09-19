@@ -29,6 +29,7 @@ function unpaddedJwt(sub: string): string {
 }
 
 function setup() {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),
@@ -42,6 +43,14 @@ function setup() {
     users: TestBed.inject(UsersApiService),
     backend: TestBed.inject(HttpTestingController),
   };
+}
+
+/**
+ * The refresh single-flight resolves through promises, so chained requests
+ * after a refresh flush land on a later microtask. Yield before asserting.
+ */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('AuthService', () => {
@@ -169,5 +178,123 @@ describe('AuthService', () => {
     tokens.set({ accessToken: unpaddedJwt('u-1'), refreshToken: 'r', sessionId: 's' });
     expect(tokens.session()?.accessToken.split('.')[1]).not.toMatch(/=$/);
     expect(auth.userIdFromAccessToken()).toBe('u-1');
+  });
+
+  it('successful login persists the complete session', async () => {
+    const { auth, tokens, backend: http } = setup();
+
+    const done = auth.login('admin', 'admin123').toPromise();
+    http.expectOne('/api/auth/login').flush({
+      accessToken: fakeJwt('u-1'),
+      refreshToken: 'r-1',
+      expiresIn: 86400,
+      sessionId: 's-1',
+    });
+    http.expectOne('/api/users/u-1').flush(ADMIN);
+    await done;
+
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toContain('.');
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBe('r-1');
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBe('s-1');
+    expect(tokens.hasTokens()).toBe(true);
+    http.verify();
+  });
+
+  it('startup with a persisted session bootstraps the current user', async () => {
+    const { auth, tokens, backend: http } = setup();
+    tokens.set({ accessToken: fakeJwt('u-1'), refreshToken: 'r-1', sessionId: 's-1' });
+
+    const done = auth.initialize();
+    http.expectOne('/api/users/u-1').flush(ADMIN);
+    await done;
+
+    expect(auth.isAuthenticated()).toBe(true);
+    expect(auth.currentUser()).toEqual(ADMIN);
+    http.verify();
+  });
+
+  it('startup with no persisted session remains unauthenticated', async () => {
+    const { auth, backend: http } = setup();
+
+    await auth.initialize();
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(auth.currentUser()).toBeNull();
+    http.verify();
+  });
+
+  it('startup refreshes an expired access token and continues the session', async () => {
+    const { auth, tokens, backend: http } = setup();
+    // 'expired' is not a decodable JWT, so bootstrap cannot run and the
+    // existing refresh mechanism must take over.
+    tokens.set({ accessToken: 'expired', refreshToken: 'valid-refresh', sessionId: 's-1' });
+
+    const done = auth.initialize();
+    http.expectOne('/api/auth/refresh').flush({
+      accessToken: fakeJwt('u-1'),
+      refreshToken: 'rotated',
+      expiresIn: 86400,
+      sessionId: 's-1',
+    });
+    await flushMicrotasks();
+    http.expectOne('/api/users/u-1').flush(ADMIN);
+    await done;
+
+    expect(auth.isAuthenticated()).toBe(true);
+    expect(auth.currentUser()).toEqual(ADMIN);
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBe('rotated');
+    http.verify();
+  });
+
+  it('startup with a rejected refresh token clears persisted state', async () => {
+    const { auth, tokens, backend: http } = setup();
+    tokens.set({ accessToken: 'expired', refreshToken: 'revoked', sessionId: 's-1' });
+
+    const done = auth.initialize();
+    http
+      .expectOne('/api/auth/refresh')
+      .flush({ message: 'Invalid refresh token' }, { status: 401, statusText: 'Unauthorized' });
+    await done;
+
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(auth.currentUser()).toBeNull();
+    expect(tokens.hasTokens()).toBe(false);
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBeNull();
+    http.verify();
+  });
+
+  it('refresh rotation updates persisted state', async () => {
+    const { auth, tokens, backend: http } = setup();
+    tokens.set({ accessToken: fakeJwt('u-1'), refreshToken: 'old', sessionId: 's' });
+
+    const rotated = auth.refreshAccessToken().toPromise();
+    http.expectOne('/api/auth/refresh').flush({
+      accessToken: fakeJwt('u-1'),
+      refreshToken: 'new',
+      expiresIn: 1,
+      sessionId: 's',
+    });
+    await rotated;
+
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBe('new');
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toContain('.');
+    http.verify();
+  });
+
+  it('logout clears persisted state', async () => {
+    const { auth, tokens, backend: http } = setup();
+    tokens.set({ accessToken: 'tok', refreshToken: 'r', sessionId: 's' });
+
+    const done = auth.logout().toPromise();
+    http.expectOne('/api/auth/logout').flush('ok');
+    await done;
+
+    expect(tokens.hasTokens()).toBe(false);
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBeNull();
+    http.verify();
   });
 });

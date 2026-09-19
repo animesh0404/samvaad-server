@@ -7,7 +7,7 @@ export class SpecBlankComponent {}
 /**
  * Test router that accepts any navigation target. Component and service
  * specs exercise router.navigate() without caring about real route config;
- * route matching itself is covered by e2e.
+ * guard specs cover the route-protection decisions.
  */
 export function provideSpecRouter() {
   return provideRouter([{ path: '**', component: SpecBlankComponent }]);

@@ -95,6 +95,37 @@ export class AuthService {
     return this.usersApi.getUser(userId).pipe(tap((user) => this.currentUserSignal.set(user)));
   }
 
+  /**
+   * Application-startup session restoration (ADR 0014).
+   *
+   * Runs once via `provideAppInitializer`, before the router's initial
+   * navigation, so restored state is present before guards decide.
+   *
+   * - No persisted session: stays unauthenticated (`/login`).
+   * - Persisted session with a usable access token: bootstraps the user.
+   * - Expired access token with a valid refresh token: rotates through the
+   *   existing refresh mechanism, then bootstraps the user.
+   * - Rejected (invalid/revoked/expired) session: clears memory and
+   *   persisted state, stays unauthenticated (`/login`).
+   *
+   * Never rejects: startup must always complete, authenticated or not.
+   */
+  initialize(): Promise<void> {
+    if (!this.tokens.hasTokens()) {
+      return Promise.resolve();
+    }
+    return firstValueFrom(
+      this.bootstrap().pipe(
+        catchError(() => this.refreshAccessToken().pipe(switchMap(() => this.bootstrap()))),
+        map(() => undefined),
+        catchError(() => {
+          this.clearState();
+          return of(undefined);
+        }),
+      ),
+    );
+  }
+
   refreshAccessToken(): Observable<string> {
     const inFlight = this.refreshInFlight;
     if (inFlight) {

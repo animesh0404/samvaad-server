@@ -4,7 +4,7 @@ import { catchError, map, of } from 'rxjs';
 import { AuthService } from './auth.service';
 import { TokenStoreService } from './token-store.service';
 
-/** Requires an in-memory session; otherwise routes to /login. */
+/** Requires a stored session (restored before initial navigation); otherwise routes to /login. */
 export const authGuard: CanActivateFn = () => {
   const tokens = inject(TokenStoreService);
   const router = inject(Router);

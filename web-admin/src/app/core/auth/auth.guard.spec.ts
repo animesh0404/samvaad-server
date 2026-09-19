@@ -26,6 +26,7 @@ function loginResponse(sub: string) {
 }
 
 function setup() {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),
@@ -57,6 +58,28 @@ describe('authGuard', () => {
     f.tokens.set({ accessToken: 'a', refreshToken: 'r', sessionId: 's' });
     expect(f.run(authGuard)).toBe(true);
     f.backend.verify();
+  });
+
+  it('allows a session restored from persisted storage', () => {
+    // Seed storage before the store is created, mirroring application
+    // startup after a browser reload.
+    sessionStorage.clear();
+    sessionStorage.setItem('samvaad.web-admin.accessToken', 'a');
+    sessionStorage.setItem('samvaad.web-admin.refreshToken', 'r');
+    sessionStorage.setItem('samvaad.web-admin.sessionId', 's');
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        provideSpecRouter(),
+      ],
+    });
+    const tokens = TestBed.inject(TokenStoreService);
+    expect(tokens.hasTokens()).toBe(true);
+    const run = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
+    expect(run).toBe(true);
+    TestBed.inject(HttpTestingController).verify();
+    sessionStorage.clear();
   });
 });
 
@@ -93,6 +116,27 @@ describe('adminGuard', () => {
   it('sends anonymous traffic to login', () => {
     const f = setup();
     expect(f.router.serializeUrl(f.run(adminGuard) as never)).toBe('/login');
+    f.backend.verify();
+  });
+
+  it('expired access with rejected refresh ends at login with cleared state', async () => {
+    const f = setup();
+    f.tokens.set({ accessToken: jwt('u-9'), refreshToken: 'revoked', sessionId: 's' });
+
+    const pending = firstValueFrom(f.run(adminGuard) as import('rxjs').Observable<unknown>);
+    // Bootstrap lookup fails on the expired access token; the interceptor
+    // then spends the revoked refresh token and also fails.
+    f.backend.expectOne('/api/users/u-9').flush({ message: 'x' }, { status: 401, statusText: 'U' });
+    f.backend
+      .expectOne('/api/auth/refresh')
+      .flush({ message: 'bad' }, { status: 401, statusText: 'U' });
+    const tree = await pending;
+
+    expect(f.router.serializeUrl(tree as never)).toBe('/login');
+    expect(f.tokens.hasTokens()).toBe(false);
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBeNull();
     f.backend.verify();
   });
 });

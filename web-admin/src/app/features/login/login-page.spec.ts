@@ -8,6 +8,7 @@ import { TokenStoreService } from '../../core/auth/token-store.service';
 import { LoginPage } from './login-page';
 
 function setup() {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),

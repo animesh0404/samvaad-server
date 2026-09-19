@@ -15,8 +15,8 @@ function isCredentialCall(url: string): boolean {
 }
 
 /**
- * Attaches the in-memory Bearer token and recovers from expiry with a
- * single-flight refresh + one retry. When refresh fails, memory state is
+ * Attaches the stored Bearer token and recovers from expiry with a
+ * single-flight refresh + one retry. When refresh fails, stored state is
  * cleared and the user is routed to /login.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

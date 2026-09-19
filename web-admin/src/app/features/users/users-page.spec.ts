@@ -17,6 +17,7 @@ function jwt(sub: string): string {
 }
 
 async function setup() {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),

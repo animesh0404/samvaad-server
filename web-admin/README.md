@@ -22,18 +22,23 @@ npm start         # ng serve on :4200, /api proxied to :8080
 ```bash
 npm run build     # production build → dist/web-admin/browser/
 npm test          # unit tests (Vitest, single run)
-npm run e2e       # Playwright (needs backend + frontend, see playwright.config.ts)
 ```
-
-Run e2e against a fresh backend database (`cd ../server && ./gradlew bootTestRun`):
-the server caps each user at five active sessions, so reusing a long-running
-backend across runs can surface session-limit errors instead of test failures.
 
 ## Notes
 
 - Login uses `clientPlatform: "WEB"` and sends no `installationId`.
-- Access/refresh tokens live in memory only; a page reload requires re-login.
+- Web Admin session tokens (`accessToken`, `refreshToken`, `sessionId`) are
+  persisted in `sessionStorage` (ADR 0014), so a page reload restores the
+  session instead of requiring re-login. Closing the tab ends the session.
+  No tokens use `localStorage`, cookies, or IndexedDB.
+- Application startup restores the persisted session before the first route
+  decision: a usable session bootstraps the current user, an expired access
+  token rotates through the existing refresh call, and a rejected session is
+  cleared back to `/login`.
 - Expired access tokens recover transparently: the first 401 triggers one
   shared refresh and retries the failed request once. There is no proactive
   refresh timer by design; expiry is handled reactively.
+- The server caps each user at five active sessions: against a long-running
+  backend, stale sessions can surface session-limit errors, so prefer a
+  fresh backend database or log out to free a slot.
 - Only ADMIN users can use this UI; authorization is enforced server-side.

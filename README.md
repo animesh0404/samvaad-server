@@ -78,9 +78,9 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 - **Styling**: Tailwind CSS v4
 - **Package manager**: npm
 - **Node convention**: Node 24 via `.nvmrc`
-- **Testing**: Vitest and Playwright
+- **Testing**: Vitest
 
-The Web Admin is a thin client of the stable Samvaad server contracts. Bootstrap is not used, and Angular Material is not a required component system for the initial panel. Access/refresh tokens are held in memory rather than browser storage.
+The Web Admin is a thin client of the stable Samvaad server contracts. Bootstrap is not used, and Angular Material is not a required component system for the initial panel. Web Admin session tokens are persisted in `sessionStorage` so a page reload restores the session; the server remains the authoritative authentication/session system (ADR 0014).
 
 The intended delivery model is to package the Angular production build into the Spring Boot executable JAR so one JAR can serve the web admin, REST API, and WebSocket endpoint through embedded Tomcat. The packaging mechanics are deferred.
 
@@ -146,7 +146,6 @@ Web Admin:
 cd web-admin
 npm test
 npm run build
-npm run e2e
 ```
 
 ## Documentation

@@ -31,7 +31,7 @@ The Web Admin first implementation slice is now implemented under `web-admin/`.
 - npm with Node 24 convention via `.nvmrc`.
 - Dashboard, user listing, creation, detail, and deletion flows.
 - Existing server authentication/session contracts; login sends `clientPlatform: "WEB"` without an `installationId`.
-- Access/refresh tokens are kept in memory only.
+- Access/refresh tokens are persisted in `sessionStorage` (ADR 0014), so a page reload restores the session.
 - Only `ADMIN` accounts can establish a Web Admin session. Valid non-admin credentials are rejected at the login page and do not retain Web Admin auth state.
 - Server-side authorization remains authoritative.
 

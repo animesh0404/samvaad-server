@@ -33,3 +33,4 @@ an earlier ADR only by explicitly naming it.
 | [0011](0011-web-admin-panel-technology-and-ui-styling.md) | Web admin panel technology and UI styling |
 | [0012](0012-web-admin-packaging-and-deployment-model.md) | Web admin packaging and deployment model |
 | [0013](0013-tls-termination-at-deployment-edge.md) | TLS termination at the deployment edge |
+| [0014](0014-web-admin-browser-session-storage.md) | Web admin browser-session storage |

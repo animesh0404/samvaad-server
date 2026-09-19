@@ -12,6 +12,7 @@ function b64url(value: object): string {
 const jwt = (sub: string) => `h.${b64url({ sub })}.s`;
 
 function setup() {
+  sessionStorage.clear();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(withInterceptors([authInterceptor])),
@@ -98,6 +99,67 @@ describe('authInterceptor', () => {
     await flushMicrotasks();
     expect(failed).toBe(true);
     expect(tokens.hasTokens()).toBe(false);
+    backend.verify();
+  });
+
+  it('attaches the Bearer token from a restored session', () => {
+    // Seed storage before the store is created, mirroring startup reload.
+    // NOTE: setup() clears storage, so this test configures TestBed inline.
+    sessionStorage.clear();
+    sessionStorage.setItem('samvaad.web-admin.accessToken', 'restored-tok');
+    sessionStorage.setItem('samvaad.web-admin.refreshToken', 'r');
+    sessionStorage.setItem('samvaad.web-admin.sessionId', 's');
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        provideSpecRouter(),
+      ],
+    });
+    const http = TestBed.inject(HttpClient);
+    const backend = TestBed.inject(HttpTestingController);
+
+    http.get('/api/users').subscribe();
+    const req = backend.expectOne('/api/users');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer restored-tok');
+    req.flush([]);
+    backend.verify();
+    sessionStorage.clear();
+  });
+
+  it('persists rotated tokens after 401 recovery', async () => {
+    const { http, backend } = setup();
+    TestBed.inject(TokenStoreService).set({ accessToken: 'old', refreshToken: 'r', sessionId: 's' });
+
+    http.get('/api/users').subscribe();
+    backend.expectOne('/api/users').flush({ message: 'x' }, { status: 401, statusText: 'U' });
+    backend
+      .expectOne('/api/auth/refresh')
+      .flush({ accessToken: 'new', refreshToken: 'r2', expiresIn: 1, sessionId: 's' });
+
+    await flushMicrotasks();
+    backend.expectOne('/api/users').flush([]);
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toBe('new');
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBe('r2');
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBe('s');
+    backend.verify();
+  });
+
+  it('clears persisted state when refresh fails', async () => {
+    const { http, backend, tokens } = setup();
+    tokens.set({ accessToken: jwt('u-1'), refreshToken: 'r', sessionId: 's' });
+
+    http.get('/api/users').subscribe({ error: () => undefined });
+    backend.expectOne('/api/users').flush({ message: 'x' }, { status: 401, statusText: 'U' });
+    backend
+      .expectOne('/api/auth/refresh')
+      .flush({ message: 'bad' }, { status: 401, statusText: 'U' });
+
+    await flushMicrotasks();
+    expect(tokens.hasTokens()).toBe(false);
+    expect(sessionStorage.getItem('samvaad.web-admin.accessToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.refreshToken')).toBeNull();
+    expect(sessionStorage.getItem('samvaad.web-admin.sessionId')).toBeNull();
     backend.verify();
   });
 

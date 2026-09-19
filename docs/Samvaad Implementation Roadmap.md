@@ -90,10 +90,10 @@ Implemented:
 - Dashboard and admin shell.
 - User listing, creation, detail, and deletion flows.
 - Existing server authentication/session contracts; login sends `clientPlatform: "WEB"` without an `installationId`.
-- In-memory access/refresh token storage.
+- `sessionStorage` Web Admin session persistence (`accessToken`, `refreshToken`, `sessionId`) with startup restoration before the first route decision.
 - Reactive access-token refresh on `401` with a single shared refresh operation and one retry.
 - Admin-only login boundary: valid non-admin credentials are rejected at `/login`, auth state is cleared, and no Web Admin session is retained.
-- Unit tests and Playwright browser coverage.
+- Unit tests (Vitest).
 
 The first implementation slice does not include a WebSocket/STOMP client or production Angular/Gradle packaging. Those remain separate concerns.
 
