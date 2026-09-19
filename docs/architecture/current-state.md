@@ -94,7 +94,7 @@ The application delivery artifact is a Spring Boot executable JAR containing the
 
 The Gradle packaging (`server/build.gradle`, no extra plugins) builds the Angular production bundle and stages it under `BOOT-INF/classes/static`, wired into `bootJar` only so backend tests stay Node-free. A small `WebAdminController` forwards SPA routes (`/`, `/login`, `/profile`, `/users…`) to `index.html` without claiming `/api/**`, `/ws`, or static files, and `SecurityConfig` permits the SPA shell plus static assets while authenticated API routes keep their existing protection.
 
-The JAR remains independently deployable against an externally provisioned PostgreSQL database through externalized configuration. Docker is an additional deployment/distribution path and is intended to support a containerized Samvaad application together with PostgreSQL through Compose.
+The JAR remains independently deployable against an externally provisioned PostgreSQL database through externalized configuration. Docker is an implemented additional deployment/distribution path: `Dockerfile` builds the Angular bundle and Spring Boot executable JAR in multi-stage builds, the runtime uses `eclipse-temurin:25-jre-alpine`, and `compose.yaml` runs the application with a Compose-managed PostgreSQL instance. `scripts/build.sh` uses Docker Buildx/BuildKit with `--load` and exports `server/build/samvaad-server.tar.gz`; `start.sh`, `restart.sh`, and `stop.sh` provide the deployment lifecycle without rebuilding or rotating an existing JWT secret.
 
 See ADR 0012 for the durable packaging/deployment decision.
 
@@ -133,8 +133,6 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - friend-gated profile visibility
 - full audit/event-history policy beyond operational logging
 - final web-admin visual design system and component inventory
-- exact Angular/Gradle build integration
-- Docker production image/Compose profile
 - release publication and one-command VPS installer/update workflow
 - concrete external configuration file generation/lookup mechanism
 - concrete TLS/reverse-proxy/tunnel provider and certificate automation
