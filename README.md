@@ -23,7 +23,7 @@ Backend commands run from `server/`. Web Admin commands run from `web-admin/`.
 
 ## Current Status
 
-The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, and the current administrative user-deletion slice are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
+The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, and the current administrative user-deletion slice are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
 
 Currently implemented:
 
@@ -45,7 +45,6 @@ Currently implemented:
 
 ### Not Yet Implemented / Deferred
 
-- Web Admin production packaging into the Spring Boot JAR; the packaging direction is locked, but Angular/Gradle integration is not yet implemented.
 - Reconnect/missed-event synchronization and offline queues.
 - Persistent read state/read receipts.
 - Typing/presence, delivery receipts, and push notifications.
@@ -82,16 +81,16 @@ See `docs/` for implementation snapshots, locked decisions, and verification rec
 
 The Web Admin is a thin client of the stable Samvaad server contracts. Bootstrap is not used, and Angular Material is not a required component system for the initial panel. Web Admin session tokens are persisted in `sessionStorage` so a page reload restores the session; the server remains the authoritative authentication/session system (ADR 0014).
 
-The intended delivery model is to package the Angular production build into the Spring Boot executable JAR so one JAR can serve the web admin, REST API, and WebSocket endpoint through embedded Tomcat. The packaging mechanics are deferred.
+The Angular production build is now packaged into the Spring Boot executable JAR, so one JAR serves the web admin, REST API, and WebSocket endpoint through embedded Tomcat. The packaging mechanics are implemented through the existing Gradle `bootJar` tasks.
 
 ---
 
 ## Deployment Direction
 
-Two deployment modes are intended:
+Two deployment modes are supported:
 
 1. **Standalone JAR** — run the executable JAR directly and connect it to an externally provisioned PostgreSQL instance using externalized deployment configuration.
-2. **Docker Compose** — run a containerized Samvaad application together with the Compose-managed PostgreSQL instance.
+2. **Docker Compose** — run the containerized Samvaad application together with the Compose-managed PostgreSQL instance using the repository lifecycle scripts.
 
 Docker is therefore a distribution/deployment option, not a hard runtime requirement for the application JAR.
 
@@ -170,8 +169,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Application packaging & deployment (packaging complete)**: the Angular production build is now packaged into the Spring Boot executable JAR (`./gradlew clean bootJar` from `server/`), and one JAR serves the web admin, REST API, and WebSocket endpoint against external PostgreSQL.
-
-Remaining deployment work: Docker production image/Compose profile, release publication, VPS installation/update workflow, external configuration mechanics, and concrete TLS/reverse-proxy setup, while preserving the locked TLS-at-edge architecture.
-
-The later release work will cover publication, VPS installation/update workflow, external configuration mechanics, and concrete TLS/reverse-proxy setup.
+**Release and external deployment operations**: application packaging and the Docker/Compose deployment path are implemented. Remaining work is release publication, VPS installation/update workflow, external configuration mechanics, and the concrete TLS/reverse-proxy setup, while preserving the locked TLS-at-edge architecture.
