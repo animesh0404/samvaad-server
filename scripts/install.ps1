@@ -86,7 +86,7 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Read-EnvLines {
   if (Test-Path -LiteralPath $EnvFile) {
-    return [System.IO.File]::ReadAllLines($EnvFile, [System.Text.Encoding]::UTF8)
+    return @([System.IO.File]::ReadAllLines($EnvFile, [System.Text.Encoding]::UTF8))
   }
   return @()
 }
@@ -112,7 +112,7 @@ if (Test-Path -LiteralPath $EnvFile) {
 }
 
 function Add-EnvValue([string]$Key, [string]$Value) {
-  $Lines = Read-EnvLines
+  $Lines = @(Read-EnvLines)
   if ($Lines.Count -gt 0 -and $Lines[-1] -ne '') { $Lines += '' }
   $Lines += "$Key=$Value"
   Write-EnvLines $Lines
