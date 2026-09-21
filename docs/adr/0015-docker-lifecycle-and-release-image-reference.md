@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted. Extends ADR 0012; does not supersede it. Implementation pending:
-the release/publish mechanism and the root `compose.yaml` image-reference
-change are future work.
+Accepted. Extends ADR 0012; does not supersede it. Implemented:
+`scripts/release-image.sh` is the release/publish mechanism and the root
+`compose.yaml` consumes the published versioned image. Extended by
+ADR 0016 (one-command installer, env-supplied database credentials).
 
 ## Context
 
@@ -76,11 +77,6 @@ Samvaad maintains two distinct Docker workflows:
 
 ## Explicitly deferred
 
-- Exact implementation of the release/publish mechanism (build, tag, push,
-  credentials, CI wiring); no `release.sh` or registry push is part of this
-  decision.
-- The `compose.yaml` image-reference edit and any `start.sh` precondition
-  updates that follow from consuming the published image.
 - Upgrade policy for moving a deployment from one version tag to the next.
 
 ## Source material

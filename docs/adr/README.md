@@ -35,3 +35,4 @@ an earlier ADR only by explicitly naming it.
 | [0013](0013-tls-termination-at-deployment-edge.md) | TLS termination at the deployment edge |
 | [0014](0014-web-admin-browser-session-storage.md) | Web admin browser-session storage |
 | [0015](0015-docker-lifecycle-and-release-image-reference.md) | Docker development vs release workflows and deployment image reference |
+| [0016](0016-installer-and-deployment-credentials.md) | One-command installer and env-supplied deployment database credentials |

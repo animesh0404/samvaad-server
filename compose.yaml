@@ -15,7 +15,11 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/samvaad
       SPRING_DATASOURCE_USERNAME: samvaad
-      SPRING_DATASOURCE_PASSWORD: samvaad
+      # Deployment database password comes from .env so the application and
+      # PostgreSQL always share the same generated secret. :? fails fast with
+      # a clear message when the variable is missing instead of booting with
+      # an empty password.
+      SPRING_DATASOURCE_PASSWORD: ${SAMVAAD_DB_PASSWORD:?SAMVAAD_DB_PASSWORD is not set. Add it to .env (see scripts/install.sh).}
     depends_on:
       db:
         condition: service_healthy
@@ -27,7 +31,7 @@ services:
     environment:
       POSTGRES_DB: samvaad
       POSTGRES_USER: samvaad
-      POSTGRES_PASSWORD: samvaad
+      POSTGRES_PASSWORD: ${SAMVAAD_DB_PASSWORD:?SAMVAAD_DB_PASSWORD is not set. Add it to .env (see scripts/install.sh).}
     volumes:
       - samvaad-data:/var/lib/postgresql
     healthcheck:

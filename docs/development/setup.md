@@ -230,6 +230,31 @@ JAR for packaging verification.
 
 The repository also provides an implemented Docker deployment path for installations that want the application and PostgreSQL lifecycle managed together. Deployment consumes the published versioned image referenced by the root `compose.yaml` (for example `animesh0404/samvaad-server:0.0.1`); deploying a release does NOT require building the application image locally first.
 
+End users normally install with the one-command installer (no repository
+checkout needed; see the project README):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/animesh0404/samvaad-server/main/scripts/install.sh | bash
+```
+
+The installer writes `~/Samvaad/compose.yaml` plus `~/Samvaad/.env`
+(`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`) and starts the stack.
+
+The deployment database password is supplied through `.env`, never
+hardcoded: the root `compose.yaml` requires `SAMVAAD_DB_PASSWORD` (fail-fast
+`${VAR:?…}` references) and passes the same value to PostgreSQL
+(`POSTGRES_PASSWORD`) and to the application
+(`SPRING_DATASOURCE_PASSWORD`). `scripts/install.sh` and
+`scripts/start.sh` generate a secure value automatically when none is
+configured and reuse the existing one otherwise.
+
+Migration note: deployments created before the password was externalized
+used the fixed password `samvaad` baked into their existing PostgreSQL
+volume. After updating, set `SAMVAAD_DB_PASSWORD` in `.env` to the password
+your existing database was initialized with (default installations: the
+previous fixed value) rather than generating a new one, otherwise the
+application cannot authenticate to the retained volume.
+
 Build the local developer image and export a portable image artifact from the repository root (local workflow only; never pushed):
 
 ```bash

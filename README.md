@@ -21,6 +21,70 @@ Backend commands run from `server/`. Web Admin commands run from `web-admin/`.
 
 ---
 
+## Installation
+
+### Docker installation (recommended)
+
+Requirements: **Docker** (including `docker compose`) must already be installed. The installer does not install Docker.
+
+Linux/macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/animesh0404/samvaad-server/main/scripts/install.sh | bash
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/animesh0404/samvaad-server/main/scripts/install.ps1 | iex
+```
+
+What the installer does:
+
+```text
+Docker required
+    ↓
+Installer creates the deployment directory (~/Samvaad, or C:\Samvaad on Windows)
+    ↓
+Downloads compose.yaml from this repository
+    ↓
+Creates/reuses .env (generates the database password, asks about the JWT secret)
+    ↓
+docker compose up -d (published versioned image; nothing is built locally)
+    ↓
+Verifies startup, then Samvaad is available at http://localhost:8080
+```
+
+Details:
+
+- **Installation directory**: `~/Samvaad` on Linux/macOS, `C:\Samvaad` on Windows. It permanently contains `compose.yaml` (kept for future `up -d` / `down` / `restart` / `pull` operations — do not delete it) and `.env`.
+- **Configuration**: secrets live only in `<install-dir>/.env` (`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`). The installer never prints them. Do not commit or share `.env`. Re-running the installer preserves existing secrets.
+- **Managing the deployment** (from the installation directory):
+  - Stop: `docker compose down` (keeps data in the named volume)
+  - Start: `docker compose up -d`
+  - Restart: `docker compose restart`
+  - Logs: `docker compose logs --tail=50` (or `docker logs samvaad-app`)
+- **Network**: the container publishes `8080:8080`, so Samvaad is reachable at `http://localhost:8080` and, host firewall permitting, from other machines on the LAN via `http://<host-ip>:8080`. The Spring Boot app itself binds all interfaces (no `server.address` restriction); Docker owns the port mapping.
+- **Bootstrap administrator (temporary credentials)**: username `admin`, password `admin123`. This is a Liquibase-seeded account (ADR 0007). Change the password after first login using the account self-service password change. The current release does not enforce this automatically; a first-time setup wizard is planned for a future release.
+
+### Standalone JAR installation
+
+The same application can run without Docker as an executable Spring Boot JAR (one process serves the Web Admin, REST API, and WebSocket endpoint):
+
+- **Java**: JDK 25.
+- **Database**: an externally provisioned PostgreSQL 18 instance with a `samvaad` database. Default connection expectations (from `server/src/main/resources/application.yaml`) are host `localhost`, port `5432`, database/user `samvaad`.
+- **Required environment**: `SAMVAAD_JWT_SECRET` must be set (signing key for JWT access tokens).
+- **Build & run** (from `server/`):
+  ```bash
+  ./gradlew clean bootJar
+  java -jar build/libs/samvaad-server-*.jar
+  ```
+  Liquibase migrates the schema (including the bootstrap `admin` account) on startup before Hibernate validates mappings.
+
+See `docs/development/setup.md` for the full packaging and deployment reference.
+
+---
+
 ## Current Status
 
 The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, and the current administrative user-deletion slice are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
