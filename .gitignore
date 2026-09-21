@@ -50,3 +50,4 @@ postman/
 node_modules/
 dist/
 .angular/
+.env.backup
