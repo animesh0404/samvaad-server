@@ -6,8 +6,7 @@ name: samvaad
 
 services:
   app:
-    image: samvaad-server:latest
-    pull_policy: never
+    image: animesh0404/samvaad-server:0.0.1
     container_name: samvaad-app
     ports:
       - "8080:8080"

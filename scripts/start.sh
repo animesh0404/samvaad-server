@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 #
-# Start the already-built Samvaad image with Docker Compose.
-# Never builds. Reuses the existing JWT secret; only creates one when none
-# is configured.
+# Start the Samvaad deployment stack with Docker Compose.
+# Deploys the published versioned image referenced by the root compose.yaml;
+# Compose pulls it from Docker Hub when it is not available locally, so no
+# local image build is required. Never builds or publishes. Reuses the
+# existing JWT secret; only creates one when none is configured.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="samvaad-server:latest"
 ENV_FILE="${ROOT}/.env"
-
-if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  echo "ERROR: Docker image '${IMAGE}' does not exist." >&2
-  echo "Build it first with ./scripts/build.sh" >&2
-  exit 1
-fi
 
 existing=""
 if [ -f "${ENV_FILE}" ]; then

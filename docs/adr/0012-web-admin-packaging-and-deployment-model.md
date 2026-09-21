@@ -4,6 +4,10 @@
 
 Accepted; Angular/Gradle packaging and Docker deployment implemented.
 
+> Extended by [ADR 0015](0015-docker-lifecycle-and-release-image-reference.md),
+> which locks the development-vs-release image workflow and the future
+> versioned deployment image reference. This record is unchanged.
+
 ## Context
 
 Samvaad is being developed as a monorepo with the Spring Boot backend under `server/`. The intended deployment should support both a simple standalone JAR installation and a Docker-based deployment, without making Docker a prerequisite for running the application.

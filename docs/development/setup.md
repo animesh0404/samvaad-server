@@ -228,9 +228,9 @@ JAR for packaging verification.
 
 ## Docker Deployment
 
-The repository also provides an implemented Docker deployment path for installations that want the application and PostgreSQL lifecycle managed together.
+The repository also provides an implemented Docker deployment path for installations that want the application and PostgreSQL lifecycle managed together. Deployment consumes the published versioned image referenced by the root `compose.yaml` (for example `animesh0404/samvaad-server:0.0.1`); deploying a release does NOT require building the application image locally first.
 
-Build the image and export a portable image artifact from the repository root:
+Build the local developer image and export a portable image artifact from the repository root (local workflow only; never pushed):
 
 ```bash
 ./scripts/build.sh
@@ -244,7 +244,27 @@ server/build/samvaad-server.tar.gz
 
 The generated `server/build/` directory is ignored by Git. The image remains loaded locally so the deployment scripts can use it directly.
 
-Start the deployment:
+Release publication is a separate workflow from the local build above
+(ADR 0015). To build and publish a versioned release image to Docker Hub:
+
+```bash
+./scripts/release-image.sh 0.0.1
+```
+
+This builds the production image from the repository `Dockerfile`, tags
+exactly `animesh0404/samvaad-server:<version>`, and pushes only that tag. It
+never tags or pushes `latest`. The version argument is required and explicit;
+authentication relies on your existing `docker login` session.
+
+In short, the deployment lifecycle scripts are:
+
+- `scripts/build.sh` → local developer build (`samvaad-server:latest`, never pushed).
+- `scripts/release-image.sh <version>` → explicit versioned Docker Hub release publication.
+- `scripts/start.sh` → deploy/start the published image referenced by root `compose.yaml` (pulls it when missing; no local build required).
+- `scripts/restart.sh` → restart the deployment stack.
+- `scripts/stop.sh` → stop the deployment stack.
+
+Start the deployment (no local build required):
 
 ```bash
 ./scripts/start.sh
