@@ -16,13 +16,11 @@ reproducible distribution/deployment path (`compose.yaml` running the
 application plus Compose-managed PostgreSQL; lifecycle via
 `scripts/build.sh`, `start.sh`, `restart.sh`, `stop.sh`).
 
-The current implementation builds and runs a local-only image
+At the time this ADR was created, the implementation built and ran a local-only image
 (`samvaad-server:latest`, `pull_policy: never` in the root `compose.yaml`),
-so deployment today requires a local build. The deferred ADR 0012 items
-— release publication mechanism and one-command VPS installer/update
-workflow — need a locked direction before they are implemented: which image
-reference the deployment Compose file should consume, how versioning works,
-and how the developer-local workflow relates to published releases.
+so deployment required a local build. This ADR records the transition from that
+model to the now-implemented published, versioned release-image workflow and
+root deployment Compose reference.
 
 ## Decision
 
@@ -35,20 +33,20 @@ Samvaad maintains two distinct Docker workflows:
    remains the development PostgreSQL-only Compose stack and is not removed.
 
 2. **Release / distribution workflow.** Published Samvaad Docker images are
-   separate release artifacts. A future dedicated release/publish mechanism
-   — separate from the normal developer `scripts/build.sh` workflow — will
-   build and publish versioned images such as
+   separate release artifacts. The dedicated `scripts/release-image.sh`
+   workflow — separate from the normal developer `scripts/build.sh` workflow
+   — builds and publishes versioned images such as
    `animesh0404/samvaad-server:0.0.1` to Docker Hub.
 
 3. **Root deployment Compose.** The root `compose.yaml` is the
    end-user/deployment Compose definition (Samvaad + PostgreSQL). Its
-   application service will eventually consume a published, versioned Docker
-   image from Docker Hub (for example,
-   `animesh0404/samvaad-server:0.0.1`) rather than the developer-local
-   `samvaad-server:latest`. The deployment model is `docker compose up -d`:
-   Compose obtains missing images, creates the network, starts PostgreSQL,
-   waits for its health check, and starts Samvaad. (`docker pull` only
-   downloads an image; it does not start PostgreSQL or any container.)
+   application service consumes the published, versioned Docker image from
+   Docker Hub (for example, `animesh0404/samvaad-server:0.0.1`) rather than
+   the developer-local `samvaad-server:latest`. The deployment model is
+   `docker compose up -d`: Compose obtains missing images, creates the network,
+   starts PostgreSQL, waits for its health check, and starts Samvaad.
+   (`docker pull` only downloads an image; it does not start PostgreSQL or any
+   container.)
 
 4. **Versioning principle.** Release/deployment image references must use
    explicit version tags corresponding to the Samvaad release (`v0.0.1` →

@@ -5,8 +5,9 @@
 Accepted; Angular/Gradle packaging and Docker deployment implemented.
 
 > Extended by [ADR 0015](0015-docker-lifecycle-and-release-image-reference.md),
-> which locks the development-vs-release image workflow and the future
-> versioned deployment image reference. This record is unchanged.
+> which records the implemented development-vs-release image workflow and
+> versioned deployment image reference, and by [ADR 0016](0016-installer-and-deployment-credentials.md),
+> which records the implemented installer and deployment-credential workflow.
 
 ## Context
 
@@ -44,10 +45,10 @@ Application configuration, including database connection details and other deplo
 - A separate frontend web server is not required for the initial deployment model.
 - Existing PostgreSQL installations remain supported.
 - Docker remains valuable for reproducible packaging and convenient database provisioning rather than becoming a hard application dependency.
-- The exact installer/one-line VPS bootstrap mechanism can be added later without changing the application artifact model.
+- The installer/one-line VPS bootstrap mechanism is implemented separately from the application artifact model.
 
 ## Explicitly deferred
 
-- Release publication mechanism (for example GitHub Releases or a container registry).
-- One-command VPS installer/update workflow.
-- Final external configuration file generation/lookup mechanism.
+- Concrete TLS/reverse-proxy/tunnel provider and certificate automation.
+- Deployment upgrade policy between published version tags.
+- First-time setup wizard and enforced bootstrap-password change.

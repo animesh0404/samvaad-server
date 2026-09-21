@@ -35,9 +35,9 @@ The Web Admin first implementation slice is now implemented under `web-admin/`.
 - Only `ADMIN` accounts can establish a Web Admin session. Valid non-admin credentials are rejected at the login page and do not retain Web Admin auth state.
 - Server-side authorization remains authoritative.
 
-The intended production delivery model is to package the Angular production assets into the Spring Boot executable JAR. Angular/Gradle packaging mechanics are not yet implemented.
+The production delivery model is implemented: Angular production assets are packaged into the Spring Boot executable JAR through the existing Gradle build.
 
-See [Web Admin README](../web-admin/README.md), [Architecture Current State](architecture/current-state.md), and ADRs 0011–0013 for the current client/deployment architecture.
+See [Web Admin README](../web-admin/README.md), [Architecture Current State](architecture/current-state.md), and ADRs 0011–0016 for the current client/deployment architecture.
 
 ## Realtime V1
 
@@ -67,7 +67,7 @@ The locked deployment direction is:
 - Docker as an additional distribution/deployment path.
 - Public HTTPS terminating at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
 
-The packaging, production Docker image, release publication, VPS installer/update workflow, external configuration mechanism, and concrete TLS/reverse-proxy provider remain implementation/deployment work.
+The deployment packaging, versioned image publication, environment-supplied credentials, and Unix/Windows installer workflow are implemented. The concrete TLS/reverse-proxy provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain deployment work.
 
 See the implementation roadmap, architecture/security documents, API contracts, and ADRs for the detailed current state and locked decisions.
 

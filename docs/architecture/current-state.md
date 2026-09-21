@@ -133,9 +133,8 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - friend-gated profile visibility
 - full audit/event-history policy beyond operational logging
 - final web-admin visual design system and component inventory
-- release publication and one-command VPS installer/update workflow
-- concrete external configuration file generation/lookup mechanism
 - concrete TLS/reverse-proxy/tunnel provider and certificate automation
+- deployment upgrade policy
 
 ## Known V1 limitation
 

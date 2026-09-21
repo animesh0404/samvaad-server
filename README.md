@@ -19,6 +19,14 @@ samvaad-server/
 
 Backend commands run from `server/`. Web Admin commands run from `web-admin/`.
 
+## Design Principles
+
+Samvaad is designed according to the principles defined in the [Software Constitution](https://github.com/animesh0404/software-constitution).
+
+The Constitution is a separate, project-independent engineering document that guides design decisions where there is meaningful freedom over how Samvaad is built and how it interacts with people. It emphasizes human dignity, autonomy, agency, meaningful consent, transparency, proportionality, data stewardship, failure containment, human oversight, and engineering restraint.
+
+The Constitution is not a software licence or a substitute for Samvaad's security, legal, or operational requirements. Samvaad's project documentation and ADRs record the concrete technical decisions through which those principles are applied.
+
 ---
 
 ## Installation
@@ -158,9 +166,9 @@ Two deployment modes are supported:
 
 Docker is therefore a distribution/deployment option, not a hard runtime requirement for the application JAR.
 
-For public/VPS deployments, HTTPS is intended to terminate at a TLS-capable reverse proxy, tunnel, or managed edge in front of the application. The Samvaad JAR remains behind that edge and must support REST and WebSocket traffic through the proxy. The concrete provider, certificate automation, and VPS installation/update workflow remain future implementation work.
+For public/VPS deployments, HTTPS is intended to terminate at a TLS-capable reverse proxy, tunnel, or managed edge in front of the application. The Samvaad JAR remains behind that edge and must support REST and WebSocket traffic through the proxy. The Unix and Windows installers provide the current one-command deployment path; the concrete TLS provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain open deployment work.
 
-See ADRs 0011–0013 for the locked architecture decisions and their explicit deferred details.
+See ADRs 0011–0013, 0015, and 0016 for the locked packaging, deployment, release-image, and installer decisions and their remaining deferred details.
 
 ## Local Development
 
@@ -233,4 +241,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Release and external deployment operations**: application packaging and the Docker/Compose deployment path are implemented. Remaining work is release publication, VPS installation/update workflow, external configuration mechanics, and the concrete TLS/reverse-proxy setup, while preserving the locked TLS-at-edge architecture.
+**Public deployment edge and operational hardening**: application packaging, Docker deployment, versioned release publication, external deployment credentials, and the Unix/Windows installer workflow are implemented. Remaining deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard.

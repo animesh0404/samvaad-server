@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted; implementation pending.
+Accepted; initial implementation complete.
 
 ## Context
 

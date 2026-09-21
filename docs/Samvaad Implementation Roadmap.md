@@ -115,7 +115,7 @@ Locked deployment direction (unchanged):
 - Docker provides an additional containerized deployment path, including a Compose-managed Samvaad application plus PostgreSQL.
 - Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
 
-Implemented Docker deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, and build/start/restart/stop lifecycle scripts. Remaining deployment work is release publication, one-command VPS installation/update, external configuration file generation, and the concrete TLS/reverse-proxy setup.
+Implemented deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, versioned Docker Hub publication, environment-supplied deployment credentials, build/start/restart/stop lifecycle scripts, and idempotent Unix/Windows installers. Remaining deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, and deployment upgrade policy.
 
 ## Later / deferred
 

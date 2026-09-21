@@ -213,15 +213,17 @@ See ADR 0011.
 
 # 14. Application Packaging and Deployment
 
-The intended production artifact is a Spring Boot executable JAR containing the Angular production static assets. The application build will produce those frontend assets and package them into the application's static resources; the exact Angular/Gradle integration remains an implementation detail.
+The production application artifact is a Spring Boot executable JAR containing the Angular production static assets. The implemented Gradle build produces the Angular bundle and stages it under `BOOT-INF/classes/static` as part of `bootJar`, while keeping backend tests independent of the Node toolchain.
 
-Running the resulting JAR with `java -jar ...` is intended to serve the web admin, REST API, and WebSocket endpoint from the same embedded Tomcat instance.
+Running the resulting JAR with `java -jar ...` serves the web admin, REST API, and WebSocket endpoint from the same embedded Tomcat instance.
 
 The JAR remains independently deployable against an externally provisioned PostgreSQL database. Deployment-sensitive configuration, including datasource details and secrets, is externalized rather than baked into the artifact.
 
-Docker is an additional distribution/deployment path, not a hard runtime dependency. The intended Compose deployment can run the containerized Samvaad application together with PostgreSQL. The eventual VPS release/installer workflow may download a release artifact or container image, but its concrete mechanism is deferred.
+Docker is an additional distribution/deployment path, not a hard runtime dependency. The implemented root Compose deployment runs the containerized Samvaad application together with PostgreSQL and consumes the published versioned application image. `scripts/release-image.sh` publishes release images; `scripts/start.sh`, `restart.sh`, and `stop.sh` manage the deployment lifecycle; `scripts/install.sh` and `scripts/install.ps1` provide one-command bootstrap on Unix-like systems and Windows.
 
-See ADR 0012.
+Deployment credentials are supplied through `.env` rather than baked into the image or Compose file. The installers generate or preserve the database password and JWT secret without printing them.
+
+See ADRs 0012, 0015, and 0016.
 
 # 15. Public HTTPS Boundary
 
@@ -229,6 +231,6 @@ For public/VPS deployments, TLS is terminated at a deployment edge in front of t
 
 The deployment edge must support both HTTP API traffic and the WebSocket connection at `/ws`. The application must remain proxy-compatible; its architecture must not require public certificate material to be embedded in the application JAR.
 
-The concrete reverse proxy/tunnel provider, certificate automation, domain/DNS configuration, and forwarded-header settings remain deployment decisions.
+The concrete reverse proxy/tunnel provider, certificate automation, domain/DNS configuration, forwarded-header settings, and deployment upgrade policy remain deployment decisions.
 
 See ADR 0013.
