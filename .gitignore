@@ -40,6 +40,9 @@ out/
 ## Environment file
 .env
 .envrc
+## Root deployment operator configuration (created by start.sh/installers,
+## populated by the application; never commit operator state).
+/application.yaml
 ## Operational logs (see docs/development/logging.md)
 logs/
 ## Local API testing (Postman)

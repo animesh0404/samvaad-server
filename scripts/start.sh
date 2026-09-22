@@ -40,6 +40,35 @@ else
   echo "Database password generated and stored in .env."
 fi
 
+# TLS keystore password (ADR 0017): same reuse-or-generate contract as the
+# database password. Never printed.
+existing_tls=""
+if [ -f "${ENV_FILE}" ]; then
+  existing_tls="$(grep -E '^SAMVAAD_TLS_KEYSTORE_PASSWORD=..+' "${ENV_FILE}" || true)"
+fi
+
+if [ -n "${existing_tls}" ]; then
+  echo "Reusing existing TLS keystore password from .env."
+else
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "ERROR: openssl is required to generate the TLS keystore password." >&2
+    exit 1
+  fi
+  append_env_var "SAMVAAD_TLS_KEYSTORE_PASSWORD" "$(openssl rand -hex 24)"
+  echo "TLS keystore password generated and stored in .env."
+fi
+
+# External operator configuration (ADR 0017): the Compose stack bind-mounts
+# ./application.yaml into the container. Ensure the file exists (empty is
+# fine: the application populates defaults on first boot and never modifies
+# existing content). Never create it with secrets inside.
+APP_CONFIG_FILE="${ROOT}/application.yaml"
+if [ ! -f "${APP_CONFIG_FILE}" ]; then
+  : > "${APP_CONFIG_FILE}"
+  chmod 600 "${APP_CONFIG_FILE}"
+  echo "Created empty application.yaml (populated by the application on first boot)."
+fi
+
 existing=""
 if [ -f "${ENV_FILE}" ]; then
   existing="$(grep -E '^SAMVAAD_JWT_SECRET=..+' "${ENV_FILE}" || true)"

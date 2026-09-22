@@ -4,8 +4,8 @@
 # Docker Hub release image. The base file keeps the full topology (services,
 # healthcheck, environment contract, ports, dependency ordering); this file
 # only swaps image identity/build source, isolates the project (so it never
-# adopts the release containers), and gives PostgreSQL its own volume so
-# development can never touch release data.
+# adopts the release containers), and gives PostgreSQL and TLS state their
+# own volumes so development can never touch release data.
 #
 # Usage (from the repository root):
 #   docker compose -f compose.yaml -f compose.dev.yaml up -d --build
@@ -25,6 +25,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: samvaad-dev-app
+    volumes:
+      - ./application.yaml:/config/application.yaml
+      - samvaad-dev-tls:/tls
 
   db:
     container_name: samvaad-dev-db
@@ -41,3 +44,4 @@ services:
 
 volumes:
   samvaad-dev-data:
+  samvaad-dev-tls:

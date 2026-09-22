@@ -136,7 +136,7 @@ When running against the Compose-managed PostgreSQL database:
    ./gradlew bootRun
    ```
 
-The application starts by default on port `8080`.
+The application starts by default on port `8080` serving **HTTPS** (application-managed TLS, ADR 0017): first local runs create `~/.samvaad/application.yaml` and `~/.samvaad/tls/keystore.p12` automatically. Use `https://localhost:8080` (accept the self-signed warning) or the `ng serve` proxy, which forwards to the HTTPS backend.
 
 ### 2. Testcontainers Development Run (Automated Database)
 
@@ -216,7 +216,7 @@ java -jar server/build/libs/samvaad-server-*.jar
 ```
 
 `SAMVAAD_JWT_SECRET` must be provided as described above; remaining
-datasource settings come from `application.yaml` for standalone JAR deployment. The JAR serves `/`
+datasource settings come from `application.yaml` for standalone JAR deployment. Since application-managed TLS (ADR 0017), standalone runs also use `~/.samvaad/application.yaml` and `~/.samvaad/tls/keystore.p12` (created automatically on first start) and serve HTTPS on port `8080`. The JAR serves `/`
 (login shell), SPA routes (`/login`, `/profile`, `/users…`, including on
 browser refresh), static assets, `/api/**`, and `/ws` on port `8080`.
 
@@ -237,8 +237,11 @@ checkout needed; see the project README):
 curl -fsSL https://raw.githubusercontent.com/animesh0404/samvaad-server/main/scripts/install.sh | bash
 ```
 
-The installer writes `~/Samvaad/compose.yaml` plus `~/Samvaad/.env`
-(`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`) and starts the stack.
+The installer writes `~/.samvaad/compose.yaml` plus `~/.samvaad/.env`
+(`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`,
+`SAMVAAD_TLS_KEYSTORE_PASSWORD`) and starts the stack. Installations created
+by older installers under `~/Samvaad` are migrated automatically (files move
+over; nothing is overwritten).
 
 The deployment database password is supplied through `.env`, never
 hardcoded: the root `compose.yaml` requires `SAMVAAD_DB_PASSWORD` (fail-fast
@@ -254,6 +257,39 @@ volume. After updating, set `SAMVAAD_DB_PASSWORD` in `.env` to the password
 your existing database was initialized with (default installations: the
 previous fixed value) rather than generating a new one, otherwise the
 application cannot authenticate to the retained volume.
+
+### Application-managed TLS
+
+Samvaad serves **HTTPS only** on port 8080 (ADR 0017); there is no insecure
+HTTP listener. On first boot the application generates a self-signed
+PKCS#12 identity (RSA 2048, SHA256withRSA, ~10-year validity, alias
+`samvaad`, default SANs `DNS:localhost` + `IP:127.0.0.1`) and persists it;
+later boots reuse it. Expired, malformed, wrong-password, or alias-missing
+stores fail startup — nothing is ever silently regenerated. Regeneration is
+explicit: delete the keystore and restart.
+
+- **Configuration split.** Secrets live in `.env` (`SAMVAAD_DB_PASSWORD`,
+  `SAMVAAD_JWT_SECRET`, `SAMVAAD_TLS_KEYSTORE_PASSWORD`).
+  Non-secret deployment settings live in the external operator-owned
+  `application.yaml`, created with defaults once and never overwritten:
+  `~/.samvaad/application.yaml` standalone (repo deployments use the
+  `application.yaml` next to `compose.yaml`), `/config/application.yaml`
+  in Docker (bind-mounted). Additional certificate SANs are configured
+  there under `samvaad.tls.sans` and apply only when the keystore is
+  (re)generated.
+- **TLS storage.** Standalone: `~/.samvaad/tls/keystore.p12`. Docker:
+  `/tls/keystore.p12` on the dedicated `samvaad-tls` volume
+  (`samvaad-dev-tls` for the dev stack) — never in the image, classpath,
+  JAR, logs, or PostgreSQL volumes.
+- **Trust.** Browsers warn on the self-signed certificate; traffic is still
+  encrypted. Compare the SHA-256 fingerprint from the application logs
+  (`[samvaad] Generated new TLS identity …` / `Reusing TLS identity …`)
+  before accepting it. Trusted public deployments terminate TLS at a
+  reverse proxy instead (ADR 0013); no ACME, rotation, HSTS, or hot reload
+  in V1.
+- **Operator fallback.** The application never shells out to `keytool`, but
+  operators may use it for diagnostics (e.g. `keytool -list
+  -keystore tls/keystore.p12 -storetype PKCS12`).
 
 Build the portable local image artifact from the repository root (local/offline workflow only; never pushed, and not consumed by any Compose workflow):
 

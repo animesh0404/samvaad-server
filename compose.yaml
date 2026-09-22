@@ -20,6 +20,18 @@ services:
       # a clear message when the variable is missing instead of booting with
       # an empty password.
       SPRING_DATASOURCE_PASSWORD: ${SAMVAAD_DB_PASSWORD:?SAMVAAD_DB_PASSWORD is not set. Add it to .env (see scripts/install.sh).}
+      # External operator configuration (ADR 0017): application.yaml lives
+      # next to this file (repo root for start.sh, ~/.samvaad for the
+      # installer) and is mounted into the container; the application
+      # populates it with defaults only when it is missing or empty and
+      # never modifies existing content. TLS identity lives in the
+      # dedicated samvaad-tls volume, never in the image or the database
+      # volume.
+      SAMVAAD_CONFIG_DIR: /config
+      SAMVAAD_TLS_DIR: /tls
+    volumes:
+      - ./application.yaml:/config/application.yaml
+      - samvaad-tls:/tls
     depends_on:
       db:
         condition: service_healthy
@@ -42,3 +54,4 @@ services:
 
 volumes:
   samvaad-data:
+  samvaad-tls:

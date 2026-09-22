@@ -52,27 +52,31 @@ What the installer does:
 ```text
 Docker required
     ↓
-Installer creates the deployment directory (~/Samvaad, or C:\Samvaad on Windows)
+Installer creates the deployment directory (~/.samvaad, or %USERPROFILE%\.samvaad on Windows)
     ↓
 Downloads compose.yaml from this repository
     ↓
-Creates/reuses .env (generates the database password, asks about the JWT secret)
+Creates/reuses .env (generates secrets, asks about the JWT secret)
+    ↓
+Ensures application.yaml (populated by the application on first boot)
     ↓
 docker compose up -d (published versioned image; nothing is built locally)
     ↓
-Verifies startup, then Samvaad is available at http://localhost:8080
+Verifies startup, then Samvaad is available at https://localhost:8080
 ```
+
+Samvaad serves **HTTPS only** (self-signed certificate, ADR 0017). Your browser will warn about the certificate on first connect: traffic is still encrypted. Verify the SHA-256 fingerprint shown by the installer against the fingerprint in the application logs before accepting it. A trusted public deployment terminates TLS at a reverse proxy instead (ADR 0013).
 
 Details:
 
-- **Installation directory**: `~/Samvaad` on Linux/macOS, `C:\Samvaad` on Windows. It permanently contains `compose.yaml` (kept for future `up -d` / `down` / `restart` / `pull` operations — do not delete it) and `.env`.
-- **Configuration**: secrets live only in `<install-dir>/.env` (`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`). The installer never prints them. Do not commit or share `.env`. Re-running the installer preserves existing secrets.
+- **Installation directory**: `~/.samvaad` on Linux/macOS, `%USERPROFILE%\.samvaad` on Windows. It permanently contains `compose.yaml` (kept for future `up -d` / `down` / `restart` / `pull` operations — do not delete it), `.env`, `application.yaml`, and `tls/`. Installations created by older installers under `~/Samvaad` / `C:\Samvaad` are migrated automatically (files move over; nothing is overwritten).
+- **Configuration**: secrets live only in `<install-dir>/.env` (`SAMVAAD_DB_PASSWORD`, `SAMVAAD_JWT_SECRET`, `SAMVAAD_TLS_KEYSTORE_PASSWORD`). Non-secret deployment settings live in `<install-dir>/application.yaml` (created with defaults once, never overwritten). TLS identity lives in `<install-dir>/tls/` (Docker: dedicated volume). The installer never prints secrets. Do not commit or share `.env`. Re-running the installer preserves existing state.
 - **Managing the deployment** (from the installation directory):
   - Stop: `docker compose down` (keeps data in the named volume)
   - Start: `docker compose up -d`
   - Restart: `docker compose restart`
   - Logs: `docker compose logs --tail=50` (or `docker logs samvaad-app`)
-- **Network**: the container publishes `8080:8080`, so Samvaad is reachable at `http://localhost:8080` and, host firewall permitting, from other machines on the LAN via `http://<host-ip>:8080`. The Spring Boot app itself binds all interfaces (no `server.address` restriction); Docker owns the port mapping.
+- **Network**: the container publishes `8080:8080`, so Samvaad is reachable at `https://localhost:8080` and, host firewall permitting, from other machines on the LAN via `https://<host-ip>:8080`. The Spring Boot app itself binds all interfaces (no `server.address` restriction); Docker owns the port mapping.
 - **Bootstrap administrator (temporary credentials)**: username `admin`, password `admin123`. This is a Liquibase-seeded account (ADR 0007). Change the password after first login using the account self-service password change. The current release does not enforce this automatically; a first-time setup wizard is planned for a future release.
 
 ### Standalone JAR installation
@@ -82,6 +86,7 @@ The same application can run without Docker as an executable Spring Boot JAR (on
 - **Java**: JDK 25.
 - **Database**: an externally provisioned PostgreSQL 18 instance with a `samvaad` database. Default connection expectations (from `server/src/main/resources/application.yaml`) are host `localhost`, port `5432`, database/user `samvaad`.
 - **Required environment**: `SAMVAAD_JWT_SECRET` must be set (signing key for JWT access tokens).
+- **HTTPS**: the application also serves HTTPS when run standalone, using `~/.samvaad/application.yaml` and `~/.samvaad/tls/keystore.p12` (created automatically on first start; see ADR 0017).
 - **Build & run** (from `server/`):
   ```bash
   ./gradlew clean bootJar
@@ -196,7 +201,7 @@ npm install
 npm start
 ```
 
-The Web Admin development server runs on `http://localhost:4200` and proxies `/api` to the backend on `http://localhost:8080`.
+The Web Admin development server runs on `http://localhost:4200` and proxies `/api` to the backend on `https://localhost:8080`.
 
 Full Docker development (application container built from local source instead of the published release image):
 

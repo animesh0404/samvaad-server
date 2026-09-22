@@ -2,21 +2,28 @@
 #
 # Samvaad one-command installer (Unix/Linux/macOS).
 #
-# Installs the published Samvaad release into ~/Samvaad without requiring a
+# Installs the published Samvaad release into ~/.samvaad without requiring a
 # repository checkout:
 #
 #   Docker required           (never installed by this script)
 #       |
-#   Creates ~/Samvaad
+#   Creates ~/.samvaad
 #       |
 #   Downloads compose.yaml from the Samvaad GitHub repository
 #       |
-#   Creates/reuses .env (generates the database password, asks about the
+#   Creates/reuses .env (generates secrets, asks about the
 #   JWT secret, preserves existing secrets on re-runs)
+#       |
+#   Ensures application.yaml (populated by the application on first boot)
 #       |
 #   docker compose up -d (published versioned image, never built locally)
 #       |
-#   Verifies Samvaad responds at http://localhost:8080
+#   Verifies Samvaad responds at https://localhost:8080
+#
+# The application serves HTTPS only (self-signed certificate, ADR 0017).
+#
+# Installations created by older installers under ~/Samvaad are migrated
+# deliberately (compose.yaml and .env move over; nothing is overwritten).
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/animesh0404/samvaad-server/main/scripts/install.sh | bash
@@ -32,9 +39,10 @@
 # scripts/start.sh, scripts/restart.sh, and scripts/stop.sh.
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/Samvaad"
+INSTALL_DIR="${HOME}/.samvaad"
+LEGACY_DIR="${HOME}/Samvaad"
 COMPOSE_URL="https://raw.githubusercontent.com/animesh0404/samvaad-server/main/compose.yaml"
-APP_URL="http://localhost:8080/"
+APP_URL="https://localhost:8080/"
 STARTUP_TIMEOUT_SECONDS=120
 
 fail() {
@@ -61,6 +69,21 @@ mkdir -p "${INSTALL_DIR}" \
   || fail "Could not create installation directory '${INSTALL_DIR}'."
 cd "${INSTALL_DIR}" \
   || fail "Could not enter installation directory '${INSTALL_DIR}'."
+
+# --- Legacy location migration --------------------------------------------------
+# Older installers used ~/Samvaad. Move deployment files over exactly once:
+# only files missing in the new location move, existing state is never
+# overwritten, and the old directory is left otherwise untouched.
+if [ -d "${LEGACY_DIR}" ] && [ "${LEGACY_DIR}" != "${INSTALL_DIR}" ]; then
+  for legacy_file in compose.yaml .env; do
+    if [ -f "${LEGACY_DIR}/${legacy_file}" ] && [ ! -f "${INSTALL_DIR}/${legacy_file}" ]; then
+      mv "${LEGACY_DIR}/${legacy_file}" "${INSTALL_DIR}/${legacy_file}" \
+        && echo "Migrated ${legacy_file} from ${LEGACY_DIR} (old location is no longer used)."
+    fi
+  done
+  echo "Note: ${LEGACY_DIR} remains on disk (including any files that were already present here)."
+  echo "Remove it manually after verifying the migration."
+fi
 
 # --- Deployment configuration -----------------------------------------------
 # compose.yaml is a managed deployment file: always refresh it from the
@@ -133,6 +156,35 @@ else
   echo "Generated database password and stored it in .env."
 fi
 
+# --- TLS keystore password -------------------------------------------------------
+# Same reuse-or-generate contract as the database password. Never printed.
+if env_has_key "SAMVAAD_TLS_KEYSTORE_PASSWORD"; then
+  echo "Reusing existing TLS keystore password from .env."
+else
+  tls_password=""
+  tls_password="$(generate_hex 24)" \
+    || fail "No secure random generator available (need openssl or /dev/urandom). Install openssl and run this installer again."
+  env_append "SAMVAAD_TLS_KEYSTORE_PASSWORD" "${tls_password}"
+  tls_password=""
+  echo "Generated TLS keystore password and stored it in .env."
+fi
+
+# --- External operator configuration ----------------------------------------------
+# The Compose stack bind-mounts ./application.yaml into the container. Ensure
+# the file exists (empty is fine: the application populates defaults on
+# first boot and never modifies existing content). Never write secrets here.
+if [ ! -f "application.yaml" ]; then
+  : > "application.yaml"
+  chmod 600 "application.yaml" 2>/dev/null || true
+  echo "Created empty application.yaml (populated by the application on first boot)."
+else
+  echo "Found existing application.yaml: preserving operator configuration."
+fi
+# TLS state directory (used directly only by standalone runs; Docker keeps
+# TLS state in the dedicated samvaad-tls volume).
+mkdir -p tls \
+  || fail "Could not create TLS state directory 'tls'."
+
 # --- JWT secret --------------------------------------------------------------
 # Prompts go to /dev/tty so they work when the installer itself is piped in
 # via 'curl ... | bash' (stdin is the script, not the terminal). Without a
@@ -196,11 +248,13 @@ docker compose -f compose.yaml up -d \
   || fail "'docker compose up -d' failed. Run 'cd \"${INSTALL_DIR}\" && docker compose ps' and 'docker compose logs --tail=50' to inspect."
 
 # --- Verify startup -----------------------------------------------------------
+# Self-signed HTTPS: -k accepts the application-generated certificate for
+# this local readiness probe only. It does not change browser trust.
 echo "Waiting for Samvaad to become ready..."
 elapsed=0
 ready=0
 while [ "${elapsed}" -lt "${STARTUP_TIMEOUT_SECONDS}" ]; do
-  if curl -fsS -o /dev/null --max-time 5 "${APP_URL}" 2>/dev/null; then
+  if curl -kfSs -o /dev/null --max-time 5 "${APP_URL}" 2>/dev/null; then
     ready=1
     break
   fi
@@ -219,6 +273,13 @@ if [ "${ready}" -ne 1 ]; then
 fi
 
 # --- Success -------------------------------------------------------------------
+# Best-effort fingerprint display: the application logs its public TLS
+# certificate fingerprint at startup (never secrets). Absence here is not
+# fatal; the fingerprint remains in the application logs.
+fingerprint=""
+fingerprint="$(docker compose -f compose.yaml logs --no-log-prefix app 2>/dev/null \
+  | grep -o 'SHA256\(:[0-9A-F]\{2\}\)\{32\}' | tail -n 1 || true)"
+
 cat <<EOF
 
 Samvaad installation completed successfully.
@@ -228,13 +289,29 @@ Installation directory:
 
 Configuration:
   ${ENV_FILE} (contains your secrets; do not commit or share it)
+  ${INSTALL_DIR}/application.yaml (operator configuration, preserved across runs)
 
 Deployment:
   Docker Compose (compose.yaml stays in the installation directory for
   future 'docker compose up -d / down / restart / pull' operations)
 
-Web Admin:
+Web Admin (HTTPS, self-signed certificate):
   ${APP_URL}
+EOF
+
+if [ -n "${fingerprint}" ]; then
+cat <<EOF
+
+Certificate fingerprint (public; verify on first browser connect):
+  ${fingerprint}
+EOF
+fi
+
+cat <<EOF
+
+Your browser will warn about the self-signed certificate. This is expected
+for direct deployments: traffic is still encrypted. A trusted public
+deployment terminates TLS at a reverse proxy instead (see documentation).
 
 Bootstrap administrator (temporary credentials):
   Username: admin
@@ -250,5 +327,9 @@ Secret management:
   Secrets live only in ${ENV_FILE}. To change them later, edit that
   file and restart ('docker compose restart'), noting that changing the
   database password after PostgreSQL was first initialized requires
-  updating the password inside the existing database as well.
+  updating the password inside the existing database as well. Changing
+  SAMVAAD_TLS_KEYSTORE_PASSWORD after the keystore was generated makes
+  the existing keystore unreadable: either restore the original password
+  or delete the keystore for explicit regeneration (tls/keystore.p12 in
+  the install dir, or the samvaad-tls volume).
 EOF

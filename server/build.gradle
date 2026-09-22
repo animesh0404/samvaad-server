@@ -27,6 +27,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	// Bouncy Castle: self-signed TLS certificate generation for
+	// application-managed HTTPS (ADR 0017). Pure-JVM X.509 issuance; the
+	// JDK exposes no supported public API for creating certificates.
+	implementation 'org.bouncycastle:bcprov-jdk18on:1.85'
+	implementation 'org.bouncycastle:bcpkix-jdk18on:1.85'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 	runtimeOnly 'org.postgresql:postgresql'
