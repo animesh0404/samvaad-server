@@ -37,7 +37,7 @@ The Web Admin first implementation slice is now implemented under `web-admin/`.
 
 The production delivery model is implemented: Angular production assets are packaged into the Spring Boot executable JAR through the existing Gradle build.
 
-See [Web Admin README](../web-admin/README.md), [Architecture Current State](architecture/current-state.md), and ADRs 0011–0016 for the current client/deployment architecture.
+See [Web Admin README](../web-admin/README.md), [Architecture Current State](architecture/current-state.md), and ADRs 0011–0017 for the current client/deployment architecture.
 
 ## Realtime V1
 
@@ -65,13 +65,23 @@ The locked deployment direction is:
 - One JAR serving the web admin, REST API, and WebSocket endpoint.
 - Externalized configuration for externally provisioned PostgreSQL.
 - Docker as an additional distribution/deployment path.
-- Public HTTPS terminating at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
+- Direct-access HTTPS managed by the application itself on port `8080`, with persisted self-signed TLS identity and external operator configuration (ADR 0017).
+- Public HTTPS terminating at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge (ADR 0013).
 
-The deployment packaging, versioned image publication, environment-supplied credentials, and Unix/Windows installer workflow are implemented. The concrete TLS/reverse-proxy provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain deployment work.
+The deployment packaging, versioned image publication, environment-supplied credentials, application-managed direct TLS, and Unix/Windows installer workflow are implemented. Remaining public deployment work is the concrete TLS/reverse-proxy provider, certificate automation, domain/DNS configuration, and deployment upgrade policy.
 
-Development and deployment use separate Docker workflows with distinct image identities: `server/compose.yaml` for PostgreSQL-only backend development, `compose.dev.yaml` (`samvaad-server:dev`, local-only) for the full Docker development loop, `scripts/build.sh` (`samvaad-server:latest`) for the portable local image artifact, and root `compose.yaml` (`animesh0404/samvaad-server:<version>`) for published-release deployment. See ADRs 0015–0016 and `docs/development/setup.md`.
+Development and deployment use separate Docker workflows with distinct image identities: `server/compose.yaml` for PostgreSQL-only backend development, `compose.dev.yaml` (`samvaad-server:dev`, local-only) for the full Docker development loop, `scripts/build.sh` (`samvaad-server:latest`) for the portable local image artifact, and root `compose.yaml` (`animesh0404/samvaad-server:<version>`) for published-release deployment. See ADRs 0015–0017 and `docs/development/setup.md`.
 
 See the implementation roadmap, architecture/security documents, API contracts, and ADRs for the detailed current state and locked decisions.
+
+## TLS Deployment Modes
+
+Samvaad currently supports two transport architectures:
+
+- **Direct access:** embedded Tomcat terminates HTTPS on port `8080`; the application generates and persists its own self-signed identity for LAN/single-host use.
+- **Public deployment:** a TLS-capable deployment edge terminates public HTTPS and forwards traffic to Samvaad. The edge may later forward to an HTTPS application listener as well; ADR 0013 does not require the backend listener to remain HTTP.
+
+The two modes are complementary rather than conflicting. ADR 0013 defines the public edge boundary; ADR 0017 defines the direct-access application-managed TLS path.
 
 ## Architecture Review
 

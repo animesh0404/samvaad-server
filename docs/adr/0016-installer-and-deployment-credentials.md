@@ -17,8 +17,9 @@ hardcoded in `compose.yaml` for both PostgreSQL and the application.
 1. **One-command installers.** `scripts/install.sh` (Unix) and
    `scripts/install.ps1` (Windows) bootstrap a deployment without a
    repository checkout: they check Docker/Compose availability (never
-   installing Docker), create the fixed installation directory
-   (`~/Samvaad`, `C:\Samvaad` on Windows), download `compose.yaml` from
+   installing Docker), create the canonical per-user installation directory
+   (`~/.samvaad`, `%USERPROFILE%\.samvaad` on Windows), with migration from
+   the former `~/Samvaad` / `C:\Samvaad` location, download `compose.yaml` from
    the canonical GitHub repository, create/reuse `.env`, generate the
    database password, prompt for JWT configuration
    (generate-or-supplied), run `docker compose up -d` against the
@@ -50,8 +51,12 @@ hardcoded in `compose.yaml` for both PostgreSQL and the application.
 - Existing deployments must align `.env` with the password their volume
   was initialized with (see `docs/development/setup.md` migration note).
 - The installer always refreshes `compose.yaml` from the canonical
-  source; per-installation state lives in `.env`, which is never
-  overwritten.
+  source; per-installation state lives in `.env`, `application.yaml`, and the
+  persistent TLS volume; existing operator state is preserved.
+
+## Relationship to ADR 0017
+
+ADR 0017 relocates the canonical installer state directory to `~/.samvaad` / `%USERPROFILE%\.samvaad`, adds external operator configuration and a dedicated TLS identity volume, and defines application-managed HTTPS for direct access. The credential-generation and installer responsibilities recorded here remain unchanged; ADR 0017 is the authoritative record for the TLS-specific configuration and storage behavior.
 
 ## Explicitly deferred
 

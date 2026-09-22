@@ -225,12 +225,20 @@ Deployment credentials are supplied through `.env` rather than baked into the im
 
 See ADRs 0012, 0015, and 0016.
 
-# 15. Public HTTPS Boundary
+# 15. HTTPS and TLS Deployment Boundary
 
-For public/VPS deployments, TLS is terminated at a deployment edge in front of the Samvaad application. The edge may be a reverse proxy, tunnel, or managed ingress service. The application may therefore continue to listen on an internal HTTP port while public traffic is served over HTTPS.
+Samvaad supports two complementary TLS deployment modes.
 
-The deployment edge must support both HTTP API traffic and the WebSocket connection at `/ws`. The application must remain proxy-compatible; its architecture must not require public certificate material to be embedded in the application JAR.
+### Direct-access deployments
 
-The concrete reverse proxy/tunnel provider, certificate automation, domain/DNS configuration, forwarded-header settings, and deployment upgrade policy remain deployment decisions.
+For single-host and LAN deployments without a TLS-terminating edge, the Spring Boot application terminates HTTPS itself on port `8080`. The application generates and persists a self-signed RSA-2048 PKCS#12 identity, with configurable certificate SANs, before embedded Tomcat starts. WebSocket/STOMP therefore operates over WSS on the same listener without a separate transport configuration. See ADR 0017.
+
+### Public/VPS deployments
+
+For public deployments, TLS is terminated at a TLS-capable deployment edge in front of the Samvaad application. The edge may be a reverse proxy, tunnel, or managed ingress service. The public edge must support both REST traffic and the WebSocket connection at `/ws` and must preserve the application’s proxy compatibility.
+
+The public edge remains the preferred production boundary described by ADR 0013. ADR 0017 does not replace that decision; it adds an application-managed TLS mode for deployments where no TLS edge is present. An edge may later forward to an HTTPS-enabled application listener as well.
+
+Certificate issuance/renewal for the public edge, production domain/DNS configuration, exact forwarded-header settings, and deployment upgrade policy remain deployment decisions.
 
 See ADR 0013.

@@ -37,7 +37,7 @@ The two supported operational modes are therefore:
 - **Standalone JAR:** an operator supplies/configures PostgreSQL and runs the Samvaad executable JAR.
 - **Docker Compose:** an operator uses the containerized Samvaad application together with the Compose-managed PostgreSQL instance. The runtime image uses the Alpine-based Temurin 25 JRE; the build uses Docker Buildx/BuildKit; `scripts/build.sh` also exports `server/build/samvaad-server.tar.gz` as a portable image artifact.
 
-Application configuration, including database connection details and other deployment-sensitive values, must be externalized from the JAR. Secrets must not be baked into the artifact.
+Application configuration, including database connection details and other deployment-sensitive values, must be externalized from the JAR. Secrets must not be baked into the artifact. Direct-access TLS configuration and persisted TLS identity are also external to the JAR and are defined by ADR 0017.
 
 ## Consequences
 
@@ -46,6 +46,10 @@ Application configuration, including database connection details and other deplo
 - Existing PostgreSQL installations remain supported.
 - Docker remains valuable for reproducible packaging and convenient database provisioning rather than becoming a hard application dependency.
 - The installer/one-line VPS bootstrap mechanism is implemented separately from the application artifact model.
+
+## Relationship to later deployment ADRs
+
+ADR 0013 defines the public deployment-edge TLS boundary. ADR 0017 adds the implemented application-managed TLS mode for direct host/LAN deployments without replacing the JAR-first packaging decision recorded here.
 
 ## Explicitly deferred
 

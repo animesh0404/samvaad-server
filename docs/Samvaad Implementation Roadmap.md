@@ -108,14 +108,15 @@ Implemented:
 - Security permits for the SPA shell and static assets; protected API routes unchanged.
 - Standalone `java -jar ...` serving the web admin, REST API, and WebSocket endpoint against external PostgreSQL.
 
-Locked deployment direction (unchanged):
+Locked deployment direction:
 - Angular production assets are packaged into the Spring Boot executable JAR.
 - `java -jar ...` serves the web admin, REST API, and WebSocket endpoint from the same embedded-Tomcat application.
 - The JAR remains capable of connecting to an externally provisioned PostgreSQL instance through externalized configuration.
 - Docker provides an additional containerized deployment path, including a Compose-managed Samvaad application plus PostgreSQL.
-- Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge.
+- Direct-access deployments use application-managed HTTPS on port `8080` with persisted self-signed TLS identity (ADR 0017).
+- Public HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge (ADR 0013).
 
-Implemented deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, versioned Docker Hub publication, environment-supplied deployment credentials, build/start/restart/stop lifecycle scripts, and idempotent Unix/Windows installers. Remaining deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, and deployment upgrade policy.
+Implemented deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, versioned Docker Hub publication, environment-supplied deployment credentials, application-managed TLS bootstrap and persistence, build/start/restart/stop lifecycle scripts, and idempotent Unix/Windows installers. Remaining public deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, and deployment upgrade policy.
 
 ## Later / deferred
 

@@ -171,9 +171,9 @@ Two deployment modes are supported:
 
 Docker is therefore a distribution/deployment option, not a hard runtime requirement for the application JAR.
 
-For public/VPS deployments, HTTPS is intended to terminate at a TLS-capable reverse proxy, tunnel, or managed edge in front of the application. The Samvaad JAR remains behind that edge and must support REST and WebSocket traffic through the proxy. The Unix and Windows installers provide the current one-command deployment path; the concrete TLS provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain open deployment work.
+Samvaad supports two TLS deployment modes. Direct-access deployments (for example, a single host or LAN deployment) use application-managed HTTPS on port `8080` with a persisted self-signed certificate as documented in ADR 0017. Public/VPS deployments continue to use a TLS-capable reverse proxy, tunnel, or managed edge as the public HTTPS boundary; the application remains proxy-compatible for REST and WebSocket traffic. The concrete public TLS provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain open deployment work.
 
-See ADRs 0011–0013, 0015, and 0016 for the locked packaging, deployment, release-image, and installer decisions and their remaining deferred details.
+See ADRs 0011–0017 for the locked packaging, deployment, release-image, installer, and TLS decisions and their remaining deferred details.
 
 ## Local Development
 
@@ -254,4 +254,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Public deployment edge and operational hardening**: application packaging, Docker deployment, versioned release publication, external deployment credentials, and the Unix/Windows installer workflow are implemented. Remaining deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard.
+**Public deployment edge and operational hardening**: application packaging, Docker deployment, versioned release publication, external deployment credentials, application-managed TLS for direct access, and the Unix/Windows installer workflow are implemented. Remaining deployment work is the concrete public TLS/reverse-proxy setup, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard.

@@ -7,14 +7,14 @@ Thin HTTP client over the existing backend contracts; the server remains authori
 
 - Node 24 (`nvm use` reads `.nvmrc`)
 - npm (comes with Node; dependencies are locked in `package-lock.json`)
-- Backend running on `http://localhost:8080` (see `../server`, e.g. `cd ../server && ./gradlew bootTestRun`)
+- Backend running on `https://localhost:8080` (self-signed certificate on first run; see `../server`, e.g. `cd ../server && ./gradlew bootTestRun`)
 
 ## Development
 
 ```bash
 nvm use
 npm install
-npm start         # ng serve on :4200, /api proxied to :8080
+npm start         # ng serve on :4200, /api proxied to the HTTPS backend on :8080
 ```
 
 ## Quality gates

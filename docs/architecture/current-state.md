@@ -100,7 +100,7 @@ See ADR 0012 for the durable packaging/deployment decision.
 
 ## Public HTTPS architecture: locked direction
 
-Public HTTPS is intended to terminate at the deployment edge in front of the Samvaad application. A TLS-capable reverse proxy, tunnel, or managed edge forwards traffic to the application. The application must support operation behind such an edge, including REST and WebSocket traffic. The specific reverse proxy/tunnel provider, certificate authority, domain, and forwarded-header configuration remain implementation decisions.
+Samvaad currently supports two HTTPS modes. For direct single-host/LAN deployments, the application terminates HTTPS itself on port `8080` using the persisted application-managed TLS identity defined by ADR 0017. For public/VPS deployments, HTTPS terminates at a TLS-capable deployment edge such as a reverse proxy, tunnel, or managed edge as defined by ADR 0013. The application remains proxy-compatible for REST and WebSocket traffic. The public reverse-proxy/tunnel provider, certificate authority, production domain, and forwarded-header configuration remain implementation decisions.
 
 See ADR 0013 for the durable TLS termination decision.
 
