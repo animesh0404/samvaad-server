@@ -255,7 +255,7 @@ your existing database was initialized with (default installations: the
 previous fixed value) rather than generating a new one, otherwise the
 application cannot authenticate to the retained volume.
 
-Build the local developer image and export a portable image artifact from the repository root (local workflow only; never pushed):
+Build the portable local image artifact from the repository root (local/offline workflow only; never pushed, and not consumed by any Compose workflow):
 
 ```bash
 ./scripts/build.sh
@@ -267,7 +267,7 @@ This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local D
 server/build/samvaad-server.tar.gz
 ```
 
-The generated `server/build/` directory is ignored by Git. The image remains loaded locally so the deployment scripts can use it directly.
+The generated `server/build/` directory is ignored by Git.
 
 ### Local Docker development loop
 

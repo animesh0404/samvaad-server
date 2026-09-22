@@ -69,6 +69,8 @@ The locked deployment direction is:
 
 The deployment packaging, versioned image publication, environment-supplied credentials, and Unix/Windows installer workflow are implemented. The concrete TLS/reverse-proxy provider, certificate automation, domain/DNS configuration, and deployment upgrade policy remain deployment work.
 
+Development and deployment use separate Docker workflows with distinct image identities: `server/compose.yaml` for PostgreSQL-only backend development, `compose.dev.yaml` (`samvaad-server:dev`, local-only) for the full Docker development loop, `scripts/build.sh` (`samvaad-server:latest`) for the portable local image artifact, and root `compose.yaml` (`animesh0404/samvaad-server:<version>`) for published-release deployment. See ADRs 0015–0016 and `docs/development/setup.md`.
+
 See the implementation roadmap, architecture/security documents, API contracts, and ADRs for the detailed current state and locked decisions.
 
 ## Architecture Review

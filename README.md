@@ -198,6 +198,14 @@ npm start
 
 The Web Admin development server runs on `http://localhost:4200` and proxies `/api` to the backend on `http://localhost:8080`.
 
+Full Docker development (application container built from local source instead of the published release image):
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+This builds the local-only `samvaad-server:dev` image and runs it with an isolated `samvaad-dev` project/volume. It is never pushed; release publication stays in `scripts/release-image.sh`.
+
 See `docs/development/setup.md` and `web-admin/README.md` for complete environment details.
 
 ## Build & Test Commands

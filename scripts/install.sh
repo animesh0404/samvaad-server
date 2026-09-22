@@ -26,8 +26,9 @@
 # deployment. Secrets are never printed.
 #
 # Responsibility boundary (ADR 0015/0016): this is a bootstrap layer only.
-# Release publication stays in scripts/release-image.sh, local developer
-# builds stay in scripts/build.sh, and day-to-day lifecycle stays in
+# Release publication stays in scripts/release-image.sh, the portable local
+# image artifact stays in scripts/build.sh, iterative Docker development
+# uses compose.dev.yaml, and day-to-day lifecycle stays in
 # scripts/start.sh, scripts/restart.sh, and scripts/stop.sh.
 set -euo pipefail
 

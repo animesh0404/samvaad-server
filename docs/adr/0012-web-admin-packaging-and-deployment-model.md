@@ -30,7 +30,7 @@ The exact Gradle/Angular build integration is an implementation detail and is no
 
 The JAR is the primary deployable application artifact and must remain capable of connecting to an externally provisioned PostgreSQL database. Docker is not a runtime requirement for the application itself.
 
-Docker additionally provides the implemented reproducible distribution/deployment path. The repository's `compose.yaml` brings up the Samvaad application container together with PostgreSQL, with the application image built by `scripts/build.sh` and the lifecycle controlled by `scripts/start.sh`, `scripts/restart.sh`, and `scripts/stop.sh`.
+Docker additionally provides the implemented reproducible distribution/deployment path. The repository's `compose.yaml` brings up the Samvaad application container together with PostgreSQL, consuming the published versioned image from Docker Hub; the lifecycle is controlled by `scripts/start.sh`, `scripts/restart.sh`, and `scripts/stop.sh`. Local image builds are separate concerns: `scripts/build.sh` produces the portable `samvaad-server:latest` artifact (plus tarball export), and `compose.dev.yaml` provides the iterative local development loop (`samvaad-server:dev`).
 
 The two supported operational modes are therefore:
 

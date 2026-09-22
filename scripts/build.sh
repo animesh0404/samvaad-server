@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #
-# Build the Samvaad Docker image. Never starts containers.
+# Build the portable local Samvaad image artifact. Never starts containers,
+# is never consumed by any Compose workflow (iterative Docker development
+# uses compose.dev.yaml), and is never pushed to a registry.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="samvaad-server:latest"
 
 echo "Building Samvaad Docker image (${IMAGE})..."
-# BuildKit/buildx. --load is required: start.sh and Compose expect the
-# image in the local image store, and buildx does not load it there by
-# default. Never pushed to a registry.
+# BuildKit/buildx. --load is required: the image must land in the local
+# image store so it can be exported below. Never pushed to a registry.
 if docker buildx build --load -t "${IMAGE}" "${ROOT}"; then
   echo "Build succeeded: ${IMAGE}"
 else
@@ -17,8 +18,8 @@ else
   exit 1
 fi
 
-# Export a portable copy of the image. The image stays loaded in the local
-# image store, so start.sh keeps working exactly as before.
+# Export a portable copy of the image for offline transfer. The image stays
+# loaded in the local image store as well.
 EXPORT_DIR="${ROOT}/server/build"
 EXPORT_FILE="${EXPORT_DIR}/samvaad-server.tar.gz"
 mkdir -p "${EXPORT_DIR}"

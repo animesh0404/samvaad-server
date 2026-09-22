@@ -25,8 +25,9 @@
   and converges the deployment. Secrets are never printed.
 
   Responsibility boundary (ADR 0015/0016): bootstrap layer only. Release
-  publication stays in scripts/release-image.sh, local developer builds
-  stay in scripts/build.sh, day-to-day lifecycle stays in
+  publication stays in scripts/release-image.sh, the portable local image
+  artifact stays in scripts/build.sh, iterative Docker development uses
+  compose.dev.yaml, day-to-day lifecycle stays in
   scripts/start.sh, scripts/restart.sh, and scripts/stop.sh.
 #>
 
