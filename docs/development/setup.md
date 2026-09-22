@@ -269,6 +269,45 @@ server/build/samvaad-server.tar.gz
 
 The generated `server/build/` directory is ignored by Git. The image remains loaded locally so the deployment scripts can use it directly.
 
+### Local Docker development loop
+
+To run the application container built from local source (instead of the
+published release image), use the tracked development override, which
+reuses the entire `compose.yaml` topology and only swaps image identity,
+build source, container/project names, and the PostgreSQL volume:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+or stepwise:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml build app
+docker compose -f compose.yaml -f compose.dev.yaml up -d
+```
+
+This builds `samvaad-server:dev` from the repository `Dockerfile` and runs
+it as `samvaad-dev-app` with PostgreSQL as `samvaad-dev-db` under the
+`samvaad-dev` project. The image name has no registry prefix, so it can
+never be pushed to Docker Hub; publishing stays the job of
+`scripts/release-image.sh`. The development database uses the separate
+`samvaad-dev-data` volume — it never shares the release `samvaad-data`
+volume. Tear down with:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml down
+```
+
+(`down` keeps the dev volume; add `-v` to drop it as well. The dev stack
+publishes the same host port `8080`, so run either the release or the dev
+stack at a time.)
+
+`scripts/build.sh` above remains the portable tarball-artifact workflow
+(`samvaad-server:latest` + `server/build/samvaad-server.tar.gz` for offline
+transfer); it is not the iterative development loop and nothing in Compose
+consumes its output.
+
 Release publication is a separate workflow from the local build above
 (ADR 0015). To build and publish a versioned release image to Docker Hub:
 
@@ -283,7 +322,8 @@ authentication relies on your existing `docker login` session.
 
 In short, the deployment lifecycle scripts are:
 
-- `scripts/build.sh` → local developer build (`samvaad-server:latest`, never pushed).
+- `scripts/build.sh` → portable local artifact (`samvaad-server:latest` + tarball, never pushed, not consumed by Compose).
+- `compose.dev.yaml` → iterative local development loop (`samvaad-server:dev`, built from source via Compose).
 - `scripts/release-image.sh <version>` → explicit versioned Docker Hub release publication.
 - `scripts/start.sh` → deploy/start the published image referenced by root `compose.yaml` (pulls it when missing; no local build required).
 - `scripts/restart.sh` → restart the deployment stack.
@@ -304,7 +344,7 @@ Restart or stop the deployment without rebuilding:
 ./scripts/stop.sh
 ```
 
-The Docker Compose deployment uses the `samvaad` project name and a separate PostgreSQL volume/network from the development stack. PostgreSQL is not published to the host by the deployment Compose file.
+The Docker Compose deployment uses the `samvaad` project name and a separate PostgreSQL volume/network from the `server/compose.yaml` development database and from the `compose.dev.yaml` local-build stack. PostgreSQL is not published to the host by the deployment Compose file.
 
 The Docker runtime image contains the Spring Boot executable JAR and the Java 25 Alpine JRE only; Node, npm, Gradle, source files, and frontend `node_modules` are build-stage content and are not included in the runtime image.
 

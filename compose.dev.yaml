@@ -1,0 +1,43 @@
+# Samvaad local development stack (override for the root compose.yaml).
+#
+# Builds and runs the application from local source instead of the published
+# Docker Hub release image. The base file keeps the full topology (services,
+# healthcheck, environment contract, ports, dependency ordering); this file
+# only swaps image identity/build source, isolates the project (so it never
+# adopts the release containers), and gives PostgreSQL its own volume so
+# development can never touch release data.
+#
+# Usage (from the repository root):
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+#   docker compose -f compose.yaml -f compose.dev.yaml logs -f app
+#   docker compose -f compose.yaml -f compose.dev.yaml down
+#
+# The image is local-only (samvaad-server:dev) and is never pushed: there is
+# no registry prefix, and publishing stays the job of
+# scripts/release-image.sh. scripts/build.sh remains the separate portable
+# tarball-artifact workflow, not the iterative development loop.
+name: samvaad-dev
+
+services:
+  app:
+    image: samvaad-server:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: samvaad-dev-app
+
+  db:
+    container_name: samvaad-dev-db
+    volumes:
+      - samvaad-dev-data:/var/lib/postgresql
+    # Pin the `db` hostname explicitly. Compose normally provides it via the
+    # implicit service-name alias (independent of container_name), but the
+    # application hardcodes jdbc:postgresql://db:5432/..., so the dev stack
+    # declares the dependency hostname explicitly rather than implicitly.
+    networks:
+      default:
+        aliases:
+          - db
+
+volumes:
+  samvaad-dev-data:
