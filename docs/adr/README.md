@@ -37,3 +37,4 @@ an earlier ADR only by explicitly naming it.
 | [0015](0015-docker-lifecycle-and-release-image-reference.md) | Docker development vs release workflows and deployment image reference |
 | [0016](0016-installer-and-deployment-credentials.md) | One-command installer and env-supplied deployment database credentials |
 | [0017](0017-application-managed-tls.md) | Application-managed TLS for direct access |
+| [0018](0018-v1-e2ee-signal-sesame-and-independent-device-identity.md) | V1 E2EE, Signal/Sesame, and independent device identity |
