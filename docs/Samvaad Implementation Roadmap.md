@@ -118,10 +118,37 @@ Locked deployment direction:
 
 Implemented deployment details include the multi-stage Dockerfile, Alpine Temurin 25 runtime, Compose-managed PostgreSQL, Buildx/BuildKit image loading, portable `server/build/samvaad-server.tar.gz` export, versioned Docker Hub publication, environment-supplied deployment credentials, application-managed TLS bootstrap and persistence, build/start/restart/stop lifecycle scripts, and idempotent Unix/Windows installers. Remaining public deployment work is the concrete TLS/reverse-proxy setup, certificate/domain configuration, and deployment upgrade policy.
 
+## V1 E2EE Device & Signal/Sesame Foundation
+
+NEXT IMPLEMENTATION SLICE — ARCHITECTURE LOCKED.
+
+The V1 messaging confidentiality direction is fixed by [ADR 0018](adr/0018-v1-e2ee-signal-sesame-and-independent-device-identity.md).
+
+Locked direction:
+- one-to-one E2EE uses the Signal protocol family with Sesame-style multi-device session management;
+- each client installation can become an independent cryptographic device;
+- there is no primary cryptographic device;
+- the first supported client may be Web, Android, or TUI;
+- the first device generates its private cryptographic material locally;
+- account-level one-time recovery codes are established after first-device setup;
+- the initial recovery-code batch contains 25 one-time codes;
+- rollover is required when the user reaches the final-code warning threshold, with the 24th consumed code leaving one final code and triggering prominent renewal guidance;
+- after first enrollment, new devices require approval by an existing trusted device or an unused recovery code;
+- future group chat remains outside V1 and is reserved for a group protocol such as MLS;
+- Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture.
+
+Immediate work before production implementation:
+1. validate the chosen Signal-family implementation against Java 25, Angular/browser, Android, TUI, Docker/Alpine, persistent crypto-state handling, and license/operational constraints;
+2. define the Samvaad-owned crypto boundary;
+3. define device, prekey, session, envelope, mailbox, and recovery state contracts;
+4. define device approval, QR pairing, revocation, and recovery ceremonies;
+5. define ciphertext history and recovery-key hierarchy;
+6. reconcile first-login password setup with the existing authentication ADR;
+7. then replace the current plaintext message contract and persistence model.
+
 ## Later / deferred
 
-- reconnect/missed-event synchronization
-- offline queues
+- group chat and MLS implementation
 - persistent read state/read receipts
 - typing/presence
 - delivery receipts
@@ -130,4 +157,5 @@ Implemented deployment details include the multi-stage Dockerfile, Alpine Temuri
 - blocking, unfriend, mute, archive
 - horizontal scaling and external brokers
 - general event bus
-- end-to-end encryption
+- attachments and reactions
+- public deployment edge hardening
