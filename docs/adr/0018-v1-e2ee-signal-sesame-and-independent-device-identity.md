@@ -116,9 +116,117 @@ A cryptographic device may have one or more authenticated server sessions during
 
 Revoking a server session is therefore not automatically equivalent to deleting an E2EE device. Conversely, revoking an E2EE device must have explicit consequences for its authenticated sessions and future encrypted-message delivery.
 
+**When an E2EE device is revoked, all authenticated server sessions belonging to that device are terminated server-side.** The device is then no longer eligible to send, receive, or synchronize E2EE traffic. An old session/JWT must not remain an alternative path around device revocation.
+
 Future device management must enforce both server-side transport/session revocation and cryptographic exclusion from future message sessions.
 
-### 8. Future groups use a separate protocol boundary
+### 8. Server-side device record and public key directory
+
+Each enrolled E2EE device has a server-side device record.
+
+The record contains the public cryptographic material and operational state required for device discovery and Signal/Sesame session establishment, including:
+
+- device identity public key;
+- signed prekey and its signature;
+- available one-time prekeys;
+- enrolled/active/revoked status;
+- device metadata required for device management.
+
+All corresponding private cryptographic material remains exclusively on the device. The server must never receive, reconstruct, or derive device private keys.
+
+The device record is distinct from the authenticated server session record.
+
+### 9. V1 device limit and equal-device model
+
+There is no primary cryptographic device. All enrolled devices are cryptographically equal peers.
+
+An account may have a maximum of **5 enrolled E2EE devices**. The five devices may be any supported client combination; the server does not assign different cryptographic authority based on client type.
+
+When a new device is enrolled, it becomes eligible for future encrypted messages immediately. Sending clients discover the recipient's currently eligible device public/prekey material through the server-side device directory when required; no user-facing manual device-list synchronization is required.
+
+A newly enrolled device obtains historical messages through the separate encrypted-history restoration mechanism. It does not receive old history merely because a new Signal/Sesame session was established.
+
+### 10. Per-device encrypted message envelopes and server mailboxes
+
+For one-to-one messaging, the sending client produces the cryptographic ciphertext/envelope needed by each currently eligible recipient device. The Samvaad server does not encrypt or decrypt message content.
+
+The server stores and routes these encrypted envelopes to per-device delivery mailboxes.
+
+If a recipient device is offline, its encrypted envelope remains available until that device receives it and acknowledges successful receipt.
+
+Mailbox delivery state is separate from permanent conversation history. A delivery acknowledgement removes the device-specific mailbox copy only; it does not delete the message from conversation history.
+
+### 11. Server-retained ciphertext history and per-device synchronization
+
+Samvaad retains encrypted message ciphertext as permanent conversation history. Delivery to one device does not delete the historical ciphertext.
+
+Each conversation has one server-authoritative, monotonically increasing sequence number. The server assigns the sequence number when it accepts the encrypted message. If concurrent messages race, server acceptance order determines their sequence order.
+
+Each enrolled device maintains a per-conversation synchronization cursor representing the last successfully synchronized conversation sequence.
+
+For example:
+
+```
+Conversation 42
+
+101 → Alice → Bob
+102 → Bob → Alice
+103 → Alice → Bob
+104 → Alice → Bob
+
+Bob Phone   → synced through 104
+Bob Laptop  → synced through 102
+Bob TUI     → synced through 101
+```
+
+A device reconnecting with cursor 101 can request the encrypted envelopes after sequence 101 rather than downloading the complete conversation history again.
+
+The server remains authoritative for conversation sequencing; clients do not choose the authoritative sequence number.
+
+### 12. Device revocation and message history
+
+Revoking a device permanently excludes that cryptographic identity from future E2EE participation.
+
+Revocation immediately terminates the device's authenticated server sessions and prevents further message send, delivery, or synchronization operations for that device.
+
+Historical conversation ciphertext is not deleted merely because one device is revoked. It remains available to other still-enrolled devices according to their synchronization state and access rights.
+
+### 13. Encrypted chat-history backup and recovery
+
+Encrypted chat-history backup is separate from account recovery codes and separate from device identity.
+
+Samvaad V1 uses full encrypted backups. A client generates a separate high-entropy backup-root key for the account's encrypted history backup. The server must never possess the plaintext backup key or plaintext chat history.
+
+The backup-root key is durable for the account rather than regenerated for every backup. Individual backup objects may use derived per-backup/per-purpose encryption keys and fresh nonces/IVs as appropriate.
+
+A new device may restore historical chat state without authorization from a previously trusted device. An optional user-chosen passphrase may be used to protect/wrap the backup-root key for independent recovery.
+
+The backup contains enough encrypted message and conversation metadata to reconstruct the user's prior conversation history as a continuous stream. Backup restoration is part of new-device enrollment rather than a separate user-facing merge operation.
+
+For V1, backup storage is an encrypted file. Cloud backup providers such as Google Drive are future storage/synchronization adapters and are not required for the V1 cryptographic architecture.
+
+### 14. V1 local backup policy
+
+The following are client-side product decisions for the initial encrypted-backup implementation:
+
+- automatic full backup is enabled by default;
+- default frequency is every 1 day;
+- supported frequencies are every 12 hours, every 1 day, and every 1 week;
+- automatic backup can be disabled by the user;
+- automatic backup runs on a fixed wall-clock schedule, with a default time of 2:00 AM local device time;
+- the backup time is user-configurable;
+- a backup is created only when message history exists and has changed since the previous successful backup;
+- the schedule is fixed-periodic and is not reset by message activity;
+- only one automatic backup is retained locally, replacing the previous automatic backup after successful creation;
+- automatic backup is stored in the client's private application storage by default;
+- users may explicitly export/copy an encrypted backup file;
+- during new-device enrollment, the client may detect an accessible local encrypted backup, show its backup timestamp, and offer restore or ignore;
+- the user may explicitly select another encrypted backup file for restoration;
+- restoration is not automatically performed merely because a backup exists.
+
+These client-side details are recorded here as the current product contract; platform-specific Android/Web/TUI implementation details remain outside the server implementation design.
+
+### 15. Future groups use a separate protocol boundary
 
 Samvaad V1 does not implement group chat.
 
@@ -128,7 +236,7 @@ MLS is therefore a future group-messaging direction, not a V1 dependency and not
 
 Signal/Sesame and future MLS group cryptography must remain separate protocol adapters behind Samvaad-owned application/crypto boundaries.
 
-### 9. Crypto implementation remains replaceable at the Samvaad boundary
+### 16. Crypto implementation remains replaceable at the Samvaad boundary
 
 Samvaad domain, persistence, transport contracts, and client APIs must not depend directly on a specific crypto library's internal classes.
 
@@ -161,6 +269,7 @@ These are implementation consequences and are not solved by this ADR.
 - exact Signal-family library selection;
 - exact QR enrollment ceremony;
 - exact recovery-code wrapping/rotation format;
+- exact backup file format;
 - backup storage provider and external-backup adapters;
 - metadata minimization beyond existing server-authoritative requirements;
 - receipts, typing/presence, attachments, reactions, edits, and other non-E2EE messaging features unless separately brought into scope.
@@ -177,6 +286,6 @@ These are implementation consequences and are not solved by this ADR.
 
 ## Implementation entry condition
 
-No production E2EE code should be written until the selected Signal-family implementation has passed focused feasibility validation for Java 25/server runtime, browser/Angular, Android, TUI, Docker/Alpine, persistent crypto-state handling, and license/operational constraints.
+The initial Signal-family feasibility validation has established the Java 25 server-side libsignal path and its glibc runtime requirement. The implementation path still requires validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints before production adoption.
 
-The next implementation slice is **V1 E2EE Device & Signal/Sesame Foundation**, beginning with feasibility validation and protocol-boundary design rather than message UI work.
+The next implementation slice is **V1 E2EE Device & Signal/Sesame Foundation**, beginning with protocol-boundary design and remaining target-specific feasibility validation rather than message UI work.
