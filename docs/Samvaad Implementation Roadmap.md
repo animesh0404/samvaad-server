@@ -128,21 +128,31 @@ Locked direction:
 - one-to-one E2EE uses the Signal protocol family with Sesame-style multi-device session management;
 - each client installation can become an independent cryptographic device;
 - there is no primary cryptographic device;
+- an account may have at most 5 enrolled cryptographic devices, with no special cryptographic authority assigned by client type;
 - the first supported client may be Web, Android, or TUI;
-- the first device generates its private cryptographic material locally;
+- each device generates and retains its private cryptographic material locally;
+- the server maintains a device record containing public identity/prekey material, enrollment status, and required device metadata;
 - account-level one-time recovery codes are established after first-device setup;
 - the initial recovery-code batch contains 25 one-time codes;
 - rollover is required when the user reaches the final-code warning threshold, with the 24th consumed code leaving one final code and triggering prominent renewal guidance;
 - after first enrollment, new devices require approval by an existing trusted device or an unused recovery code;
+- revoking a device terminates all authenticated server sessions belonging to that device and excludes it from future E2EE participation;
+- newly enrolled devices become eligible for future encrypted messages immediately; old history is restored separately through encrypted-history recovery;
+- the sender's crypto layer produces device-specific encrypted envelopes; the server only stores/routes ciphertext;
+- offline device mailboxes retain encrypted envelopes until successful receipt acknowledgement;
+- encrypted message ciphertext remains in permanent conversation history after delivery;
+- each conversation has a server-assigned monotonically increasing sequence number, and each device tracks a per-conversation synchronization cursor;
+- encrypted chat-history backup is a separate concern from account recovery and device identity; V1 uses full encrypted backups with a durable backup-root key, optional passphrase protection, and local encrypted-file restoration;
+- automatic local backup is enabled by default on a configurable fixed wall-clock schedule, with 2:00 AM as the default time; only changed histories are backed up and one automatic backup is retained;
 - future group chat remains outside V1 and is reserved for a group protocol such as MLS;
 - Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture.
 
 Immediate work before production implementation:
-1. validate the chosen Signal-family implementation against Java 25, Angular/browser, Android, TUI, Docker/Alpine, persistent crypto-state handling, and license/operational constraints;
+1. complete remaining target-specific Signal-family validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints;
 2. define the Samvaad-owned crypto boundary;
-3. define device, prekey, session, envelope, mailbox, and recovery state contracts;
+3. define device, public-key/prekey directory, session, envelope, mailbox, conversation-history, synchronization-cursor, and recovery state contracts;
 4. define device approval, QR pairing, revocation, and recovery ceremonies;
-5. define ciphertext history and recovery-key hierarchy;
+5. define ciphertext history and backup/recovery-key hierarchy;
 6. reconcile first-login password setup with the existing authentication ADR;
 7. then replace the current plaintext message contract and persistence model.
 
