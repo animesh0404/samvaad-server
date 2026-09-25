@@ -174,7 +174,7 @@ The current session-validation logic is intentionally duplicated between the HTT
 
 # 10. Deferred Realtime Work
 
-Reconnect/missed-event synchronization, offline queues, read state/read receipts, typing/presence, delivery receipts, push notifications, message edits/deletes/replies, blocking/unfriend/mute/archive, horizontal scaling/external brokers, end-to-end encryption, and a general event bus are outside Realtime V1.
+Reconnect/missed-event synchronization, offline queues, read state/read receipts, typing/presence, delivery receipts, push notifications, message edits/deletes/replies, blocking/unfriend/mute/archive, horizontal scaling/external brokers, and a general event bus are outside Realtime V1. V1 E2EE is separately admitted and governed by ADR 0018.
 
 # 11. Operational Logging
 
