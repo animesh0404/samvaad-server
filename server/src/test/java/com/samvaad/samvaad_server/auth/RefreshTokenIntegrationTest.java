@@ -40,6 +40,15 @@ class RefreshTokenIntegrationTest {
     private RefreshTokenService refreshTokenService;
 
     @Autowired
+    private com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo recoveryCodeRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo deviceRepo;
+
+    @Autowired
     private UserRepo userRepo;
 
     @Autowired
@@ -62,7 +71,10 @@ class RefreshTokenIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        oneTimePrekeyRepo.deleteAll();
+        recoveryCodeRepo.deleteAll();
         sessionRepo.deleteAll();
+        deviceRepo.deleteAll();
         userProfileRepo.deleteAll();
         userRepo.deleteAll();
 

@@ -53,6 +53,15 @@ class UserServiceLoggingTest {
     private ConversationRepo conversationRepo;
 
     @Mock
+    private com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
+
+    @Mock
+    private com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo deviceRepo;
+
+    @Mock
+    private com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo recoveryCodeRepo;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService userService;
@@ -61,7 +70,8 @@ class UserServiceLoggingTest {
     void setUp() {
         userService = new UserService(
                 userRepo, userProfileService, userProfileRepo, sessionRepo,
-                friendRequestRepo, messageRepo, conversationRepo, passwordEncoder);
+                friendRequestRepo, messageRepo, conversationRepo,
+                oneTimePrekeyRepo, deviceRepo, recoveryCodeRepo, passwordEncoder);
     }
 
     private User userWithPassword(UUID userId) {

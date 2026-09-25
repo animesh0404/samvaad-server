@@ -1,6 +1,8 @@
 samvaad:
   auth:
     jwt-secret: test-secret-key-that-is-at-least-32-bytes-long
+  e2ee:
+    pending-device-ttl: P7D
   logging:
     file:
       # Keep test runs out of the repository working tree (build/ is gitignored).

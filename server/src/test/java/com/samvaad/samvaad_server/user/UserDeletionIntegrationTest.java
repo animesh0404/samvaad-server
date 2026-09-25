@@ -61,6 +61,15 @@ class UserDeletionIntegrationTest {
     private MessageService messageService;
 
     @Autowired
+    private com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo recoveryCodeRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo deviceRepo;
+
+    @Autowired
     private UserRepo userRepo;
 
     @Autowired
@@ -86,7 +95,10 @@ class UserDeletionIntegrationTest {
         messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
+        oneTimePrekeyRepo.deleteAll();
+        recoveryCodeRepo.deleteAll();
         sessionRepo.deleteAll();
+        deviceRepo.deleteAll();
         userProfileRepo.deleteAll();
         userRepo.deleteAll();
     }
