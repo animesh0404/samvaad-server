@@ -131,8 +131,10 @@ class E2eeRecoveryIntegrationTest {
         deviceService.revokeDevice(user.getUserId(), first.getDevice().getDeviceId());
 
         // Plain enrollment is rejected even though credentials are valid.
+        // Revocation killed the enrolling session, so a fresh session is used.
+        LoginResponseDto fresh = login(user.getUsername());
         assertThrows(RecoveryRequiredException.class, () -> deviceService.enrollDevice(
-                user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(201, ClientPlatform.WEB)));
+                user.getUserId(), fresh.sessionId(), E2eeTestKeys.enrollRequest(201, ClientPlatform.WEB)));
     }
 
     @Test
@@ -144,8 +146,9 @@ class E2eeRecoveryIntegrationTest {
         deviceService.revokeDevice(user.getUserId(), first.getDevice().getDeviceId());
         int usableBefore = recoveryCodeRepo.findUsableByUser(user).size();
 
+        LoginResponseDto fresh = login(user.getUsername());
         assertThrows(InvalidRecoveryCodeException.class, () -> deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest("not-a-real-code", 211)));
+                user.getUserId(), fresh.sessionId(), recoveryRequest("not-a-real-code", 211)));
 
         assertEquals(1, deviceRepo.count());
         assertEquals(usableBefore, recoveryCodeRepo.findUsableByUser(user).size());
@@ -161,17 +164,20 @@ class E2eeRecoveryIntegrationTest {
         UUID oldDeviceId = first.getDevice().getDeviceId();
         deviceService.revokeDevice(user.getUserId(), oldDeviceId);
 
+        LoginResponseDto fresh = login(user.getUsername());
         DeviceDto recovered = deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest(code, 221));
+                user.getUserId(), fresh.sessionId(), recoveryRequest(code, 221));
 
         assertEquals(DeviceStatus.ACTIVE, recovered.getStatus());
         assertNotEquals(oldDeviceId, recovered.getDeviceId());
         assertEquals(recovered.getDeviceId(),
-                sessionRepo.findById(login.sessionId()).orElseThrow().getDeviceId());
+                sessionRepo.findById(fresh.sessionId()).orElseThrow().getDeviceId());
 
-        // The same code cannot be used again.
+        // The same code cannot be used again. A fresh session is required
+        // because the successful recovery bound the previous one.
+        LoginResponseDto retry = login(user.getUsername());
         assertThrows(InvalidRecoveryCodeException.class, () -> deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest(code, 222)));
+                user.getUserId(), retry.sessionId(), recoveryRequest(code, 222)));
         assertEquals(2, deviceRepo.count());
     }
 
@@ -184,9 +190,12 @@ class E2eeRecoveryIntegrationTest {
         String code = first.getRecoveryCodes().get(3);
         int usableBefore = recoveryCodeRepo.findUsableByUser(user).size();
 
-        // Valid code, wrong state: rejected and NOT consumed.
+        // Valid code, wrong state: rejected and NOT consumed. A fresh
+        // unbound session is used so the attempt reaches the state check
+        // rather than the session-binding guard.
+        LoginResponseDto fresh = login(user.getUsername());
         assertThrows(InvalidRecoveryCodeException.class, () -> deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest(code, 231)));
+                user.getUserId(), fresh.sessionId(), recoveryRequest(code, 231)));
         assertEquals(usableBefore, recoveryCodeRepo.findUsableByUser(user).size());
         assertEquals(1, deviceRepo.count());
     }
@@ -206,11 +215,12 @@ class E2eeRecoveryIntegrationTest {
 
         // Old set is dead even though the code was never consumed.
         deviceService.revokeDevice(user.getUserId(), first.getDevice().getDeviceId());
+        LoginResponseDto fresh = login(user.getUsername());
         assertThrows(InvalidRecoveryCodeException.class, () -> deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest(oldCode, 241)));
+                user.getUserId(), fresh.sessionId(), recoveryRequest(oldCode, 241)));
 
         DeviceDto recovered = deviceService.recoverEnroll(
-                user.getUserId(), login.sessionId(), recoveryRequest(rotated.getRecoveryCodes().get(0), 242));
+                user.getUserId(), fresh.sessionId(), recoveryRequest(rotated.getRecoveryCodes().get(0), 242));
         assertEquals(DeviceStatus.ACTIVE, recovered.getStatus());
     }
 

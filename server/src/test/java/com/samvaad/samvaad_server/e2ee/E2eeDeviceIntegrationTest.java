@@ -113,6 +113,9 @@ class E2eeDeviceIntegrationTest {
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private com.samvaad.samvaad_server.session.SessionService sessionService;
+
     @BeforeEach
     void setUp() {
         prekeyRepo.deleteAll();
@@ -137,6 +140,11 @@ class E2eeDeviceIntegrationTest {
                 new LoginRequestDto(username, "secret123", null, ClientPlatform.WEB, "Test", "1.0.0"),
                 "127.0.0.1",
                 "UserAgent");
+    }
+
+    private void logout(UUID sessionId) {
+        sessionService.revokeSession(
+                sessionId, com.samvaad.samvaad_server.session.RevocationReason.USER_LOGOUT);
     }
 
     private EnrollDeviceResponseDto bootstrap(User user, LoginResponseDto login, int seed) {
@@ -195,8 +203,9 @@ class E2eeDeviceIntegrationTest {
         LoginResponseDto login = login(user.getUsername());
         bootstrap(user, login, 20);
 
+        LoginResponseDto fresh = login(user.getUsername());
         assertThrows(DeviceAlreadyExistsException.class, () -> deviceService.enrollDevice(
-                user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(20, ClientPlatform.WEB)));
+                user.getUserId(), fresh.sessionId(), E2eeTestKeys.enrollRequest(20, ClientPlatform.WEB)));
     }
 
     @Test
@@ -205,22 +214,30 @@ class E2eeDeviceIntegrationTest {
         LoginResponseDto login = login(user.getUsername());
         EnrollDeviceResponseDto first = bootstrap(user, login, 30);
         assertEquals(DeviceStatus.ACTIVE, first.getDevice().getStatus());
+        // Each new device is enrolled from its own fresh session: an
+        // already-bound session may not enroll again. Sessions are logged
+        // out after use to stay within the session cap.
         UUID pendingId = null;
         for (int seed = 31; seed <= 34; seed++) {
+            LoginResponseDto fresh = login(user.getUsername());
             EnrollDeviceResponseDto enrolled = deviceService.enrollDevice(
-                    user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(seed, ClientPlatform.WEB));
+                    user.getUserId(), fresh.sessionId(), E2eeTestKeys.enrollRequest(seed, ClientPlatform.WEB));
             pendingId = enrolled.getDevice().getDeviceId();
+            logout(fresh.sessionId());
         }
 
+        LoginResponseDto sixth = login(user.getUsername());
         assertThrows(DeviceLimitExceededException.class, () -> deviceService.enrollDevice(
-                user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(35, ClientPlatform.WEB)));
+                user.getUserId(), sixth.sessionId(), E2eeTestKeys.enrollRequest(35, ClientPlatform.WEB)));
+        logout(sixth.sessionId());
 
         // Revoking a PENDING device keeps one ACTIVE device, so the account
         // stays enrollable and the freed slot accepts a new enrollment.
         deviceService.revokeDevice(user.getUserId(), pendingId);
-        EnrollDeviceResponseDto replacement = deviceService.enrollDevice(
-                user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(35, ClientPlatform.WEB));
-        assertNotNull(replacement.getDevice().getDeviceId());
+        LoginResponseDto replacement = login(user.getUsername());
+        EnrollDeviceResponseDto replaced = deviceService.enrollDevice(
+                user.getUserId(), replacement.sessionId(), E2eeTestKeys.enrollRequest(35, ClientPlatform.WEB));
+        assertNotNull(replaced.getDevice().getDeviceId());
     }
 
     @Test

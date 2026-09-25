@@ -11,6 +11,7 @@ import com.samvaad.samvaad_server.e2ee.exception.InvalidPrekeyBatchException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
 import com.samvaad.samvaad_server.e2ee.exception.PrekeyClaimConflictException;
 import com.samvaad.samvaad_server.e2ee.exception.RecoveryRequiredException;
+import com.samvaad.samvaad_server.e2ee.exception.SessionAlreadyBoundException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestConflictException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestNotFoundException;
 import com.samvaad.samvaad_server.messaging.ConversationNotFoundException;
@@ -198,6 +199,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public E2eeErrorResponse handleRecoveryRequired(RecoveryRequiredException ex) {
         return new E2eeErrorResponse(ex.getMessage(), RecoveryRequiredException.REASON);
+    }
+
+    @ExceptionHandler(SessionAlreadyBoundException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleSessionAlreadyBound(SessionAlreadyBoundException ex) {
+        return new ErrorResponse(ex.getMessage());
     }
 
     public record ErrorResponse(String message) {

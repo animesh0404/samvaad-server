@@ -13,13 +13,11 @@ public final class E2eePolicy {
     /** Maximum enrolled (non-REVOKED) cryptographic devices per account. */
     public static final int MAX_ENROLLED_DEVICES = 5;
 
-    /** One-time prekeys provisioned with a device's initial upload. */
-    public static final int INITIAL_ONE_TIME_PREKEYS = 100;
-
-    /** Replenish the pool when fewer than this many remain available. */
-    public static final int REPLENISH_BELOW_AVAILABLE = 20;
-
-    /** One-time prekeys added by each replenishment upload. */
+    /**
+     * One-time prekeys per accepted upload batch. Every upload — initial
+     * provisioning and replenishment alike — carries exactly this many keys,
+     * so a device's pool is always established in full batches.
+     */
     public static final int REPLENISH_BATCH_SIZE = 100;
 
     /** One-time recovery codes generated per set. */

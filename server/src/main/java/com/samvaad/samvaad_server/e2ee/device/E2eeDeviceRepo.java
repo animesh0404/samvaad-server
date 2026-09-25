@@ -23,7 +23,7 @@ public interface E2eeDeviceRepo extends JpaRepository<E2eeDevice, UUID> {
     @Query("SELECT d FROM E2eeDevice d WHERE d.deviceId = :deviceId")
     Optional<E2eeDevice> findByDeviceIdWithLock(@Param("deviceId") UUID deviceId);
 
-    Optional<E2eeDevice> findByUserUserIdAndDeviceIdentityPublicKey(UUID userId, byte[] deviceIdentityPublicKey);
+    boolean existsByDeviceIdentityPublicKey(byte[] deviceIdentityPublicKey);
 
     @Modifying
     @Query("DELETE FROM E2eeDevice d WHERE d.user.userId = :userId")

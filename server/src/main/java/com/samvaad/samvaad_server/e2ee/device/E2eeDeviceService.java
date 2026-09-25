@@ -24,6 +24,7 @@ import com.samvaad.samvaad_server.e2ee.exception.InvalidPrekeyBatchException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
 import com.samvaad.samvaad_server.e2ee.exception.PrekeyClaimConflictException;
 import com.samvaad.samvaad_server.e2ee.exception.RecoveryRequiredException;
+import com.samvaad.samvaad_server.e2ee.exception.SessionAlreadyBoundException;
 import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryService;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
@@ -33,6 +34,8 @@ import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserNotFoundException;
 import com.samvaad.samvaad_server.user.UserRepo;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -80,6 +83,9 @@ public class E2eeDeviceService {
     private final DeviceApprovalAuthorizer approvalAuthorizer;
     private final Duration pendingDeviceTtl;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public E2eeDeviceService(
             E2eeDeviceRepo deviceRepo,
             E2eeOneTimePrekeyRepo prekeyRepo,
@@ -111,6 +117,13 @@ public class E2eeDeviceService {
                 .orElseThrow(() -> new UserNotFoundException(callerUserId));
         expireStalePending(user);
 
+        Session session = resolveOwnedSession(callerUserId, callerSessionId);
+        // A session may create a new device only when it is not already bound
+        // to another device. Rebinding would orphan the previously bound
+        // device, leaving it ACTIVE but permanently unmanageable. This check
+        // runs before any device row is created.
+        requireUnboundSession(session);
+
         EnrollmentState state = enrollmentState(user);
         if (state == EnrollmentState.RECOVERY_REQUIRED) {
             log.warn("Device enrollment denied: recovery required userId={}", callerUserId);
@@ -128,7 +141,6 @@ public class E2eeDeviceService {
                 : DeviceStatus.PENDING;
         E2eeDevice device = insertDevice(user, request, material, status);
 
-        Session session = resolveOwnedSession(callerUserId, callerSessionId);
         session.setDeviceId(device.getDeviceId());
         sessionRepo.save(session);
 
@@ -198,7 +210,7 @@ public class E2eeDeviceService {
         List<E2eeOneTimePrekey> rows = new ArrayList<>(batch.size());
         Set<Integer> seen = new HashSet<>();
         for (OneTimePrekeyDto entry : batch) {
-            if (entry.getPrekeyId() == null) {
+            if (entry == null || entry.getPrekeyId() == null) {
                 throw new InvalidPrekeyBatchException("prekey ID is required");
             }
             if (!seen.add(entry.getPrekeyId())) {
@@ -343,12 +355,20 @@ public class E2eeDeviceService {
             throw new InvalidRecoveryCodeException();
         }
 
+        Session session = resolveOwnedSession(callerUserId, callerSessionId);
+        requireUnboundSession(session);
+
+        long enrolled = deviceRepo.countByUserAndStatusIn(user, NON_REVOKED);
+        if (enrolled >= E2eePolicy.MAX_ENROLLED_DEVICES) {
+            log.warn("Recovery enrollment denied: device limit userId={}", callerUserId);
+            throw new DeviceLimitExceededException();
+        }
+
         // Atomic with device creation below: any failure rolls the consumption
         // back, and two concurrent uses resolve to a single winner.
         recoveryService.consumeCode(user, request.getRecoveryCode());
 
         E2eeDevice device = insertDevice(user, request.getDevice(), material, DeviceStatus.ACTIVE);
-        Session session = resolveOwnedSession(callerUserId, callerSessionId);
         session.setDeviceId(device.getDeviceId());
         sessionRepo.save(session);
 
@@ -412,11 +432,25 @@ public class E2eeDeviceService {
         device.setClientName(request.getClientName());
         device.setClientVersion(request.getClientVersion());
         device.setLastActiveAt(LocalDateTime.now());
+        if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())) {
+            log.warn("Device enrollment conflict: identity already enrolled userId={}", user.getUserId());
+            throw new DeviceAlreadyExistsException();
+        }
         try {
             return deviceRepo.saveAndFlush(device);
         } catch (DataIntegrityViolationException e) {
-            log.warn("Device enrollment conflict: identity already enrolled userId={}", user.getUserId());
-            throw new DeviceAlreadyExistsException();
+            // A racing enrollment may have committed the same identity key
+            // after the pre-check above. The failed insert remains queued in
+            // the persistence context and would fail again on the re-check's
+            // auto-flush, so the context is cleared first. Only a genuine
+            // duplicate maps to a conflict; any other integrity failure is
+            // rethrown unchanged. Either outcome rolls the transaction back.
+            entityManager.clear();
+            if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())) {
+                log.warn("Device enrollment conflict: identity already enrolled userId={}", user.getUserId());
+                throw new DeviceAlreadyExistsException();
+            }
+            throw e;
         }
     }
 
@@ -442,6 +476,17 @@ public class E2eeDeviceService {
         }
     }
 
+    /**
+     * A session may create a new device only when it is not already bound to
+     * another device. The binding is left untouched on rejection.
+     */
+    private void requireUnboundSession(Session session) {
+        if (session.getDeviceId() != null) {
+            log.warn("Device enrollment denied: session already bound sessionId={} deviceId={}",
+                    session.getSessionId(), session.getDeviceId());
+            throw new SessionAlreadyBoundException();
+        }
+    }
 
     private EnrollmentState enrollmentState(User user) {
         List<E2eeDevice> devices = deviceRepo.findByUserUserIdOrderByCreatedAtAsc(user.getUserId());

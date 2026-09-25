@@ -1,6 +1,8 @@
 package com.samvaad.samvaad_server.e2ee.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Recovery enrollment: one unused recovery code plus the new device's public
@@ -12,6 +14,8 @@ public class RecoveryEnrollRequestDto {
     @NotBlank(message = "Recovery code is required")
     private String recoveryCode;
 
+    @Valid
+    @NotNull(message = "Device material is required")
     private EnrollDeviceRequestDto device;
 
     public RecoveryEnrollRequestDto() {

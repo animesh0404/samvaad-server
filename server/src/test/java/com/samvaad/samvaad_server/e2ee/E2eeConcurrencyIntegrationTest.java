@@ -35,6 +35,7 @@ import com.samvaad.samvaad_server.e2ee.dto.EnrollDeviceResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.RecoveryEnrollRequestDto;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceLimitExceededException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
+import com.samvaad.samvaad_server.e2ee.exception.SessionAlreadyBoundException;
 import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.SessionRepo;
@@ -84,6 +85,9 @@ class E2eeConcurrencyIntegrationTest {
     private UserProfileRepo userProfileRepo;
 
     @Autowired
+    private com.samvaad.samvaad_server.session.SessionService sessionService;
+
+    @Autowired
     private com.samvaad.samvaad_server.messaging.MessageRepo messageRepo;
 
     @Autowired
@@ -121,23 +125,36 @@ class E2eeConcurrencyIntegrationTest {
     @Test
     void serializesConcurrentEnrollmentsAndEnforcesFiveDeviceLimit() throws Exception {
         User user = createUser("e2ee_conc_cap");
-        LoginResponseDto bootstrapLogin = login(user.getUsername());
-        deviceService.enrollDevice(
-                user.getUserId(), bootstrapLogin.sessionId(), E2eeTestKeys.enrollRequest(300, ClientPlatform.WEB));
+        // Three devices pre-exist (one ACTIVE bootstrap, two PENDING), each
+        // enrolled from its own session; sessions are logged out afterwards
+        // so the concurrent attempts below stay within the session cap while
+        // every attempt still uses a distinct unbound session.
+        for (int seed = 300; seed <= 302; seed++) {
+            LoginResponseDto login = login(user.getUsername());
+            deviceService.enrollDevice(
+                    user.getUserId(), login.sessionId(), E2eeTestKeys.enrollRequest(seed, ClientPlatform.WEB));
+            sessionService.revokeSession(
+                    login.sessionId(), com.samvaad.samvaad_server.session.RevocationReason.USER_LOGOUT);
+        }
 
-        int concurrentAttempts = 6;
+        int concurrentAttempts = 4;
+        List<UUID> attemptSessions = new ArrayList<>();
+        for (int i = 0; i < concurrentAttempts; i++) {
+            attemptSessions.add(login(user.getUsername()).sessionId());
+        }
         ExecutorService executor = Executors.newFixedThreadPool(concurrentAttempts);
         CyclicBarrier barrier = new CyclicBarrier(concurrentAttempts);
         AtomicInteger successes = new AtomicInteger(0);
         AtomicInteger limitExceeded = new AtomicInteger(0);
         List<Future<?>> futures = new ArrayList<>();
 
-        for (int i = 1; i <= concurrentAttempts; i++) {
-            final int seed = 300 + i;
+        for (int i = 0; i < concurrentAttempts; i++) {
+            final int seed = 310 + i;
+            final UUID sessionId = attemptSessions.get(i);
             futures.add(executor.submit(() -> {
                 try {
                     barrier.await(30, TimeUnit.SECONDS);
-                    deviceService.enrollDevice(user.getUserId(), bootstrapLogin.sessionId(),
+                    deviceService.enrollDevice(user.getUserId(), sessionId,
                             E2eeTestKeys.enrollRequest(seed, ClientPlatform.WEB));
                     successes.incrementAndGet();
                 } catch (DeviceLimitExceededException e) {
@@ -153,8 +170,8 @@ class E2eeConcurrencyIntegrationTest {
         }
         executor.shutdown();
 
-        // One bootstrap exists; exactly four of six concurrent enrollments may succeed.
-        assertEquals(4, successes.get(), "Exactly four concurrent enrollments must succeed");
+        // Three slots taken; exactly two of four concurrent enrollments may succeed.
+        assertEquals(2, successes.get(), "Exactly two concurrent enrollments must succeed");
         assertEquals(2, limitExceeded.get(), "Remaining enrollments must hit the device limit");
         long enrolled = deviceRepo.countByUserAndStatusIn(user,
                 java.util.EnumSet.of(DeviceStatus.PENDING, DeviceStatus.ACTIVE));
@@ -223,6 +240,9 @@ class E2eeConcurrencyIntegrationTest {
         String code = first.getRecoveryCodes().get(0);
         deviceService.revokeDevice(user.getUserId(), first.getDevice().getDeviceId());
 
+        // Revocation killed the enrolling session; both racers share one
+        // fresh unbound session so the race is on code consumption alone.
+        UUID raceSessionId = login(user.getUsername()).sessionId();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CyclicBarrier barrier = new CyclicBarrier(2);
@@ -238,11 +258,13 @@ class E2eeConcurrencyIntegrationTest {
                     request.setRecoveryCode(code);
                     request.setDevice(E2eeTestKeys.enrollRequest(seed, ClientPlatform.ANDROID));
                     DeviceDto recovered = deviceService.recoverEnroll(
-                            user.getUserId(), login.sessionId(), request);
+                            user.getUserId(), raceSessionId, request);
                     if (recovered != null && recovered.getStatus() == DeviceStatus.ACTIVE) {
                         successes.incrementAndGet();
                     }
-                } catch (InvalidRecoveryCodeException e) {
+                } catch (InvalidRecoveryCodeException | SessionAlreadyBoundException e) {
+                    // Lost the consumption race, or ran after the winner
+                    // bound the shared session: both are correct rejections.
                     rejected.incrementAndGet();
                 } catch (Exception e) {
                     throw new AssertionError("Unexpected exception during concurrent recovery", e);
