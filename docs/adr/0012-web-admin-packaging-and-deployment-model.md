@@ -35,7 +35,7 @@ Docker additionally provides the implemented reproducible distribution/deploymen
 The two supported operational modes are therefore:
 
 - **Standalone JAR:** an operator supplies/configures PostgreSQL and runs the Samvaad executable JAR.
-- **Docker Compose:** an operator uses the containerized Samvaad application together with the Compose-managed PostgreSQL instance. The runtime image uses the Alpine-based Temurin 25 JRE; the build uses Docker Buildx/BuildKit; `scripts/build.sh` also exports `server/build/samvaad-server.tar.gz` as a portable image artifact.
+- **Docker Compose:** an operator uses the containerized Samvaad application together with the Compose-managed PostgreSQL instance. The build uses Docker Buildx/BuildKit; `scripts/build.sh` also exports `server/build/samvaad-server.tar.gz` as a portable image artifact. The E2EE runtime path requires a glibc-based Temurin 25 runtime; the current Alpine runtime must be replaced before libsignal-backed production deployment.
 
 Application configuration, including database connection details and other deployment-sensitive values, must be externalized from the JAR. Secrets must not be baked into the artifact. Direct-access TLS configuration and persisted TLS identity are also external to the JAR and are defined by ADR 0017.
 
