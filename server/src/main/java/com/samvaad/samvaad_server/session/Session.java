@@ -29,6 +29,17 @@ public class Session extends AuditableEntity {
     @Column(name = "installation_id", length = 255)
     private String installationId;
 
+    /**
+     * Nullable binding to a cryptographic E2EE device
+     * ({@code e2ee_devices.device_id}). This is revocation/trust metadata
+     * only: it is never an authentication primitive and must never be
+     * reinterpreted as installation identity. A session may only become
+     * bound to a device at that device's own enrollment; there is no API
+     * that binds an existing session to an already-existing device.
+     */
+    @Column(name = "device_id")
+    private UUID deviceId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "client_platform", nullable = false, length = 16)
     private ClientPlatform clientPlatform;
@@ -95,6 +106,14 @@ public class Session extends AuditableEntity {
 
     public void setInstallationId(String installationId) {
         this.installationId = installationId;
+    }
+
+    public UUID getDeviceId() {
+        return deviceId;
+    }
+
+    public void setDeviceId(UUID deviceId) {
+        this.deviceId = deviceId;
     }
 
     public ClientPlatform getClientPlatform() {

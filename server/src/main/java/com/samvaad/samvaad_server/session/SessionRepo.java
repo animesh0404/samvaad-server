@@ -31,4 +31,20 @@ public interface SessionRepo extends JpaRepository<Session, UUID> {
     @Modifying
     @Query("DELETE FROM Session s WHERE s.user.userId = :userId")
     void deleteByUserId(@Param("userId") UUID userId);
+
+    /**
+     * Revokes every still-active session bound to the given device. Used for
+     * E2EE device revocation: an old session/JWT must not remain an
+     * alternative path around device revocation. Returns the revoked count.
+     */
+    @Modifying
+    @Query("""
+        UPDATE Session s
+        SET s.revokedAt = :revokedAt, s.revocationReason = :reason
+        WHERE s.deviceId = :deviceId AND s.revokedAt IS NULL
+    """)
+    int revokeActiveSessionsByDeviceId(
+            @Param("deviceId") UUID deviceId,
+            @Param("revokedAt") LocalDateTime revokedAt,
+            @Param("reason") RevocationReason reason);
 }
