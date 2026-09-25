@@ -390,7 +390,7 @@ profile visibility + chat
 
 The existing direct-conversation, message, history, ordering, read-state, and persistence decisions remain in force unless explicitly superseded by an ADR.
 
-Features such as reactions, attachments, groups, rich text, and E2EE remain outside the V1 boundary as recorded in the relevant ADRs.
+Features such as reactions, attachments, groups, and rich text remain outside the V1 boundary as recorded in the relevant ADRs. V1 E2EE one-to-one messaging is now admitted into scope by ADR 0018; group E2EE remains deferred.
 
 For the latest authoritative relationship and authorization decisions, see:
 
