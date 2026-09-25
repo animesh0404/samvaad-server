@@ -21,3 +21,11 @@ databaseChangeLog:
       file: db/changelog/changes/010-create-conversations-and-messages.yaml
   - include:
       file: db/changelog/changes/011-make-installation-id-nullable.yaml
+  - include:
+      file: db/changelog/changes/012-create-e2ee-devices.yaml
+  - include:
+      file: db/changelog/changes/013-create-e2ee-one-time-prekeys.yaml
+  - include:
+      file: db/changelog/changes/014-create-e2ee-recovery-codes.yaml
+  - include:
+      file: db/changelog/changes/015-add-sessions-device-id.yaml

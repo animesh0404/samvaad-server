@@ -1,0 +1,116 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-create-e2ee-devices
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: e2ee_devices
+            columns:
+              - column:
+                  name: device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: registration_id
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: device_identity_public_key
+                  type: BYTEA
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: signed_prekey_id
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: signed_prekey
+                  type: BYTEA
+                  constraints:
+                    nullable: false
+              - column:
+                  name: signed_prekey_signature
+                  type: BYTEA
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: client_platform
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: client_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: client_version
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: revoked_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: revocation_reason
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: last_active_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_devices
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_e2ee_devices_user
+        - createIndex:
+            tableName: e2ee_devices
+            indexName: idx_e2ee_devices_user_status
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: status
+        - sql:
+            sql: ALTER TABLE e2ee_devices ADD CONSTRAINT ck_e2ee_devices_status CHECK (status IN ('PENDING', 'ACTIVE', 'REVOKED'))

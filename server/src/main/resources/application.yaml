@@ -11,6 +11,11 @@ spring:
 samvaad:
   auth:
     jwt-secret: ${SAMVAAD_JWT_SECRET}
+  e2ee:
+    # Time-to-live for PENDING device enrollments awaiting trusted-device
+    # approval. Abandoned pending enrollments are lazily expired so they do
+    # not permanently consume one of the five device slots.
+    pending-device-ttl: P7D
   logging:
     file:
       name: logs/samvaad.log

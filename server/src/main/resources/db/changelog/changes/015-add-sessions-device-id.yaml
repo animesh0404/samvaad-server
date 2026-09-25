@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-add-sessions-device-id
+      author: Animesh Kahara
+      changes:
+        - addColumn:
+            tableName: sessions
+            columns:
+              - column:
+                  name: device_id
+                  type: UUID
+                  constraints:
+                    nullable: true
+        - addForeignKeyConstraint:
+            baseTableName: sessions
+            baseColumnNames: device_id
+            referencedTableName: e2ee_devices
+            referencedColumnNames: device_id
+            constraintName: fk_sessions_device
+        - createIndex:
+            tableName: sessions
+            indexName: idx_sessions_device_active
+            columns:
+              - column:
+                  name: device_id
+              - column:
+                  name: revoked_at

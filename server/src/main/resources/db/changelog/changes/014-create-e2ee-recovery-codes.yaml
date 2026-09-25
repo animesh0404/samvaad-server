@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-create-e2ee-recovery-codes
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: e2ee_recovery_codes
+            columns:
+              - column:
+                  name: recovery_code_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: set_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_position
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_hash
+                  type: VARCHAR(72)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: consumed_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: superseded_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_recovery_codes
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_e2ee_recovery_user
+        - addUniqueConstraint:
+            tableName: e2ee_recovery_codes
+            columnNames: user_id, set_id, code_position
+            constraintName: uq_e2ee_recovery_user_set_position
+        - createIndex:
+            tableName: e2ee_recovery_codes
+            indexName: idx_e2ee_recovery_user_set
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: set_id
+              - column:
+                  name: consumed_at

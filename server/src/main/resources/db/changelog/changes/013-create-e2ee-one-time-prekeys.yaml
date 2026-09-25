@@ -1,0 +1,78 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-create-e2ee-one-time-prekeys
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: e2ee_one_time_prekeys
+            columns:
+              - column:
+                  name: one_time_prekey_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prekey_id
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: public_key
+                  type: BYTEA
+                  constraints:
+                    nullable: false
+              - column:
+                  name: consumed_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: consumed_by_request_id
+                  type: UUID
+                  constraints:
+                    nullable: true
+                    unique: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_one_time_prekeys
+            baseColumnNames: device_id
+            referencedTableName: e2ee_devices
+            referencedColumnNames: device_id
+            constraintName: fk_e2ee_otpk_device
+        - addUniqueConstraint:
+            tableName: e2ee_one_time_prekeys
+            columnNames: device_id, prekey_id
+            constraintName: uq_e2ee_otpk_device_prekey
+        - createIndex:
+            tableName: e2ee_one_time_prekeys
+            indexName: idx_e2ee_otpk_device_consumed
+            columns:
+              - column:
+                  name: device_id
+              - column:
+                  name: consumed_at
