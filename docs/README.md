@@ -54,7 +54,7 @@ Realtime V1 provides:
 
 A manual smoke test has verified authenticated clients connecting, subscribing to the same conversation, and realtime message delivery without polling. See [Realtime V1 Smoke Test](verification/realtime-smoke-test.md).
 
-The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, external brokers/horizontal scaling, and end-to-end encryption remain deferred.
+The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. V1 E2EE architecture is locked by ADR 0018 and is the next implementation slice.
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 
