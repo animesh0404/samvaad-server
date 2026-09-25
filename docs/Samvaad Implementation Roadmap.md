@@ -132,27 +132,33 @@ Locked direction:
 - the first supported client may be Web, Android, or TUI;
 - each device generates and retains its private cryptographic material locally;
 - the server maintains a device record containing public identity/prekey material, enrollment status, and required device metadata;
+- each enrolled device maintains 100 one-time prekeys initially and replenishes when fewer than 20 remain;
+- one-time prekeys are used for session establishment, not per-message encryption;
 - account-level one-time recovery codes are established after first-device setup;
 - the initial recovery-code batch contains 25 one-time codes;
 - rollover is required when the user reaches the final-code warning threshold, with the 24th consumed code leaving one final code and triggering prominent renewal guidance;
 - after first enrollment, new devices require approval by an existing trusted device or an unused recovery code;
 - revoking a device terminates all authenticated server sessions belonging to that device and excludes it from future E2EE participation;
+- a previously trusted device identity-key change is treated as a security-relevant event and pauses encrypted communication with that device until the new identity is explicitly verified/accepted;
 - newly enrolled devices become eligible for future encrypted messages immediately; old history is restored separately through encrypted-history recovery;
 - the sender's crypto layer produces device-specific encrypted envelopes; the server only stores/routes ciphertext;
+- server-visible message metadata is limited to what is required for routing, ordering, delivery, synchronization, and necessary abuse protection; message content and non-essential message metadata remain inside authenticated encrypted payloads;
 - offline device mailboxes retain encrypted envelopes until successful receipt acknowledgement;
 - encrypted message ciphertext remains in permanent conversation history after delivery;
 - each conversation has a server-assigned monotonically increasing sequence number, and each device tracks a per-conversation synchronization cursor;
 - encrypted chat-history backup is a separate concern from account recovery and device identity; V1 uses full encrypted backups with a durable backup-root key, optional passphrase protection, and local encrypted-file restoration;
+- V1 backup encryption uses ChaCha20-Poly1305 AEAD with unique nonces per encryption operation;
 - automatic local backup is enabled by default on a configurable fixed wall-clock schedule, with 2:00 AM as the default time; only changed histories are backed up and one automatic backup is retained;
 - future group chat remains outside V1 and is reserved for a group protocol such as MLS;
-- Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture.
+- Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture;
+- browser/Angular may use a different compatible cryptographic implementation from JVM/Android/TUI as long as all clients follow the same Samvaad protocol semantics and wire contracts.
 
 Immediate work before production implementation:
 1. complete remaining target-specific Signal-family validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints;
 2. define the Samvaad-owned crypto boundary;
 3. define device, public-key/prekey directory, session, envelope, mailbox, conversation-history, synchronization-cursor, and recovery state contracts;
-4. define device approval, QR pairing, revocation, and recovery ceremonies;
-5. define ciphertext history and backup/recovery-key hierarchy;
+4. define device approval, QR pairing, revocation, key-change, and recovery ceremonies;
+5. define the ciphertext history and backup/recovery-key hierarchy, including the exact backup file format and key derivation;
 6. reconcile first-login password setup with the existing authentication ADR;
 7. then replace the current plaintext message contract and persistence model.
 
