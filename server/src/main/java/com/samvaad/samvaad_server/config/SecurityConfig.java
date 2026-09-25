@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/friend-requests/**").authenticated()
                         .requestMatchers("/api/friends/**").authenticated()
                         .requestMatchers("/api/conversations/**").authenticated()
+                        .requestMatchers("/api/e2ee/**").authenticated()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/login", "/profile", "/users", "/users/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/*.js", "/*.css", "/*.png", "/*.ico", "/*.webmanifest").permitAll()

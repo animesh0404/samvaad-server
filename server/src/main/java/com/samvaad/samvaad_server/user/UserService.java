@@ -2,6 +2,9 @@ package com.samvaad.samvaad_server.user;
 
 import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
+import com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo;
+import com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo;
+import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.Conversation;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
@@ -34,6 +37,9 @@ public class UserService {
     private final FriendRequestRepo friendRequestRepo;
     private final MessageRepo messageRepo;
     private final ConversationRepo conversationRepo;
+    private final E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
+    private final E2eeDeviceRepo deviceRepo;
+    private final E2eeRecoveryCodeRepo recoveryCodeRepo;
     private final PasswordEncoder passwordEncoder;
 
     public UserService(
@@ -44,6 +50,9 @@ public class UserService {
             FriendRequestRepo friendRequestRepo,
             MessageRepo messageRepo,
             ConversationRepo conversationRepo,
+            E2eeOneTimePrekeyRepo oneTimePrekeyRepo,
+            E2eeDeviceRepo deviceRepo,
+            E2eeRecoveryCodeRepo recoveryCodeRepo,
             PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
         this.userProfileService = userProfileService;
@@ -52,6 +61,9 @@ public class UserService {
         this.friendRequestRepo = friendRequestRepo;
         this.messageRepo = messageRepo;
         this.conversationRepo = conversationRepo;
+        this.oneTimePrekeyRepo = oneTimePrekeyRepo;
+        this.deviceRepo = deviceRepo;
+        this.recoveryCodeRepo = recoveryCodeRepo;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -105,7 +117,12 @@ public class UserService {
 
         // Explicit dependent cleanup in foreign-key-safe order. The schema
         // keeps RESTRICT foreign keys as a backstop; no JPA cascades are used.
+        // E2EE children precede their device parents; sessions already carry
+        // the device binding, so sessions are removed before devices.
+        oneTimePrekeyRepo.deleteByDeviceUserId(userId);
         sessionRepo.deleteByUserId(userId);
+        deviceRepo.deleteByUserId(userId);
+        recoveryCodeRepo.deleteByUserId(userId);
         userProfileRepo.deleteById(userId);
         friendRequestRepo.deleteByParticipantUserId(userId);
         messageRepo.deleteBySenderUserId(userId);

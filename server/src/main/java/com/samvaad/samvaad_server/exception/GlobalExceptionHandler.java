@@ -1,5 +1,16 @@
 package com.samvaad.samvaad_server.exception;
 
+import com.samvaad.samvaad_server.e2ee.dto.E2eeErrorResponse;
+import com.samvaad.samvaad_server.e2ee.exception.DeviceAlreadyExistsException;
+import com.samvaad.samvaad_server.e2ee.exception.DeviceApprovalDeniedException;
+import com.samvaad.samvaad_server.e2ee.exception.DeviceLimitExceededException;
+import com.samvaad.samvaad_server.e2ee.exception.DeviceNotActiveException;
+import com.samvaad.samvaad_server.e2ee.exception.DeviceNotFoundException;
+import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
+import com.samvaad.samvaad_server.e2ee.exception.InvalidPrekeyBatchException;
+import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
+import com.samvaad.samvaad_server.e2ee.exception.PrekeyClaimConflictException;
+import com.samvaad.samvaad_server.e2ee.exception.RecoveryRequiredException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestConflictException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestNotFoundException;
 import com.samvaad.samvaad_server.messaging.ConversationNotFoundException;
@@ -127,6 +138,66 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleForbidden(ForbiddenOperationException ex) {
         return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(DeviceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleDeviceNotFound(DeviceNotFoundException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(DeviceAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDeviceAlreadyExists(DeviceAlreadyExistsException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(DeviceLimitExceededException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDeviceLimitExceeded(DeviceLimitExceededException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(DeviceNotActiveException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDeviceNotActive(DeviceNotActiveException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(DeviceApprovalDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleDeviceApprovalDenied(DeviceApprovalDeniedException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidKeyMaterialException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidKeyMaterial(InvalidKeyMaterialException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPrekeyBatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidPrekeyBatch(InvalidPrekeyBatchException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidRecoveryCodeException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleInvalidRecoveryCode(InvalidRecoveryCodeException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(PrekeyClaimConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handlePrekeyClaimConflict(PrekeyClaimConflictException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(RecoveryRequiredException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public E2eeErrorResponse handleRecoveryRequired(RecoveryRequiredException ex) {
+        return new E2eeErrorResponse(ex.getMessage(), RecoveryRequiredException.REASON);
     }
 
     public record ErrorResponse(String message) {
