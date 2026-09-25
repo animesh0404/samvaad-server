@@ -127,7 +127,7 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - message editing/deletion/replies
 - blocking, unfriend, mute, archive
 - horizontal scaling/external brokers/general event bus
-- end-to-end encryption
+- group E2EE / MLS implementation
 - rate limiting and stable machine-readable error codes
 - dedicated conversation recency field if `updatedAt` later proves insufficient
 - friend-gated profile visibility
