@@ -24,7 +24,7 @@
 - Operational log files use configurable size-based rolling, compressed archives, and bounded retention; the default retention target is 50 rolled files.
 
 
-## E2EE enrollment security boundary
+## E2EE enrollment and device security boundary
 
 The V1 E2EE enrollment flow distinguishes first-device bootstrap from recovery-required enrollment.
 
@@ -34,7 +34,9 @@ The V1 E2EE enrollment flow distinguishes first-device bootstrap from recovery-r
 - Recovery-code consumption is atomic with successful recovery enrollment.
 - Device revocation terminates all authenticated sessions belonging to that device, so stale sessions cannot bypass cryptographic device revocation.
 
-The enrollment state machine is defined by ADR 0018 and remains unimplemented in the current server.
+The enrollment state machine defined by ADR 0018 is implemented in the server-side E2EE foundation. The implemented boundary covers device enrollment state, trusted-device approval authorization, recovery-required enrollment, session-to-device binding, device revocation/session termination, one-time prekey handling, recipient device discovery, and account-level recovery-code handling.
+
+This is not yet full E2EE message confidentiality. Signal/Sesame session establishment, client-side cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, history synchronization, and encrypted history backup/restoration remain unimplemented. The current direct-message content path therefore remains server-readable plaintext until the subsequent messaging-encryption slice replaces it.
 
 ## Deferred / future
 
@@ -46,4 +48,4 @@ The enrollment state machine is defined by ADR 0018 and remains unimplemented in
 - Rate limiting and stable machine-readable error codes.
 - Full audit/event-history policy beyond operational logging.
 - Horizontal scaling/external brokers and a crash-safe outbox.
-- E2EE implementation and rollout; architecture is locked by ADR 0018 and remains unimplemented.
+- Full E2EE message implementation and rollout; the device/prekey foundation is implemented and architecture remains governed by ADR 0018.

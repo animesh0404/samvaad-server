@@ -100,7 +100,7 @@ See `docs/development/setup.md` for the full packaging and deployment reference.
 
 ## Current Status
 
-The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, and the current administrative user-deletion slice are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
+The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, the current administrative user-deletion slice, and the V1 E2EE device/prekey foundation are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
 
 Currently implemented:
 
@@ -127,7 +127,9 @@ Currently implemented:
 - Typing/presence, delivery receipts, and push notifications.
 - Message editing/deletion/replies.
 - Blocking, unfriend, archiving, and mute preferences.
-- Horizontal scaling/external brokers, a general event bus, and end-to-end encryption.
+- Horizontal scaling/external brokers and a general event bus.
+- **V1 E2EE device/prekey foundation**: independent cryptographic device records, enrollment/recovery state machine, trusted-device approval seam, device revocation/session termination, five-device cap, one-time prekey upload/claim, recipient device directory, and account-level recovery-code handling.
+- **Full E2EE messaging is not yet implemented**: Signal/Sesame session establishment, client-side persistent cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, encrypted history synchronization, and encrypted history backup/restoration remain future slices.
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
@@ -254,4 +256,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**Public deployment edge and operational hardening**: application packaging, Docker deployment, versioned release publication, external deployment credentials, application-managed TLS for direct access, and the Unix/Windows installer workflow are implemented. Remaining deployment work is the concrete public TLS/reverse-proxy setup, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard.
+**V1 E2EE messaging implementation**: the server-side device, enrollment, recovery-code, prekey, and device-directory foundation is implemented. The next E2EE work is the Samvaad-owned crypto/session boundary and target-specific Signal-family integration, followed by encrypted message envelopes and migration of the current plaintext message contract. Public deployment edge configuration, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard remain separate deployment work.

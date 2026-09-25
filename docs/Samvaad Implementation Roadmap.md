@@ -120,7 +120,9 @@ Implemented deployment details include the multi-stage Dockerfile, Alpine Temuri
 
 ## V1 E2EE Device & Signal/Sesame Foundation
 
-NEXT IMPLEMENTATION SLICE — ARCHITECTURE LOCKED.
+COMPLETE — SERVER-SIDE FOUNDATION IMPLEMENTED.
+
+The architecture remains governed by ADR 0018. This slice establishes the server-side E2EE trust/device foundation; it does not yet encrypt message content.
 
 The V1 messaging confidentiality direction is fixed by [ADR 0018](adr/0018-v1-e2ee-signal-sesame-and-independent-device-identity.md).
 
@@ -157,14 +159,15 @@ Locked direction:
 - Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture;
 - browser/Angular may use a different compatible cryptographic implementation from JVM/Android/TUI as long as all clients follow the same Samvaad protocol semantics and wire contracts.
 
-Immediate work before production implementation:
+Remaining E2EE implementation work:
 1. complete remaining target-specific Signal-family validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints;
-2. define the Samvaad-owned crypto boundary;
-3. define device, public-key/prekey directory, session, envelope, mailbox, conversation-history, synchronization-cursor, and recovery state contracts;
-4. define device approval, QR pairing, revocation, key-change, and recovery ceremonies;
-5. define the ciphertext history and backup/recovery-key hierarchy, including the exact backup file format and key derivation;
-6. reconcile first-login password setup with the existing authentication ADR;
-7. then replace the current plaintext message contract and persistence model.
+2. implement the Samvaad-owned crypto/session boundary and Signal/Sesame session state;
+3. implement encrypted message envelopes, per-device mailboxes, and ciphertext conversation history while preserving existing authorization, sequencing, and idempotency invariants;
+4. implement per-device synchronization and missed-message handling;
+5. define and implement the exact ciphertext-history and backup/recovery-key hierarchy, including backup file format and key derivation;
+6. implement client-side persistent cryptographic state and target-specific Web/Android/TUI integration;
+7. reconcile first-login password setup with the existing authentication ADR;
+8. migrate the current plaintext message contract and persistence model to encrypted envelopes.
 
 ## Later / deferred
 

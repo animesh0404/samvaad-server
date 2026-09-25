@@ -312,6 +312,25 @@ These are implementation consequences and are not solved by this ADR.
 - **ADR 0009:** STOMP remains a transport concern. E2EE introduces encrypted envelopes and asynchronous delivery semantics above/beside that transport.
 - **ADR 0010:** remains authoritative that `installationId` is optional session metadata. E2EE device identity is a new independent concept.
 
+## Implementation status
+
+The server-side **V1 E2EE Device & Prekey Foundation** defined by this ADR is implemented.
+
+Implemented foundation includes:
+
+- independent E2EE device records and PENDING/ACTIVE/REVOKED lifecycle;
+- first-device bootstrap, trusted-device enrollment, and recovery-required enrollment state handling;
+- trusted-device approval authorization seam;
+- session-to-device binding and prevention of session rebinding during enrollment;
+- five-device non-REVOKED enrollment limit and pending-device expiry;
+- public identity/signed-prekey storage and one-time prekey upload/atomic claim;
+- friendship-gated recipient device discovery;
+- account-level 25-code recovery sets with hashed storage and atomic single-use consumption;
+- device revocation with server-session termination;
+- Samvaad-owned validation/authorization seams and regression coverage for concurrency and security boundaries.
+
+The implementation intentionally does **not** yet provide full E2EE message confidentiality. Signal/Sesame session establishment, client-side persistent cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, per-device synchronization, encrypted history backup/restoration, and target-specific Web/Android/TUI cryptographic clients remain future implementation work.
+
 ## Implementation entry condition
 
 The initial Signal-family feasibility validation has established the Java 25 server-side libsignal path and its glibc runtime requirement. The implementation path still requires validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints before production adoption. The exact backup file format and key-derivation serialization remain implementation details, while the V1 cipher choice is fixed above.

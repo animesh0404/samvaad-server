@@ -32,11 +32,13 @@ The full suite also verifies that existing HTTP behavior remains passing after t
 
 ## What the Tests Currently Establish
 
-The automated suite provides evidence for the implemented user/profile, authentication/session, relationship, direct-messaging write, conversation/message read, and Realtime V1 foundations.
+The automated suite provides evidence for the implemented user/profile, authentication/session, relationship, direct-messaging write, conversation/message read, Realtime V1, and E2EE device/prekey foundation slices.
 
 Realtime V1 specifically establishes that authentication uses the existing JWT/session model, participant subscriptions are authorized, STOMP sends reuse the existing message business logic, persistence precedes broadcast, idempotent replay does not create a second message, and failed sends do not produce a persisted/broadcast message.
 
-The suite does **not** establish the full planned messaging system. Reconnect/missed-event synchronization, offline queues, persistent read state, typing/presence, delivery receipts, push notifications, message mutations/replies, relationship controls, horizontal scaling/external brokers, and end-to-end encryption remain outside the implemented slices.
+The suite does **not** establish the full planned messaging system. Reconnect/missed-event synchronization, offline queues, persistent read state, typing/presence, delivery receipts, push notifications, message mutations/replies, relationship controls, horizontal scaling/external brokers, Signal/Sesame message sessions, encrypted message envelopes/mailboxes, ciphertext history, history synchronization, client cryptographic persistence, or encrypted history backup/restoration remain outside the implemented slices.
+
+The E2EE foundation has dedicated integration, concurrency, and security regression coverage for device enrollment, approval, revocation, prekey handling, recovery enrollment, recovery-code consumption, device limits, and validation/error paths.
 
 ## Manual Verification
 

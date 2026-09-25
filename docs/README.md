@@ -22,6 +22,10 @@ The server provides authentication and persisted sessions, user/profile operatio
 
 Administrative hard deletion is implemented as explicit transactional cleanup rather than database `ON DELETE CASCADE`. A deletion locks the user row, removes sessions, profile, friend requests, sent messages, conversations involving the user and their messages, then removes the user row. The existing RESTRICT foreign keys remain database backstops. Successful deletion is `204 No Content`; a residual concurrent deletion conflict is `409 Conflict`.
 
+## V1 E2EE Device & Prekey Foundation
+
+The server-side E2EE device/enrollment/prekey/recovery foundation is implemented. Full E2EE message confidentiality remains unimplemented and is governed by ADR 0018.
+
 ## Web Admin
 
 The Web Admin first implementation slice is now implemented under `web-admin/`.
@@ -54,7 +58,7 @@ Realtime V1 provides:
 
 A manual smoke test has verified authenticated clients connecting, subscribing to the same conversation, and realtime message delivery without polling. See [Realtime V1 Smoke Test](verification/realtime-smoke-test.md).
 
-The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. V1 E2EE architecture is locked by ADR 0018 and is the next implementation slice.
+The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. The V1 E2EE device/prekey foundation is implemented and governed by ADR 0018. Full E2EE messaging remains the next implementation area: Signal/Sesame session establishment, client cryptographic state, encrypted message envelopes/mailboxes, ciphertext history, synchronization, and encrypted backup remain unimplemented.
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 
