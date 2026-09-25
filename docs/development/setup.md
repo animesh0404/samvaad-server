@@ -382,7 +382,7 @@ Restart or stop the deployment without rebuilding:
 
 The Docker Compose deployment uses the `samvaad` project name and a separate PostgreSQL volume/network from the `server/compose.yaml` development database and from the `compose.dev.yaml` local-build stack. PostgreSQL is not published to the host by the deployment Compose file.
 
-The Docker runtime image contains the Spring Boot executable JAR and the Java 25 Alpine JRE only; Node, npm, Gradle, source files, and frontend `node_modules` are build-stage content and are not included in the runtime image.
+The Docker runtime image contains the Spring Boot executable JAR and a Java 25 JRE only; Node, npm, Gradle, source files, and frontend `node_modules` are build-stage content and are not included in the runtime image. The E2EE/libsignal runtime requires a glibc-based JRE image rather than Alpine/musl.
 
 ---
 
