@@ -23,6 +23,19 @@
 - Operational logging is intended to capture meaningful business/application and security/authentication events with traceable correlation context, while avoiding routine low-level CRUD logging and sensitive authentication secrets.
 - Operational log files use configurable size-based rolling, compressed archives, and bounded retention; the default retention target is 50 rolled files.
 
+
+## E2EE enrollment security boundary
+
+The V1 E2EE enrollment flow distinguishes first-device bootstrap from recovery-required enrollment.
+
+- First-device bootstrap is allowed only for an account that has never completed a trusted E2EE device enrollment.
+- If an existing account has one or more ACTIVE E2EE devices, a new device must receive explicit approval from an already trusted device before becoming fully trusted.
+- If an existing account has previously completed E2EE enrollment but has zero ACTIVE E2EE devices, the account is in recovery-required enrollment. Account credentials alone do not complete authentication; an unused account-level recovery code is required.
+- Recovery-code consumption is atomic with successful recovery enrollment.
+- Device revocation terminates all authenticated sessions belonging to that device, so stale sessions cannot bypass cryptographic device revocation.
+
+The enrollment state machine is defined by ADR 0018 and remains unimplemented in the current server.
+
 ## Deferred / future
 
 - Reconnect/missed-event synchronization and offline queues.

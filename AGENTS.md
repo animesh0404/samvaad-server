@@ -42,3 +42,5 @@ means unresolved: do not present an implementation choice as already accepted.
 - Keep changes scoped. Add or update tests for behavior changes, including
   boundary, authorization, persistence, and concurrency tests where relevant.
 - Do not commit or push unless explicitly instructed.
+
+- E2EE enrollment trust is part of authentication: first-device bootstrap applies only to accounts with no completed E2EE enrollment; existing accounts with ACTIVE devices require trusted-device approval for a new device, while existing accounts with zero ACTIVE devices require recovery-code enrollment. Do not treat zero active devices as a new-account bootstrap state.

@@ -138,6 +138,10 @@ Locked direction:
 - the initial recovery-code batch contains 25 one-time codes;
 - rollover is required when the user reaches the final-code warning threshold, with the 24th consumed code leaving one final code and triggering prominent renewal guidance;
 - after first enrollment, new devices require approval by an existing trusted device or an unused recovery code;
+- first-device bootstrap is distinct from later device enrollment: an account with no completed E2EE enrollment may complete its first device setup using account credentials, while an existing account with zero ACTIVE E2EE devices enters recovery-required enrollment rather than bootstrap;
+- when trusted devices exist, a new device does not receive a fully trusted authenticated session until an existing trusted device approves it;
+- when an existing account has zero ACTIVE E2EE devices, account credential validation may establish only a provisional recovery context; an unused recovery code is required before authentication and enrollment complete and the new device becomes ACTIVE;
+- recovery-code consumption is atomic with successful recovery enrollment;
 - revoking a device terminates all authenticated server sessions belonging to that device and excludes it from future E2EE participation;
 - a previously trusted device identity-key change is treated as a security-relevant event and pauses encrypted communication with that device until the new identity is explicitly verified/accepted;
 - newly enrolled devices become eligible for future encrypted messages immediately; old history is restored separately through encrypted-history recovery;

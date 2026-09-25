@@ -114,6 +114,19 @@ See ADR 0013 for the durable TLS termination decision.
 - `current-messaging-read-flow.puml` — HTTP conversation/message reads.
 - `current-realtime-message-flow.puml` — STOMP connect, subscription, send, persistence, and broadcast flow.
 
+
+## E2EE enrollment architecture: locked, implementation pending
+
+ADR 0018 defines the V1 E2EE enrollment state machine. Device enrollment is part of authentication/trust establishment rather than an independent post-login action.
+
+- An account that has never completed E2EE enrollment uses **first-device bootstrap**. The first supported client authenticates with the provisioned account credentials, creates its cryptographic identity locally, completes recovery-code setup, and becomes the first ACTIVE E2EE device.
+- An existing account with one or more ACTIVE E2EE devices requires **existing-device approval** before a newly presented device becomes trusted and receives a fully trusted authenticated session.
+- An existing account that previously completed E2EE enrollment but has **zero ACTIVE E2EE devices** enters **recovery-required enrollment**. It is not treated as a new account. Account credential validation alone is insufficient; an unused account-level recovery code is required to complete authentication/enrollment.
+- Recovery-code consumption is atomic with successful recovery enrollment.
+- Recovery creates a new cryptographic device identity. It does not recreate a revoked/lost device identity. Encrypted chat-history restoration remains a separate recovery mechanism.
+
+This is architectural state only; the enrollment implementation is not yet present in the current server.
+
 ## Realtime V1 boundary
 
 The WebSocket handshake is servlet-security-permitted, while actual authentication occurs on STOMP `CONNECT`. Subscription authorization is participant-only. Unknown and non-participant subscription destinations are rejected identically to avoid existence leakage. STOMP sends enter the existing message service and broadcast only after successful persistence.

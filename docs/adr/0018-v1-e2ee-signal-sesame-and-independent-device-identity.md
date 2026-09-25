@@ -110,6 +110,24 @@ At least two approval paths are required:
 
 The exact approval ceremony and QR transport/UI remain implementation details of the device-enrollment slice.
 
+### 6a. Enrollment state machine: bootstrap, trusted-device approval, and recovery
+
+Device enrollment is part of the authentication/trust-establishment flow. Account credential validation alone does not make a newly presented cryptographic device trusted after the account has already completed an E2EE enrollment.
+
+Samvaad distinguishes three enrollment states:
+
+1. **First-device bootstrap:** the account has never completed an E2EE device enrollment. The first supported client authenticates with the provisioned account credentials, generates its device identity locally, completes first-device setup and recovery-code setup, and the device becomes the first ACTIVE E2EE device.
+2. **Trusted-device enrollment:** the account has one or more ACTIVE E2EE devices. A new client may authenticate with the account credentials and generate a new local device identity, but authentication/enrollment is not completed until an already trusted device explicitly approves the new device.
+3. **Recovery-required enrollment:** the account has previously completed an E2EE device enrollment but currently has zero ACTIVE E2EE devices. This state is **not** treated as first-device bootstrap. A new client may validate the account credentials, but it must also prove possession of an unused account-level recovery code before authentication and device enrollment are completed and the new device becomes ACTIVE.
+
+The distinction between first-device bootstrap and recovery-required enrollment is based on whether the account has ever completed a trusted E2EE device enrollment, not merely on whether the current active-device count is zero.
+
+The authentication flow may use a provisional enrollment context while approval or recovery is pending, but it must not issue a fully trusted authenticated session for the new device before the required trust step succeeds.
+
+Recovery-code consumption and successful recovery enrollment must be atomic: a recovery code is consumed only as part of a successfully completed recovery enrollment, and a failed enrollment must not burn the code.
+
+A recovery enrollment establishes a new independent cryptographic device identity. It does not restore or reuse the revoked/lost device's cryptographic identity. Historical message restoration remains a separate encrypted-history recovery operation as defined below.
+
 ### 7. Device identity and server session remain separate
 
 A cryptographic device may have one or more authenticated server sessions during its lifetime.
