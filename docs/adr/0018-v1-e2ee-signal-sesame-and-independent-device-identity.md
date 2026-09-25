@@ -27,7 +27,7 @@ The intended responsibilities are:
 - asynchronous/offline encrypted-message delivery;
 - multi-device fan-out and device/session lifecycle management.
 
-The exact implementation library remains a separate engineering decision and must be validated for Java, browser, Android, and TUI targets before adoption.
+The selected Signal-family implementation must satisfy the Samvaad-owned crypto boundary and be validated for Java, browser, Android, and TUI targets before production adoption. The initial Java feasibility spike validated libsignal-client 0.86.5 on Java 25 with a glibc-based Temurin runtime; the browser, Android, and TUI paths still require target-specific validation.
 
 ### 2. Samvaad uses independent cryptographic devices
 
@@ -154,6 +154,8 @@ The server stores and routes these encrypted envelopes to per-device delivery ma
 
 If a recipient device is offline, its encrypted envelope remains available until that device receives it and acknowledges successful receipt.
 
+A device maintains a pool of one-time prekeys for asynchronous session establishment. V1 starts each enrolled device with **100 one-time prekeys** and replenishes the pool when fewer than **20 remain**. One-time prekeys are consumed for session establishment, not per message; if the pool is temporarily empty, session establishment may fall back to the signed prekey according to the selected Signal/Sesame implementation.
+
 Mailbox delivery state is separate from permanent conversation history. A delivery acknowledgement removes the device-specific mailbox copy only; it does not delete the message from conversation history.
 
 ### 11. Server-retained ciphertext history and per-device synchronization
@@ -203,7 +205,7 @@ A new device may restore historical chat state without authorization from a prev
 
 The backup contains enough encrypted message and conversation metadata to reconstruct the user's prior conversation history as a continuous stream. Backup restoration is part of new-device enrollment rather than a separate user-facing merge operation.
 
-For V1, backup storage is an encrypted file. Cloud backup providers such as Google Drive are future storage/synchronization adapters and are not required for the V1 cryptographic architecture.
+For V1, backup storage is an encrypted file. Backup encryption uses **ChaCha20-Poly1305 AEAD**. Each encryption operation uses a unique nonce; the nonce is stored with the ciphertext and is not secret. The exact key-derivation, backup-file serialization, associated-data fields, and versioning format remain implementation details of the backup contract. Cloud backup providers such as Google Drive are future storage/synchronization adapters and are not required for the V1 cryptographic architecture.
 
 ### 14. V1 local backup policy
 
@@ -236,13 +238,23 @@ MLS is therefore a future group-messaging direction, not a V1 dependency and not
 
 Signal/Sesame and future MLS group cryptography must remain separate protocol adapters behind Samvaad-owned application/crypto boundaries.
 
-### 16. Crypto implementation remains replaceable at the Samvaad boundary
+### 16. Message privacy boundary
+
+Only metadata required for routing, ordering, delivery, synchronization, and necessary abuse protection is server-visible. Message content and non-essential message metadata remain inside authenticated encrypted payloads.
+
+The server stores the metadata envelope and ciphertext needed for its authoritative sequencing and delivery responsibilities but does not decrypt message content.
+
+## Crypto implementation boundary
 
 Samvaad domain, persistence, transport contracts, and client APIs must not depend directly on a specific crypto library's internal classes.
 
-A Samvaad-owned cryptographic boundary must be capable of supporting the selected Signal/Sesame implementation for V1 and a future group protocol such as MLS.
+A Samvaad-owned cryptographic boundary must be capable of supporting the selected Signal/Sesame implementation for V1 and a future group protocol such as MLS. This is an architectural seam, not a requirement to implement multiple providers now.
 
-This is an architectural seam, not a requirement to implement multiple providers now.
+The browser client may use a different compatible cryptographic implementation from the JVM/Android/TUI clients, provided all clients implement the same Samvaad E2EE protocol semantics and wire contracts.
+
+## Identity-key change handling
+
+If a previously trusted device presents a different cryptographic identity key, Samvaad V1 treats this as a security-relevant key-change event. Encrypted communication with that device is paused until the new identity is explicitly verified/accepted. This is distinct from device revocation; the key-change handling must provide a path for legitimate device re-establishment without silently trusting the new identity.
 
 ## Consequences
 
@@ -269,9 +281,7 @@ These are implementation consequences and are not solved by this ADR.
 - exact Signal-family library selection;
 - exact QR enrollment ceremony;
 - exact recovery-code wrapping/rotation format;
-- exact backup file format;
 - backup storage provider and external-backup adapters;
-- metadata minimization beyond existing server-authoritative requirements;
 - receipts, typing/presence, attachments, reactions, edits, and other non-E2EE messaging features unless separately brought into scope.
 
 ## Relationship to existing ADRs
@@ -286,6 +296,6 @@ These are implementation consequences and are not solved by this ADR.
 
 ## Implementation entry condition
 
-The initial Signal-family feasibility validation has established the Java 25 server-side libsignal path and its glibc runtime requirement. The implementation path still requires validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints before production adoption.
+The initial Signal-family feasibility validation has established the Java 25 server-side libsignal path and its glibc runtime requirement. The implementation path still requires validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints before production adoption. The exact backup file format and key-derivation serialization remain implementation details, while the V1 cipher choice is fixed above.
 
 The next implementation slice is **V1 E2EE Device & Signal/Sesame Foundation**, beginning with protocol-boundary design and remaining target-specific feasibility validation rather than message UI work.
