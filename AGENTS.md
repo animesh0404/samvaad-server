@@ -31,8 +31,11 @@ means unresolved: do not present an implementation choice as already accepted.
   value when implementing this contract.
 - Never persist or log plaintext passwords. Passwords must use BCrypt when the
   authentication slice is implemented.
-- Do not implement V1-excluded features (including E2EE, attachments,
+- Do not implement V1-excluded features (including attachments,
   reactions, groups, and rich text) without an explicit scope decision.
+- V1 one-to-one E2EE is explicitly in scope and governed by ADR 0018. Do not
+  silently introduce a custom encryption design or change the locked E2EE
+  protocol/device/recovery decisions.
 - V1 application-level encryption of profile/private application data is
   deferred. Do not add fake encryption abstractions, but avoid coupling domain
   behavior and API contracts directly to persistence representation.
