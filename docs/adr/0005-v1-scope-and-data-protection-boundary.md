@@ -6,27 +6,32 @@ Accepted.
 
 ## Decision
 
-V1 excludes E2EE, attachments, reactions, groups, rich text, moderation, and
-other features listed in the original design record. Application-level
-encryption of profile/private application data is deliberately deferred for V1.
+V1 originally excluded E2EE, but that specific exclusion has been **superseded by ADR 0018**. ADR 0018 is now authoritative for V1 end-to-end encrypted one-to-one messaging.
 
-Passwords remain an exception: they use BCrypt, and plaintext passwords must
-never be persisted or logged. Deferring application-level encryption does not
-mean it is unnecessary permanently.
+The following original V1 exclusions remain in force unless explicitly superseded by a later ADR:
+
+- attachments
+- reactions
+- groups
+- rich text
+- moderation
+- other features not separately admitted into V1 scope
+
+Application-level encryption of non-message profile/private application data remains a separate future security concern unless explicitly brought into scope.
+
+Passwords remain an exception: they use BCrypt with generated salt, and plaintext passwords must never be persisted or logged.
+
+For messaging, the server is no longer permitted to persist message content in a server-readable plaintext representation once the ADR 0018 E2EE implementation slice is adopted. The E2EE design is client-side encryption with server-retained ciphertext and server-visible metadata limited to what is required for routing, ordering, delivery, synchronization, and necessary abuse protection.
 
 ## Consequences
 
-Do not implement profile/message application-level encryption or introduce
-placeholder encryption abstractions now. At the same time, avoid coupling
-domain behavior, API contracts, or messaging semantics to a specific plaintext
-persistence representation so that future protection can be introduced without
-a whole-system rewrite.
-
-Current profile/account fields are plaintext at rest; future application-level
-encryption is a planned security phase, not a current capability.
+- ADR 0018 governs the V1 messaging confidentiality boundary and supersedes this ADR's earlier E2EE deferral.
+- Do not reintroduce a separate plaintext message-storage path or a second encryption design outside the ADR 0018 protocol boundary.
+- Profile/account fields that are still outside the E2EE message boundary may remain server-readable unless a later decision protects them.
+- Existing domain behavior, API contracts, authorization, and messaging invariants should remain stable while the message persistence representation is migrated to ciphertext/encrypted-envelope storage.
 
 ## Source material
 
+- [ADR 0018: V1 E2EE, Signal/Sesame, and independent device identity](0018-v1-e2ee-signal-sesame-and-independent-device-identity.md)
 - `docs/Samvaad Product & Design Decisions.md`, sections 11 and 14
-- `docs/Samvaad Implementation Roadmap.md`, section 15
-- Reconciliation decision: V1 data encryption
+- `docs/Samvaad Implementation Roadmap.md`
