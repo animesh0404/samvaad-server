@@ -33,4 +33,4 @@
 - Rate limiting and stable machine-readable error codes.
 - Full audit/event-history policy beyond operational logging.
 - Horizontal scaling/external brokers and a crash-safe outbox.
-- End-to-end encryption.
+- E2EE implementation and rollout; architecture is locked by ADR 0018 and remains unimplemented.
