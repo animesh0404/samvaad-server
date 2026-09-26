@@ -227,11 +227,15 @@ class E2eeEnrollmentRegressionTest {
                     "deviceIdentityPublicKey": "%s",
                     "signedPrekeyId": 2531,
                     "signedPrekey": "%s",
-                    "signedPrekeySignature": "%s"
+                    "signedPrekeySignature": "%s",
+                    "kyberPrekeyId": 4531,
+                    "kyberPrekey": "%s",
+                    "kyberPrekeySignature": "%s"
                   }
                 }
                 """.formatted(code,
-                E2eeTestKeys.key(5311), E2eeTestKeys.key(5312), E2eeTestKeys.key(5313, 64));
+                E2eeTestKeys.key(5311), E2eeTestKeys.key(5312), E2eeTestKeys.key(5313, 64),
+                E2eeTestKeys.key(5314, 1569), E2eeTestKeys.key(5315, 64));
         mockMvc.perform(post("/api/e2ee/recovery/enroll")
                         .header("Authorization", "Bearer " + fresh.accessToken())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -309,6 +313,9 @@ class E2eeEnrollmentRegressionTest {
                   "signedPrekeyId": %d,
                   "signedPrekey": "%s",
                   "signedPrekeySignature": "%s",
+                  "kyberPrekeyId": %d,
+                  "kyberPrekey": "%s",
+                  "kyberPrekeySignature": "%s",
                   "clientPlatform": "WEB",
                   "clientName": "Test",
                   "clientVersion": "1.0.0"

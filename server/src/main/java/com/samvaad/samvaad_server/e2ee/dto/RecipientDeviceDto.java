@@ -16,6 +16,14 @@ public class RecipientDeviceDto {
     private String signedPrekey;
     private String signedPrekeySignature;
     private boolean hasAvailableOneTimePrekey;
+    /**
+     * Last-resort Kyber (PQXDH) public material. Null only for device rows
+     * enrolled before Kyber support; such rows cannot serve PQXDH bundles
+     * until the owner replaces the material.
+     */
+    private Integer kyberPrekeyId;
+    private String kyberPrekey;
+    private String kyberPrekeySignature;
 
     public RecipientDeviceDto() {
     }
@@ -74,5 +82,29 @@ public class RecipientDeviceDto {
 
     public void setHasAvailableOneTimePrekey(boolean hasAvailableOneTimePrekey) {
         this.hasAvailableOneTimePrekey = hasAvailableOneTimePrekey;
+    }
+
+    public Integer getKyberPrekeyId() {
+        return kyberPrekeyId;
+    }
+
+    public void setKyberPrekeyId(Integer kyberPrekeyId) {
+        this.kyberPrekeyId = kyberPrekeyId;
+    }
+
+    public String getKyberPrekey() {
+        return kyberPrekey;
+    }
+
+    public void setKyberPrekey(String kyberPrekey) {
+        this.kyberPrekey = kyberPrekey;
+    }
+
+    public String getKyberPrekeySignature() {
+        return kyberPrekeySignature;
+    }
+
+    public void setKyberPrekeySignature(String kyberPrekeySignature) {
+        this.kyberPrekeySignature = kyberPrekeySignature;
     }
 }

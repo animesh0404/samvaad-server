@@ -18,6 +18,13 @@ public class DeviceDto {
     private String deviceIdentityPublicKey;
     private int signedPrekeyId;
     private DeviceStatus status;
+    /**
+     * Owner's own last-resort Kyber (PQXDH) public material. Public bytes
+     * only; null for rows enrolled before Kyber support.
+     */
+    private Integer kyberPrekeyId;
+    private String kyberPrekey;
+    private String kyberPrekeySignature;
     private ClientPlatform clientPlatform;
     private String clientName;
     private String clientVersion;
@@ -58,6 +65,30 @@ public class DeviceDto {
 
     public void setSignedPrekeyId(int signedPrekeyId) {
         this.signedPrekeyId = signedPrekeyId;
+    }
+
+    public Integer getKyberPrekeyId() {
+        return kyberPrekeyId;
+    }
+
+    public void setKyberPrekeyId(Integer kyberPrekeyId) {
+        this.kyberPrekeyId = kyberPrekeyId;
+    }
+
+    public String getKyberPrekey() {
+        return kyberPrekey;
+    }
+
+    public void setKyberPrekey(String kyberPrekey) {
+        this.kyberPrekey = kyberPrekey;
+    }
+
+    public String getKyberPrekeySignature() {
+        return kyberPrekeySignature;
+    }
+
+    public void setKyberPrekeySignature(String kyberPrekeySignature) {
+        this.kyberPrekeySignature = kyberPrekeySignature;
     }
 
     public DeviceStatus getStatus() {

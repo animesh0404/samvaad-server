@@ -40,6 +40,16 @@ public class TransportKeyMaterialValidator implements KeyMaterialEnvelopeValidat
         check("publicKey", encoded);
     }
 
+    @Override
+    public void validateKyberPrekey(byte[] encoded) {
+        check("kyberPrekey", encoded);
+    }
+
+    @Override
+    public void validateKyberPrekeySignature(byte[] encoded) {
+        check("kyberPrekeySignature", encoded);
+    }
+
     private void check(String field, byte[] encoded) {
         if (encoded == null || encoded.length == 0) {
             throw new InvalidKeyMaterialException(field + " must be present and non-empty");

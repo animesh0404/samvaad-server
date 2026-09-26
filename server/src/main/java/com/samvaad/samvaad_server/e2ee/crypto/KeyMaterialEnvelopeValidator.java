@@ -26,4 +26,14 @@ public interface KeyMaterialEnvelopeValidator {
     void validateSignedPrekeySignature(byte[] encoded);
 
     void validateOneTimePrekey(byte[] encoded);
+
+    /**
+     * Last-resort Kyber (PQXDH) public key. Envelope-only in this slice:
+     * presence, non-emptiness, and the generous transport bound. No Kyber
+     * format rules and no signature verification; those belong to the future
+     * Signal-backed adapter behind this same interface.
+     */
+    void validateKyberPrekey(byte[] encoded);
+
+    void validateKyberPrekeySignature(byte[] encoded);
 }

@@ -33,6 +33,8 @@ class E2eeSeamUnitTest {
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateSignedPrekey(new byte[0]));
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateSignedPrekeySignature(null));
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateOneTimePrekey(new byte[0]));
+        assertThrows(InvalidKeyMaterialException.class, () -> validator.validateKyberPrekey(null));
+        assertThrows(InvalidKeyMaterialException.class, () -> validator.validateKyberPrekeySignature(new byte[0]));
     }
 
     @Test
@@ -42,6 +44,8 @@ class E2eeSeamUnitTest {
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateSignedPrekey(oversized));
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateSignedPrekeySignature(oversized));
         assertThrows(InvalidKeyMaterialException.class, () -> validator.validateOneTimePrekey(oversized));
+        assertThrows(InvalidKeyMaterialException.class, () -> validator.validateKyberPrekey(oversized));
+        assertThrows(InvalidKeyMaterialException.class, () -> validator.validateKyberPrekeySignature(oversized));
     }
 
     @Test
@@ -50,6 +54,8 @@ class E2eeSeamUnitTest {
         assertDoesNotThrow(() -> validator.validateSignedPrekey(new byte[]{1}));
         assertDoesNotThrow(() -> validator.validateSignedPrekeySignature(new byte[]{1}));
         assertDoesNotThrow(() -> validator.validateOneTimePrekey(new byte[]{1}));
+        assertDoesNotThrow(() -> validator.validateKyberPrekey(new byte[1569]));
+        assertDoesNotThrow(() -> validator.validateKyberPrekeySignature(new byte[64]));
     }
 
     @Test

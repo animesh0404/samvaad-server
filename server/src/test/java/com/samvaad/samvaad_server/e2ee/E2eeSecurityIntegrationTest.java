@@ -123,6 +123,9 @@ class E2eeSecurityIntegrationTest {
                   "signedPrekeyId": %d,
                   "signedPrekey": "%s",
                   "signedPrekeySignature": "%s",
+                  "kyberPrekeyId": %d,
+                  "kyberPrekey": "%s",
+                  "kyberPrekeySignature": "%s",
                   "clientPlatform": "WEB",
                   "clientName": "Test",
                   "clientVersion": "1.0.0"

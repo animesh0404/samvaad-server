@@ -16,6 +16,15 @@ public class ClaimPrekeyResponseDto {
     private String signedPrekey;
     private String signedPrekeySignature;
     private OneTimePrekeyDto oneTimePrekey;
+    /**
+     * Last-resort Kyber (PQXDH) public material. Always present for
+     * Kyber-capable devices and never consumed by the EC one-time-prekey
+     * claim: repeated claims (including requestId replays) return the
+     * identical Kyber material.
+     */
+    private Integer kyberPrekeyId;
+    private String kyberPrekey;
+    private String kyberPrekeySignature;
 
     public ClaimPrekeyResponseDto() {
     }
@@ -74,5 +83,29 @@ public class ClaimPrekeyResponseDto {
 
     public void setOneTimePrekey(OneTimePrekeyDto oneTimePrekey) {
         this.oneTimePrekey = oneTimePrekey;
+    }
+
+    public Integer getKyberPrekeyId() {
+        return kyberPrekeyId;
+    }
+
+    public void setKyberPrekeyId(Integer kyberPrekeyId) {
+        this.kyberPrekeyId = kyberPrekeyId;
+    }
+
+    public String getKyberPrekey() {
+        return kyberPrekey;
+    }
+
+    public void setKyberPrekey(String kyberPrekey) {
+        this.kyberPrekey = kyberPrekey;
+    }
+
+    public String getKyberPrekeySignature() {
+        return kyberPrekeySignature;
+    }
+
+    public void setKyberPrekeySignature(String kyberPrekeySignature) {
+        this.kyberPrekeySignature = kyberPrekeySignature;
     }
 }

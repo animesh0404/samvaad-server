@@ -27,6 +27,15 @@ public class EnrollDeviceRequestDto {
     @NotBlank(message = "Signed prekey signature is required")
     private String signedPrekeySignature;
 
+    @NotNull(message = "Kyber prekey ID is required")
+    private Integer kyberPrekeyId;
+
+    @NotBlank(message = "Kyber prekey is required")
+    private String kyberPrekey;
+
+    @NotBlank(message = "Kyber prekey signature is required")
+    private String kyberPrekeySignature;
+
     @NotNull(message = "Client platform is required")
     private ClientPlatform clientPlatform;
 
@@ -75,6 +84,30 @@ public class EnrollDeviceRequestDto {
 
     public void setSignedPrekeySignature(String signedPrekeySignature) {
         this.signedPrekeySignature = signedPrekeySignature;
+    }
+
+    public Integer getKyberPrekeyId() {
+        return kyberPrekeyId;
+    }
+
+    public void setKyberPrekeyId(Integer kyberPrekeyId) {
+        this.kyberPrekeyId = kyberPrekeyId;
+    }
+
+    public String getKyberPrekey() {
+        return kyberPrekey;
+    }
+
+    public void setKyberPrekey(String kyberPrekey) {
+        this.kyberPrekey = kyberPrekey;
+    }
+
+    public String getKyberPrekeySignature() {
+        return kyberPrekeySignature;
+    }
+
+    public void setKyberPrekeySignature(String kyberPrekeySignature) {
+        this.kyberPrekeySignature = kyberPrekeySignature;
     }
 
     public ClientPlatform getClientPlatform() {

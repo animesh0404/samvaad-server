@@ -25,6 +25,8 @@ public interface E2eeDeviceRepo extends JpaRepository<E2eeDevice, UUID> {
 
     boolean existsByDeviceIdentityPublicKey(byte[] deviceIdentityPublicKey);
 
+    boolean existsByKyberPrekey(byte[] kyberPrekey);
+
     @Modifying
     @Query("DELETE FROM E2eeDevice d WHERE d.user.userId = :userId")
     void deleteByUserId(@Param("userId") UUID userId);

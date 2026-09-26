@@ -38,9 +38,22 @@ public final class E2eeTestKeys {
         request.setSignedPrekeyId(2000 + seed);
         request.setSignedPrekey(key(seed * 10 + 2));
         request.setSignedPrekeySignature(key(seed * 10 + 3, 64));
+        request.setKyberPrekeyId(4000 + seed);
+        request.setKyberPrekey(key(seed * 10 + 4, 1569));
+        request.setKyberPrekeySignature(key(seed * 10 + 5, 64));
         request.setClientPlatform(platform);
         request.setClientName("Test Client");
         request.setClientVersion("1.0.0");
+        return request;
+    }
+
+    public static com.samvaad.samvaad_server.e2ee.dto.RotateKyberPrekeyRequestDto rotateKyberRequest(
+            int kyberPrekeyId, int seed) {
+        com.samvaad.samvaad_server.e2ee.dto.RotateKyberPrekeyRequestDto request =
+                new com.samvaad.samvaad_server.e2ee.dto.RotateKyberPrekeyRequestDto();
+        request.setKyberPrekeyId(kyberPrekeyId);
+        request.setKyberPrekey(key(seed, 1569));
+        request.setKyberPrekeySignature(key(seed + 1, 64));
         return request;
     }
 

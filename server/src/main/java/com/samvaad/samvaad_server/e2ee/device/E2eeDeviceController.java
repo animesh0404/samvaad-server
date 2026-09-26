@@ -7,6 +7,7 @@ import com.samvaad.samvaad_server.e2ee.dto.DeviceListDto;
 import com.samvaad.samvaad_server.e2ee.dto.EnrollDeviceRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.EnrollDeviceResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.RecipientDeviceDto;
+import com.samvaad.samvaad_server.e2ee.dto.RotateKyberPrekeyRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.UploadOneTimePrekeysDto;
 import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.security.CurrentUser;
@@ -77,6 +78,14 @@ public class E2eeDeviceController {
         AuthenticatedUser caller = CurrentUser.require();
         UUID requestId = request != null ? request.getRequestId() : null;
         return deviceService.claimOneTimePrekey(caller.userId(), deviceId, requestId);
+    }
+
+    @PutMapping("/devices/{deviceId}/kyber-prekey")
+    public DeviceDto replaceKyberPrekey(
+            @PathVariable UUID deviceId,
+            @Valid @RequestBody RotateKyberPrekeyRequestDto request) {
+        AuthenticatedUser caller = CurrentUser.require();
+        return deviceService.replaceKyberPrekey(caller.userId(), caller.sessionId(), deviceId, request);
     }
 
     @DeleteMapping("/devices/{deviceId}")

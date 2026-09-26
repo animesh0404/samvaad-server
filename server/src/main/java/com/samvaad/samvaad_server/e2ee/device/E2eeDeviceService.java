@@ -14,12 +14,14 @@ import com.samvaad.samvaad_server.e2ee.dto.EnrollmentState;
 import com.samvaad.samvaad_server.e2ee.dto.OneTimePrekeyDto;
 import com.samvaad.samvaad_server.e2ee.dto.RecipientDeviceDto;
 import com.samvaad.samvaad_server.e2ee.dto.RecoveryEnrollRequestDto;
+import com.samvaad.samvaad_server.e2ee.dto.RotateKyberPrekeyRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.RotateRecoveryCodesResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.UploadOneTimePrekeysDto;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceAlreadyExistsException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceLimitExceededException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceNotActiveException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceNotFoundException;
+import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidPrekeyBatchException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
 import com.samvaad.samvaad_server.e2ee.exception.PrekeyClaimConflictException;
@@ -46,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -241,6 +244,68 @@ public class E2eeDeviceService {
         return E2eeMapper.toDeviceDto(saved, available);
     }
 
+    @OperationalLog("e2ee.device.rotateKyber")
+    @Transactional
+    public DeviceDto replaceKyberPrekey(
+            UUID callerUserId, UUID callerSessionId, UUID deviceId, RotateKyberPrekeyRequestDto request) {
+        if (request == null || request.getKyberPrekeyId() == null) {
+            throw new InvalidKeyMaterialException("Kyber material is required");
+        }
+        byte[] kyberPrekey = E2eeMapper.decodeBase64("kyberPrekey", request.getKyberPrekey());
+        byte[] kyberSignature =
+                E2eeMapper.decodeBase64("kyberPrekeySignature", request.getKyberPrekeySignature());
+        envelopeValidator.validateKyberPrekey(kyberPrekey);
+        envelopeValidator.validateKyberPrekeySignature(kyberSignature);
+
+        E2eeDevice device = deviceRepo.findByDeviceIdWithLock(deviceId)
+                .orElseThrow(() -> new DeviceNotFoundException(deviceId));
+        requireOwner(callerUserId, device);
+        if (!device.isActive()) {
+            throw new DeviceNotActiveException();
+        }
+
+        Session session = resolveOwnedSession(callerUserId, callerSessionId);
+        if (session.getDeviceId() == null || !session.getDeviceId().equals(deviceId)) {
+            log.warn("Kyber replacement denied: session not bound to device userId={} deviceId={}",
+                    callerUserId, deviceId);
+            throw new ForbiddenOperationException();
+        }
+
+        if (request.getKyberPrekeyId().equals(device.getKyberPrekeyId())) {
+            if (device.getKyberPrekey() != null && Arrays.equals(device.getKyberPrekey(), kyberPrekey)
+                    && device.getKyberPrekeySignature() != null
+                    && Arrays.equals(device.getKyberPrekeySignature(), kyberSignature)) {
+                log.debug("Kyber replacement no-op deviceId={} kyberPrekeyId={}",
+                        deviceId, request.getKyberPrekeyId());
+                return E2eeMapper.toDeviceDto(
+                        device, prekeyRepo.countByDeviceAndConsumedAtIsNull(device));
+            }
+            log.warn("Kyber replacement denied: identifier reuse deviceId={} kyberPrekeyId={}",
+                    deviceId, request.getKyberPrekeyId());
+            throw new InvalidKeyMaterialException("Kyber prekey ID already in use with different bytes");
+        }
+        if (deviceRepo.existsByKyberPrekey(kyberPrekey)) {
+            log.warn("Kyber replacement conflict: key already enrolled deviceId={}", deviceId);
+            throw new DeviceAlreadyExistsException();
+        }
+
+        device.setKyberPrekeyId(request.getKyberPrekeyId());
+        device.setKyberPrekey(kyberPrekey);
+        device.setKyberPrekeySignature(kyberSignature);
+        device.setLastActiveAt(LocalDateTime.now());
+        try {
+            E2eeDevice saved = deviceRepo.saveAndFlush(device);
+            long available = prekeyRepo.countByDeviceAndConsumedAtIsNull(saved);
+            log.info("Kyber key replaced userId={} deviceId={} kyberPrekeyId={}",
+                    callerUserId, deviceId, request.getKyberPrekeyId());
+            return E2eeMapper.toDeviceDto(saved, available);
+        } catch (DataIntegrityViolationException e) {
+            entityManager.clear();
+            log.warn("Kyber replacement conflict deviceId={}", deviceId);
+            throw new DeviceAlreadyExistsException();
+        }
+    }
+
     @OperationalLog("e2ee.device.claimPrekey")
     @Transactional
     public ClaimPrekeyResponseDto claimOneTimePrekey(
@@ -404,7 +469,8 @@ public class E2eeDeviceService {
     }
 
     private DeviceMaterial decodeDeviceMaterial(EnrollDeviceRequestDto request) {
-        if (request == null || request.getRegistrationId() == null || request.getSignedPrekeyId() == null) {
+        if (request == null || request.getRegistrationId() == null || request.getSignedPrekeyId() == null
+                || request.getKyberPrekeyId() == null) {
             throw new InvalidPrekeyBatchException("device material is required");
         }
         byte[] identityKey = E2eeMapper.decodeBase64(
@@ -412,10 +478,16 @@ public class E2eeDeviceService {
         byte[] signedPrekey = E2eeMapper.decodeBase64("signedPrekey", request.getSignedPrekey());
         byte[] signature = E2eeMapper.decodeBase64(
                 "signedPrekeySignature", request.getSignedPrekeySignature());
+        byte[] kyberPrekey = E2eeMapper.decodeBase64("kyberPrekey", request.getKyberPrekey());
+        byte[] kyberSignature = E2eeMapper.decodeBase64(
+                "kyberPrekeySignature", request.getKyberPrekeySignature());
         envelopeValidator.validateDeviceIdentityKey(identityKey);
         envelopeValidator.validateSignedPrekey(signedPrekey);
         envelopeValidator.validateSignedPrekeySignature(signature);
-        return new DeviceMaterial(identityKey, signedPrekey, signature);
+        envelopeValidator.validateKyberPrekey(kyberPrekey);
+        envelopeValidator.validateKyberPrekeySignature(kyberSignature);
+        return new DeviceMaterial(identityKey, signedPrekey, signature,
+                request.getKyberPrekeyId(), kyberPrekey, kyberSignature);
     }
 
     private E2eeDevice insertDevice(
@@ -427,6 +499,9 @@ public class E2eeDeviceService {
         device.setSignedPrekeyId(request.getSignedPrekeyId());
         device.setSignedPrekey(material.signedPrekey());
         device.setSignedPrekeySignature(material.signature());
+        device.setKyberPrekeyId(material.kyberPrekeyId());
+        device.setKyberPrekey(material.kyberPrekey());
+        device.setKyberPrekeySignature(material.kyberSignature());
         device.setStatus(status);
         device.setClientPlatform(request.getClientPlatform());
         device.setClientName(request.getClientName());
@@ -434,6 +509,10 @@ public class E2eeDeviceService {
         device.setLastActiveAt(LocalDateTime.now());
         if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())) {
             log.warn("Device enrollment conflict: identity already enrolled userId={}", user.getUserId());
+            throw new DeviceAlreadyExistsException();
+        }
+        if (deviceRepo.existsByKyberPrekey(material.kyberPrekey())) {
+            log.warn("Device enrollment conflict: Kyber key already enrolled userId={}", user.getUserId());
             throw new DeviceAlreadyExistsException();
         }
         try {
@@ -446,8 +525,9 @@ public class E2eeDeviceService {
             // duplicate maps to a conflict; any other integrity failure is
             // rethrown unchanged. Either outcome rolls the transaction back.
             entityManager.clear();
-            if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())) {
-                log.warn("Device enrollment conflict: identity already enrolled userId={}", user.getUserId());
+            if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())
+                    || deviceRepo.existsByKyberPrekey(material.kyberPrekey())) {
+                log.warn("Device enrollment conflict: key material already enrolled userId={}", user.getUserId());
                 throw new DeviceAlreadyExistsException();
             }
             throw e;
@@ -527,6 +607,7 @@ public class E2eeDeviceService {
         }
     }
 
-    private record DeviceMaterial(byte[] identityKey, byte[] signedPrekey, byte[] signature) {
+    private record DeviceMaterial(byte[] identityKey, byte[] signedPrekey, byte[] signature,
+            Integer kyberPrekeyId, byte[] kyberPrekey, byte[] kyberSignature) {
     }
 }

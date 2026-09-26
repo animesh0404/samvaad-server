@@ -24,7 +24,8 @@ import java.util.UUID;
  *
  * The record holds only PUBLIC cryptographic material: the device identity
  * public key, the public signed prekey and its signature alongside the
- * one-time-prekey pool, enrollment/lifecycle status, and device-management
+ * one-time-prekey pool, the public last-resort Kyber (PQXDH) prekey and its
+ * signature, enrollment/lifecycle status, and device-management
  * metadata. Private cryptographic material belongs exclusively to the client
  * device and must never cross the API/persistence boundary; this entity has
  * no field capable of holding it.
@@ -56,6 +57,21 @@ public class E2eeDevice extends AuditableEntity {
 
     @Column(name = "signed_prekey_signature", nullable = false)
     private byte[] signedPrekeySignature;
+
+    /**
+     * Last-resort Kyber (PQXDH) public material. Nullable only for device
+     * rows enrolled before Kyber support; every new enrollment must supply
+     * all three columns. The key is reusable across session establishments
+     * and is never consumed by the EC one-time-prekey claim.
+     */
+    @Column(name = "kyber_prekey_id", nullable = true)
+    private Integer kyberPrekeyId;
+
+    @Column(name = "kyber_prekey", nullable = true)
+    private byte[] kyberPrekey;
+
+    @Column(name = "kyber_prekey_signature", nullable = true)
+    private byte[] kyberPrekeySignature;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
@@ -146,6 +162,30 @@ public class E2eeDevice extends AuditableEntity {
 
     public void setSignedPrekeySignature(byte[] signedPrekeySignature) {
         this.signedPrekeySignature = signedPrekeySignature;
+    }
+
+    public Integer getKyberPrekeyId() {
+        return kyberPrekeyId;
+    }
+
+    public void setKyberPrekeyId(Integer kyberPrekeyId) {
+        this.kyberPrekeyId = kyberPrekeyId;
+    }
+
+    public byte[] getKyberPrekey() {
+        return kyberPrekey;
+    }
+
+    public void setKyberPrekey(byte[] kyberPrekey) {
+        this.kyberPrekey = kyberPrekey;
+    }
+
+    public byte[] getKyberPrekeySignature() {
+        return kyberPrekeySignature;
+    }
+
+    public void setKyberPrekeySignature(byte[] kyberPrekeySignature) {
+        this.kyberPrekeySignature = kyberPrekeySignature;
     }
 
     public DeviceStatus getStatus() {

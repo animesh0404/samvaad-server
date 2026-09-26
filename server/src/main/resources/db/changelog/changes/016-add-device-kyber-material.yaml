@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-add-device-kyber-material
+      author: Animesh Kahara
+      changes:
+        - addColumn:
+            tableName: e2ee_devices
+            columns:
+              - column:
+                  name: kyber_prekey_id
+                  type: INTEGER
+                  constraints:
+                    nullable: true
+              - column:
+                  name: kyber_prekey
+                  type: BYTEA
+                  constraints:
+                    nullable: true
+              - column:
+                  name: kyber_prekey_signature
+                  type: BYTEA
+                  constraints:
+                    nullable: true
+        # Public-only last-resort Kyber material (PQXDH foundation). Nullable
+        # so pre-Kyber device rows remain valid; new enrollments must supply
+        # all three columns. No backfill is possible or permitted: the server
+        # must never generate key material. PostgreSQL unique constraints
+        # treat NULLs as distinct, so legacy rows are unaffected while any
+        # two devices may never share the same Kyber public key.
+        - addUniqueConstraint:
+            tableName: e2ee_devices
+            columnNames: kyber_prekey
+            constraintName: uq_e2ee_devices_kyber_prekey

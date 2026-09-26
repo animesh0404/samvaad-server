@@ -155,6 +155,9 @@ class E2eeDeviceInsertMappingUnitTest {
         request.setSignedPrekeyId(1);
         request.setSignedPrekey(E2eeTestKeys.key(2));
         request.setSignedPrekeySignature(E2eeTestKeys.key(3, 64));
+        request.setKyberPrekeyId(4);
+        request.setKyberPrekey(E2eeTestKeys.key(5, 1569));
+        request.setKyberPrekeySignature(E2eeTestKeys.key(6, 64));
         request.setClientPlatform(ClientPlatform.WEB);
         return request;
     }
