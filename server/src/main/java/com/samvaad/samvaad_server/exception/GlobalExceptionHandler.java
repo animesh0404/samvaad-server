@@ -6,6 +6,7 @@ import com.samvaad.samvaad_server.e2ee.exception.DeviceApprovalDeniedException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceLimitExceededException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceNotActiveException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceNotFoundException;
+import com.samvaad.samvaad_server.e2ee.exception.E2eeMessageConflictException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidPrekeyBatchException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidRecoveryCodeException;
@@ -192,6 +193,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PrekeyClaimConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handlePrekeyClaimConflict(PrekeyClaimConflictException ex) {
+        return new ErrorResponse(ex.getMessage());
+    }
+
+    @ExceptionHandler(E2eeMessageConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleE2eeMessageConflict(E2eeMessageConflictException ex) {
         return new ErrorResponse(ex.getMessage());
     }
 

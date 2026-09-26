@@ -85,8 +85,27 @@ class E2eeSecurityIntegrationTest {
     @Autowired
     private com.samvaad.samvaad_server.friendrequest.FriendRequestRepo friendRequestRepo;
 
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeMessageRepo e2eeMessageRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeEnvelopeRepo e2eeEnvelopeRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeMailboxRepo e2eeMailboxRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeSyncCursorRepo e2eeSyncCursorRepo;
+
     @BeforeEach
     void setUp() {
+        // Ciphertext transport tables precede conversations/users: RESTRICT
+        // foreign keys forbid deleting a conversation or sender still
+        // referenced by durable ciphertext rows.
+        e2eeMailboxRepo.deleteAll();
+        e2eeEnvelopeRepo.deleteAll();
+        e2eeMessageRepo.deleteAll();
+        e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
         messageRepo.deleteAll();
@@ -135,7 +154,10 @@ class E2eeSecurityIntegrationTest {
                 E2eeTestKeys.key(seed * 10 + 1),
                 2000 + seed,
                 E2eeTestKeys.key(seed * 10 + 2),
-                E2eeTestKeys.key(seed * 10 + 3, 64));
+                E2eeTestKeys.key(seed * 10 + 3, 64),
+                4000 + seed,
+                E2eeTestKeys.key(seed * 10 + 4, 1569),
+                E2eeTestKeys.key(seed * 10 + 5, 64));
     }
 
     private String uploadJson(int firstPrekeyId, int size) {

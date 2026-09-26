@@ -94,3 +94,72 @@ reusable and is never consumed by the claim.
 their existing contracts; enrollment-bearing recovery flows require the
 Kyber fields through the shared enrollment DTO.
 
+# E2EE Ciphertext Transport (ADR 0020)
+
+The server routes, orders, retains, delivers, and synchronizes opaque
+ciphertext. It never decrypts, parses, or interprets it. Vocabulary:
+
+- **logical message** — one `messageRequestId` from one sender device;
+  carries one envelope per recipient device, one conversation, one
+  sequence number.
+- **ciphertext envelope** — one recipient device's opaque bytes plus
+  the sender-supplied `envelopeType` (`PREKEY_INIT`/`RATCHET`).
+- **mailbox entry** — an undelivered pointer (device + message).
+  Acknowledgement deletes the entry only.
+- **durable history** — permanent per-device envelopes, readable
+  after acknowledgement.
+- **acknowledgement** — per-device delivery completion; idempotent.
+- **synchronization cursor** — per-device, per-conversation
+  highest-durably-processed sequence, advanced only by explicit
+  client assertion. Fetching/acking never moves it.
+
+## `POST /api/e2ee/messages` — submit
+
+`201 Created` (new) or `200 OK` (identical retry). Body:
+
+```json
+{
+  "messageRequestId": "<uuid>",
+  "envelopes": [
+    {
+      "senderDeviceId": "<uuid>",
+      "recipientDeviceId": "<uuid>",
+      "envelopeType": "PREKEY_INIT",
+      "ciphertext": "<base64>"
+    }
+  ]
+}
+```
+
+Rules: every `senderDeviceId` must equal the session-bound device
+(spoofing → `403`); each recipient device must exist, be `ACTIVE`,
+and belong to a friend (unknown/inactive → `404`, self/unauthorized
+→ `403`); all envelopes address one recipient user in one
+conversation (created on demand). Same `messageRequestId` with
+identical content replays the original response; any difference is
+`409`. The batch is atomic.
+
+## `GET /api/e2ee/mailbox?limit=50` — fetch
+
+`200 OK`. The session-bound device's undelivered ciphertext in stable
+acceptance order (`limit` 1–100). Sessions without a device see an
+empty mailbox.
+
+## `POST /api/e2ee/mailbox/ack` — acknowledge
+
+`200 OK` with `{"acknowledged": n}`. Deletes only the bound device's
+entries for the given message ids; unknown ids and foreign ids
+acknowledge nothing (idempotent, per-device).
+
+## `GET /api/e2ee/conversations/{id}/messages?afterSequence=0&limit=20` — history
+
+`200 OK`. The bound device's durable envelopes after `afterSequence`,
+ascending, participant-only (`404` unknown / `403` non-participant).
+Readable after acknowledgement; history never deletes.
+
+## `PUT /api/e2ee/sync` + `GET /api/e2ee/sync?conversationId=` — cursor
+
+Advance is `{"conversationId": "<uuid>", "throughSequence": n}` → the
+stored cursor; repeats are safe, backwards moves are `409`. Read
+returns the stored value or `0`. The cursor means durably processed —
+never delivery, never proof of decryption.

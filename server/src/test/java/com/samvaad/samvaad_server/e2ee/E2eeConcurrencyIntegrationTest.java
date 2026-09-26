@@ -96,8 +96,27 @@ class E2eeConcurrencyIntegrationTest {
     @Autowired
     private com.samvaad.samvaad_server.friendrequest.FriendRequestRepo friendRequestRepo;
 
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeMessageRepo e2eeMessageRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeEnvelopeRepo e2eeEnvelopeRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeMailboxRepo e2eeMailboxRepo;
+
+    @Autowired
+    private com.samvaad.samvaad_server.e2ee.message.E2eeSyncCursorRepo e2eeSyncCursorRepo;
+
     @BeforeEach
     void setUp() {
+        // Ciphertext transport tables precede conversations/users: RESTRICT
+        // foreign keys forbid deleting a conversation or sender still
+        // referenced by durable ciphertext rows.
+        e2eeMailboxRepo.deleteAll();
+        e2eeEnvelopeRepo.deleteAll();
+        e2eeMessageRepo.deleteAll();
+        e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
         messageRepo.deleteAll();

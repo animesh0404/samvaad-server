@@ -4,6 +4,7 @@ import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo;
 import com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo;
+import com.samvaad.samvaad_server.e2ee.message.E2eeMessageService;
 import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.Conversation;
@@ -40,6 +41,7 @@ public class UserService {
     private final E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
     private final E2eeDeviceRepo deviceRepo;
     private final E2eeRecoveryCodeRepo recoveryCodeRepo;
+    private final E2eeMessageService e2eeMessageService;
     private final PasswordEncoder passwordEncoder;
 
     public UserService(
@@ -53,6 +55,7 @@ public class UserService {
             E2eeOneTimePrekeyRepo oneTimePrekeyRepo,
             E2eeDeviceRepo deviceRepo,
             E2eeRecoveryCodeRepo recoveryCodeRepo,
+            E2eeMessageService e2eeMessageService,
             PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
         this.userProfileService = userProfileService;
@@ -64,6 +67,7 @@ public class UserService {
         this.oneTimePrekeyRepo = oneTimePrekeyRepo;
         this.deviceRepo = deviceRepo;
         this.recoveryCodeRepo = recoveryCodeRepo;
+        this.e2eeMessageService = e2eeMessageService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -125,6 +129,7 @@ public class UserService {
         recoveryCodeRepo.deleteByUserId(userId);
         userProfileRepo.deleteById(userId);
         friendRequestRepo.deleteByParticipantUserId(userId);
+        e2eeMessageService.deleteUserData(userId);
         messageRepo.deleteBySenderUserId(userId);
         List<Conversation> conversations =
                 conversationRepo.findByParticipantAOrParticipantB(userId, userId, Pageable.unpaged());

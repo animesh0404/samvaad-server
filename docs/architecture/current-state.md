@@ -126,7 +126,12 @@ ADR 0018 defines the V1 E2EE enrollment state machine. The server-side device/en
 - Recovery creates a new cryptographic device identity. It does not recreate a revoked/lost device identity. Encrypted chat-history restoration remains a separate recovery mechanism.
 - The implementation enforces the five-device non-REVOKED limit, PENDING/ACTIVE/REVOKED lifecycle, session-to-device binding, trusted-device approval authorization seam, device revocation/session termination, one-time prekey upload/claim, friendship-gated device discovery, and account-level recovery-code handling.
 
-The implemented slice is the E2EE device/prekey foundation only. Signal/Sesame session establishment, actual message encryption, encrypted envelopes/mailboxes, ciphertext message persistence, history synchronization, client cryptographic state, and encrypted backup/restoration remain unimplemented.
+The implemented slice is the E2EE device/prekey foundation plus ciphertext
+transport (ADR 0020): batched submission, durable per-device history, per-device
+mailbox with acknowledgement, per-device processed-cursors, and server-assigned
+sequencing over the reused pair-scoped conversations. Signal/Sesame session
+establishment, actual message encryption, client cryptographic state, and
+encrypted backup/restoration remain unimplemented.
 
 ## Realtime V1 boundary
 
@@ -142,8 +147,8 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 - blocking, unfriend, mute, archive
 - horizontal scaling/external brokers/general event bus
 - group E2EE / MLS implementation
-- Signal/Sesame message-session establishment and encrypted message delivery
-- encrypted message history synchronization and backup/restoration
+- client-side Signal/Sesame session establishment and message encryption
+- encrypted backup/restoration
 - rate limiting and stable machine-readable error codes
 - dedicated conversation recency field if `updatedAt` later proves insufficient
 - friend-gated profile visibility

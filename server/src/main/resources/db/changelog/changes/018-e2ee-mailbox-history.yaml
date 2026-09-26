@@ -1,0 +1,261 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-e2ee-mailbox-history
+      author: Animesh Kahara
+      changes:
+        - createTable:
+            tableName: e2ee_messages
+            columns:
+              - column:
+                  name: message_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: conversation_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sender_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sender_device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: sequence_number
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: server_timestamp
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: e2ee_envelopes
+            columns:
+              - column:
+                  name: envelope_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: message_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: recipient_device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: envelope_type
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ciphertext
+                  type: BYTEA
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: e2ee_mailbox
+            columns:
+              - column:
+                  name: entry_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: recipient_device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: message_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: e2ee_sync_cursors
+            columns:
+              - column:
+                  name: cursor_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: recipient_device_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: conversation_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: through_sequence
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        # One logical message per request id; one sequence per conversation;
+        # one envelope and one mailbox entry per (message, device); one
+        # cursor per (device, conversation). Constraints — not application
+        # checks — enforce idempotency, ordering, and no-duplicate delivery.
+        - addUniqueConstraint:
+            tableName: e2ee_messages
+            columnNames: conversation_id, sequence_number
+            constraintName: uq_e2ee_messages_conversation_sequence
+        - addUniqueConstraint:
+            tableName: e2ee_envelopes
+            columnNames: message_id, recipient_device_id
+            constraintName: uq_e2ee_envelopes_message_device
+        - addUniqueConstraint:
+            tableName: e2ee_mailbox
+            columnNames: recipient_device_id, message_id
+            constraintName: uq_e2ee_mailbox_device_message
+        - addUniqueConstraint:
+            tableName: e2ee_sync_cursors
+            columnNames: recipient_device_id, conversation_id
+            constraintName: uq_e2ee_sync_cursors_device_conversation
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_messages
+            baseColumnNames: conversation_id
+            referencedTableName: conversations
+            referencedColumnNames: conversation_id
+            constraintName: fk_e2ee_messages_conversation
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_messages
+            baseColumnNames: sender_user_id
+            referencedTableName: users
+            referencedColumnNames: user_id
+            constraintName: fk_e2ee_messages_sender
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_envelopes
+            baseColumnNames: message_id
+            referencedTableName: e2ee_messages
+            referencedColumnNames: message_id
+            constraintName: fk_e2ee_envelopes_message
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_mailbox
+            baseColumnNames: message_id
+            referencedTableName: e2ee_messages
+            referencedColumnNames: message_id
+            constraintName: fk_e2ee_mailbox_message
+        - addForeignKeyConstraint:
+            baseTableName: e2ee_sync_cursors
+            baseColumnNames: conversation_id
+            referencedTableName: conversations
+            referencedColumnNames: conversation_id
+            constraintName: fk_e2ee_sync_cursors_conversation
+        - createIndex:
+            tableName: e2ee_mailbox
+            indexName: idx_e2ee_mailbox_device
+            columns:
+              - column:
+                  name: recipient_device_id
+        - createIndex:
+            tableName: e2ee_envelopes
+            indexName: idx_e2ee_envelopes_device
+            columns:
+              - column:
+                  name: recipient_device_id
+        - sql:
+            sql: ALTER TABLE e2ee_envelopes ADD CONSTRAINT ck_e2ee_envelopes_type CHECK (envelope_type IN ('PREKEY_INIT', 'RATCHET'))

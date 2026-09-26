@@ -72,6 +72,9 @@ class UserServiceTest {
     private com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo recoveryCodeRepo;
 
     @Mock
+    private com.samvaad.samvaad_server.e2ee.message.E2eeMessageService e2eeMessageService;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     private UserService userService;
@@ -80,7 +83,7 @@ class UserServiceTest {
     void setUp() {
         userService = new UserService(userRepo, userProfileService, userProfileRepo, sessionRepo,
                 friendRequestRepo, messageRepo, conversationRepo,
-                oneTimePrekeyRepo, deviceRepo, recoveryCodeRepo, passwordEncoder);
+                oneTimePrekeyRepo, deviceRepo, recoveryCodeRepo, e2eeMessageService, passwordEncoder);
     }
 
     @Test
