@@ -11,6 +11,8 @@ public class ClaimPrekeyResponseDto {
 
     private UUID deviceId;
     private int registrationId;
+    /** Server-assigned Signal integer id for address construction (see PART C). */
+    private int signalDeviceId;
     private String deviceIdentityPublicKey;
     private int signedPrekeyId;
     private String signedPrekey;
@@ -43,6 +45,14 @@ public class ClaimPrekeyResponseDto {
 
     public void setRegistrationId(int registrationId) {
         this.registrationId = registrationId;
+    }
+
+    public int getSignalDeviceId() {
+        return signalDeviceId;
+    }
+
+    public void setSignalDeviceId(int signalDeviceId) {
+        this.signalDeviceId = signalDeviceId;
     }
 
     public String getDeviceIdentityPublicKey() {

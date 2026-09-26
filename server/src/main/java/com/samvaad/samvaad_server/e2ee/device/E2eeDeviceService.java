@@ -494,6 +494,11 @@ public class E2eeDeviceService {
             User user, EnrollDeviceRequestDto request, DeviceMaterial material, DeviceStatus status) {
         E2eeDevice device = new E2eeDevice();
         device.setUser(user);
+        // Monotonic per-account Signal id, allocated under the caller's
+        // per-user enrollment lock (findByIdWithLock in enroll/recover
+        // paths) so concurrent enrollments serialize and receive distinct
+        // ids. Revoked rows keep their ids, so allocation never reuses.
+        device.setSignalDeviceId(deviceRepo.findMaxSignalDeviceIdByUserId(user.getUserId()) + 1);
         device.setRegistrationId(request.getRegistrationId());
         device.setDeviceIdentityPublicKey(material.identityKey());
         device.setSignedPrekeyId(request.getSignedPrekeyId());
@@ -529,6 +534,21 @@ public class E2eeDeviceService {
                     || deviceRepo.existsByKyberPrekey(material.kyberPrekey())) {
                 log.warn("Device enrollment conflict: key material already enrolled userId={}", user.getUserId());
                 throw new DeviceAlreadyExistsException();
+            }
+            if (deviceRepo.existsByUserUserIdAndSignalDeviceId(
+                    user.getUserId(), device.getSignalDeviceId())) {
+                // Defensive: unreachable while callers hold the per-user
+                // enrollment lock, but a lost race must reallocate rather
+                // than persist a duplicate or fail the enrollment.
+                log.warn("Device enrollment signal-id race, reallocating userId={}", user.getUserId());
+                device.setSignalDeviceId(
+                        deviceRepo.findMaxSignalDeviceIdByUserId(user.getUserId()) + 1);
+                try {
+                    return deviceRepo.saveAndFlush(device);
+                } catch (DataIntegrityViolationException retry) {
+                    entityManager.clear();
+                    throw retry;
+                }
             }
             throw e;
         }

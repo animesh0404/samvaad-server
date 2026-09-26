@@ -43,6 +43,17 @@ public class E2eeDevice extends AuditableEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    /**
+     * Server-assigned Signal integer device id. Starts at 1 per user,
+     * increases monotonically, and is never reused — revoked rows keep
+     * their allocation. Stable for the lifetime of the device row. This
+     * is addressing material for Signal session construction only; the
+     * UUID {@code deviceId} remains canonical for API paths, revocation,
+     * trust, persistence relationships, and routing identity.
+     */
+    @Column(name = "signal_device_id", nullable = false)
+    private int signalDeviceId;
+
     @Column(name = "registration_id", nullable = false)
     private int registrationId;
 
@@ -122,6 +133,14 @@ public class E2eeDevice extends AuditableEntity {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public int getSignalDeviceId() {
+        return signalDeviceId;
+    }
+
+    public void setSignalDeviceId(int signalDeviceId) {
+        this.signalDeviceId = signalDeviceId;
     }
 
     public int getRegistrationId() {

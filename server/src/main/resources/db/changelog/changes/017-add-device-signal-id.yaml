@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-add-device-signal-id
+      author: Animesh Kahara
+      changes:
+        - addColumn:
+            tableName: e2ee_devices
+            columns:
+              - column:
+                  name: signal_device_id
+                  type: INTEGER
+                  constraints:
+                    nullable: true
+        # Backfill: per-user allocation in enrollment order. Runtime
+        # allocation is max+1 under the per-user enrollment lock and
+        # revoked rows keep their ids, so ids are never reused.
+        - sql:
+            sql: UPDATE e2ee_devices d SET signal_device_id = ranked.rn FROM (SELECT device_id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at ASC, device_id ASC) AS rn FROM e2ee_devices) AS ranked WHERE d.device_id = ranked.device_id
+        - addNotNullConstraint:
+            tableName: e2ee_devices
+            columnName: signal_device_id
+            columnDataType: INTEGER
+        - addUniqueConstraint:
+            tableName: e2ee_devices
+            columnNames: user_id, signal_device_id
+            constraintName: uq_e2ee_devices_user_signal

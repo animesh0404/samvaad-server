@@ -27,6 +27,16 @@ public interface E2eeDeviceRepo extends JpaRepository<E2eeDevice, UUID> {
 
     boolean existsByKyberPrekey(byte[] kyberPrekey);
 
+    /**
+     * Highest Signal integer id allocated to the account, over all rows
+     * including revoked ones so ids are never reused. Must be called
+     * within the per-user enrollment lock held by the caller.
+     */
+    @Query("SELECT COALESCE(MAX(d.signalDeviceId), 0) FROM E2eeDevice d WHERE d.user.userId = :userId")
+    int findMaxSignalDeviceIdByUserId(@Param("userId") UUID userId);
+
+    boolean existsByUserUserIdAndSignalDeviceId(UUID userId, int signalDeviceId);
+
     @Modifying
     @Query("DELETE FROM E2eeDevice d WHERE d.user.userId = :userId")
     void deleteByUserId(@Param("userId") UUID userId);

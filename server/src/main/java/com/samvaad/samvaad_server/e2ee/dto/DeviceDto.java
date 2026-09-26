@@ -15,6 +15,12 @@ public class DeviceDto {
 
     private UUID deviceId;
     private int registrationId;
+    /**
+     * Server-assigned Signal integer device id (PART C address semantics:
+     * Signal address = owning userId + this integer). Stable for the
+     * lifetime of the device row; never reused after revocation.
+     */
+    private int signalDeviceId;
     private String deviceIdentityPublicKey;
     private int signedPrekeyId;
     private DeviceStatus status;
@@ -49,6 +55,14 @@ public class DeviceDto {
 
     public void setRegistrationId(int registrationId) {
         this.registrationId = registrationId;
+    }
+
+    public int getSignalDeviceId() {
+        return signalDeviceId;
+    }
+
+    public void setSignalDeviceId(int signalDeviceId) {
+        this.signalDeviceId = signalDeviceId;
     }
 
     public String getDeviceIdentityPublicKey() {

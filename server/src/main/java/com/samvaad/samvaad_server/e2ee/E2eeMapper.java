@@ -43,6 +43,7 @@ public final class E2eeMapper {
         DeviceDto dto = new DeviceDto();
         dto.setDeviceId(device.getDeviceId());
         dto.setRegistrationId(device.getRegistrationId());
+        dto.setSignalDeviceId(device.getSignalDeviceId());
         dto.setDeviceIdentityPublicKey(encodeBase64(device.getDeviceIdentityPublicKey()));
         dto.setSignedPrekeyId(device.getSignedPrekeyId());
         dto.setKyberPrekeyId(device.getKyberPrekeyId());
@@ -62,6 +63,7 @@ public final class E2eeMapper {
         RecipientDeviceDto dto = new RecipientDeviceDto();
         dto.setDeviceId(device.getDeviceId());
         dto.setRegistrationId(device.getRegistrationId());
+        dto.setSignalDeviceId(device.getSignalDeviceId());
         dto.setDeviceIdentityPublicKey(encodeBase64(device.getDeviceIdentityPublicKey()));
         dto.setSignedPrekeyId(device.getSignedPrekeyId());
         dto.setSignedPrekey(encodeBase64(device.getSignedPrekey()));
@@ -77,6 +79,7 @@ public final class E2eeMapper {
         ClaimPrekeyResponseDto dto = new ClaimPrekeyResponseDto();
         dto.setDeviceId(device.getDeviceId());
         dto.setRegistrationId(device.getRegistrationId());
+        dto.setSignalDeviceId(device.getSignalDeviceId());
         dto.setDeviceIdentityPublicKey(encodeBase64(device.getDeviceIdentityPublicKey()));
         dto.setSignedPrekeyId(device.getSignedPrekeyId());
         dto.setSignedPrekey(encodeBase64(device.getSignedPrekey()));
