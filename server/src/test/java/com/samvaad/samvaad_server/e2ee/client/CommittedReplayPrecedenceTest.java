@@ -45,7 +45,7 @@ class CommittedReplayPrecedenceTest {
                 List.of(CryptoTestFixtures.listed(bob, peer, 1, "bob-phone-v2", 9));
 
         SamvaadCryptoService recovered = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), h.stores(), h.claimFake(), h.submitFake());
         SamvaadCryptoService.FanoutResult r2 =
                 recovered.sendToDevices(msg, sender, "m".getBytes(), directoryV2, Set.of());
         assertEquals(SamvaadCryptoService.DeviceOutcome.SENT, r2.outcomes().get(peer));
@@ -77,7 +77,7 @@ class CommittedReplayPrecedenceTest {
         // envelope is still replayed byte-identically (revocation gates new
         // messages, and the idempotent resubmission is arbitrated server-side).
         SamvaadCryptoService recovered = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), h.stores(), h.claimFake(), h.submitFake());
         SamvaadCryptoService.FanoutResult r =
                 recovered.sendToDevices(msg, sender, "m".getBytes(), directory, Set.of(peer));
         assertEquals(SamvaadCryptoService.DeviceOutcome.SENT, r.outcomes().get(peer));

@@ -93,7 +93,9 @@ public interface SamvaadCryptoService {
      * wire {@link CryptoTypes.EnvelopeType} — never by trial-parsing:
      * PREKEY_INIT converges without destroying a concurrent outbound
      * session; RATCHET advances the committed session. Persists updated
-     * blobs before returning.
+     * blobs before returning; PREKEY_INIT commits the inbound session and
+     * the OTPK consumption atomically via
+     * {@link ClientCryptoStore#commitInboundEstablishment}.
      */
     byte[] decrypt(UUID senderDeviceId, UUID peerDeviceId, CryptoTypes.EnvelopeType kind, byte[] envelopeCiphertext);
 

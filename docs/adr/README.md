@@ -41,3 +41,4 @@ an earlier ADR only by explicitly naming it.
 | [0019](0019-v1-pqxdh-kyber-public-material-foundation.md) | V1 PQXDH last-resort Kyber public-material foundation |
 | [0020](0020-v1-e2ee-ciphertext-mailbox-history.md) | V1 E2EE ciphertext mailbox and history transport |
 | [0021](0021-v1-e2ee-identity-fingerprint-contract.md) | V1 E2EE identity fingerprint contract |
+| [0022](0022-v1-e2ee-client-persistent-store-boundary.md) | V1 E2EE client persistent store boundary |

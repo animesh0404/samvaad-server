@@ -25,13 +25,13 @@ import org.junit.jupiter.api.Test;
  */
 class AtomicCommitTest {
 
-    /** SessionStore that records which write path produced each COMMITTED slot. */
-    static final class CommitSpySessions implements SessionStore {
-        private final SessionStore delegate;
+    /** ClientCryptoStore spy recording which write path produced each COMMITTED slot. */
+    static final class CommitSpyStores implements ClientCryptoStore {
+        private final ClientCryptoStore delegate;
         private final AtomicInteger atomicCommits = new AtomicInteger();
         private final AtomicInteger directCommittedSlotWrites = new AtomicInteger();
 
-        CommitSpySessions(SessionStore delegate) {
+        CommitSpyStores(ClientCryptoStore delegate) {
             this.delegate = delegate;
         }
 
@@ -86,14 +86,96 @@ class AtomicCommitTest {
             atomicCommits.incrementAndGet();
             delegate.commitOutboundCiphertext(advancedSession, committedSlot);
         }
+
+        @Override
+        public void commitInboundEstablishment(
+                CryptoTypes.SessionRecord inboundSession, Integer consumedOneTimePrekeyIdOrNull) {
+            delegate.commitInboundEstablishment(inboundSession, consumedOneTimePrekeyIdOrNull);
+        }
+
+        @Override
+        public void provision(
+                SignalAdapter.LocalIdentity identity, SignalAdapter.SignedPrekeyPair signedPrekey) {
+            delegate.provision(identity, signedPrekey);
+        }
+
+        @Override
+        public boolean isProvisioned() {
+            return delegate.isProvisioned();
+        }
+
+        @Override
+        public UUID ownDeviceId() {
+            return delegate.ownDeviceId();
+        }
+
+        @Override
+        public int registrationId() {
+            return delegate.registrationId();
+        }
+
+        @Override
+        public byte[] identityPublicKey() {
+            return delegate.identityPublicKey();
+        }
+
+        @Override
+        public SignalAdapter.SealedPrivateHandle identityPrivate() {
+            return delegate.identityPrivate();
+        }
+
+        @Override
+        public SignalAdapter.SignedPrekeyPair signedPrekey() {
+            return delegate.signedPrekey();
+        }
+
+        @Override
+        public void putOneTimePrivate(int prekeyId, SignalAdapter.SealedPrivateHandle privateHandle) {
+            delegate.putOneTimePrivate(prekeyId, privateHandle);
+        }
+
+        @Override
+        public Optional<SignalAdapter.SealedPrivateHandle> oneTimePrivate(int prekeyId) {
+            return delegate.oneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public void forgetOneTimePrivate(int prekeyId) {
+            delegate.forgetOneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public CryptoTypes.TrustRecord observe(UUID peerDeviceId, byte[] identityPublicKey) {
+            return delegate.observe(peerDeviceId, identityPublicKey);
+        }
+
+        @Override
+        public Optional<CryptoTypes.TrustRecord> load(UUID peerDeviceId) {
+            return delegate.load(peerDeviceId);
+        }
+
+        @Override
+        public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
+            delegate.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
+        }
+
+        @Override
+        public void rejectKeyChange(UUID peerDeviceId) {
+            delegate.rejectKeyChange(peerDeviceId);
+        }
+
+        @Override
+        public void markRevoked(UUID peerDeviceId) {
+            delegate.markRevoked(peerDeviceId);
+        }
     }
 
-    /** SessionStore that simulates a crash inside the atomic commit boundary. */
-    static final class CrashDuringCommitSessions implements SessionStore {
-        private final SessionStore delegate;
+    /** ClientCryptoStore simulating a crash inside the atomic commit boundary. */
+    static final class CrashDuringCommitStores implements ClientCryptoStore {
+        private final CommitSpyStores delegate;
         private final AtomicBoolean armed = new AtomicBoolean(true);
 
-        CrashDuringCommitSessions(SessionStore delegate) {
+        CrashDuringCommitStores(CommitSpyStores delegate) {
             this.delegate = delegate;
         }
 
@@ -152,6 +234,88 @@ class AtomicCommitTest {
             }
             delegate.commitOutboundCiphertext(advancedSession, committedSlot);
         }
+
+        @Override
+        public void commitInboundEstablishment(
+                CryptoTypes.SessionRecord inboundSession, Integer consumedOneTimePrekeyIdOrNull) {
+            delegate.commitInboundEstablishment(inboundSession, consumedOneTimePrekeyIdOrNull);
+        }
+
+        @Override
+        public void provision(
+                SignalAdapter.LocalIdentity identity, SignalAdapter.SignedPrekeyPair signedPrekey) {
+            delegate.provision(identity, signedPrekey);
+        }
+
+        @Override
+        public boolean isProvisioned() {
+            return delegate.isProvisioned();
+        }
+
+        @Override
+        public UUID ownDeviceId() {
+            return delegate.ownDeviceId();
+        }
+
+        @Override
+        public int registrationId() {
+            return delegate.registrationId();
+        }
+
+        @Override
+        public byte[] identityPublicKey() {
+            return delegate.identityPublicKey();
+        }
+
+        @Override
+        public SignalAdapter.SealedPrivateHandle identityPrivate() {
+            return delegate.identityPrivate();
+        }
+
+        @Override
+        public SignalAdapter.SignedPrekeyPair signedPrekey() {
+            return delegate.signedPrekey();
+        }
+
+        @Override
+        public void putOneTimePrivate(int prekeyId, SignalAdapter.SealedPrivateHandle privateHandle) {
+            delegate.putOneTimePrivate(prekeyId, privateHandle);
+        }
+
+        @Override
+        public Optional<SignalAdapter.SealedPrivateHandle> oneTimePrivate(int prekeyId) {
+            return delegate.oneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public void forgetOneTimePrivate(int prekeyId) {
+            delegate.forgetOneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public CryptoTypes.TrustRecord observe(UUID peerDeviceId, byte[] identityPublicKey) {
+            return delegate.observe(peerDeviceId, identityPublicKey);
+        }
+
+        @Override
+        public Optional<CryptoTypes.TrustRecord> load(UUID peerDeviceId) {
+            return delegate.load(peerDeviceId);
+        }
+
+        @Override
+        public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
+            delegate.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
+        }
+
+        @Override
+        public void rejectKeyChange(UUID peerDeviceId) {
+            delegate.rejectKeyChange(peerDeviceId);
+        }
+
+        @Override
+        public void markRevoked(UUID peerDeviceId) {
+            delegate.markRevoked(peerDeviceId);
+        }
     }
 
     static final class SimulatedCrash extends RuntimeException {
@@ -164,9 +328,9 @@ class AtomicCommitTest {
     void committedCiphertextUsesOnlyTheAtomicBoundary() {
         UUID sender = UUID.randomUUID();
         CryptoTestFixtures.Harness h = CryptoTestFixtures.harness(sender);
-        CommitSpySessions spy = new CommitSpySessions(h.sessions());
+        CommitSpyStores spy = new CommitSpyStores(h.stores());
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), spy, h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), spy, h.claimFake(), h.submitFake());
 
         UUID bob = UUID.randomUUID();
         UUID peer = UUID.randomUUID();
@@ -189,9 +353,10 @@ class AtomicCommitTest {
     void crashDuringCommitLeavesNoPartialStateAndRetryIsDeterministic() {
         UUID sender = UUID.randomUUID();
         CryptoTestFixtures.Harness h = CryptoTestFixtures.harness(sender);
-        CrashDuringCommitSessions crashing = new CrashDuringCommitSessions(h.sessions());
+        CrashDuringCommitStores crashing =
+                new CrashDuringCommitStores(new CommitSpyStores(h.stores()));
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), crashing, h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), crashing, h.claimFake(), h.submitFake());
 
         UUID bob = UUID.randomUUID();
         UUID peer = UUID.randomUUID();
@@ -222,7 +387,7 @@ class AtomicCommitTest {
         // one deterministic commit, then an ACKED slot.
         crashing.disarm();
         SamvaadCryptoService recovered = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), crashing, h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), crashing, h.claimFake(), h.submitFake());
         SamvaadCryptoService.FanoutResult r =
                 recovered.sendToDevices(msg, sender, "m".getBytes(), directory, Set.of());
         assertEquals(SamvaadCryptoService.DeviceOutcome.SENT, r.outcomes().get(peer));

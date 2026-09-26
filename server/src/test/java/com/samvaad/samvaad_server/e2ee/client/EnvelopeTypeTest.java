@@ -81,7 +81,7 @@ class EnvelopeTypeTest {
                 h.sessions().loadSlot(msg, peer).orElseThrow().envelopeType());
 
         SamvaadCryptoService recovered = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), h.stores(), h.claimFake(), h.submitFake());
         recovered.sendToDevices(msg, sender, "m".getBytes(), directory, Set.of());
         assertEquals(CryptoTypes.EnvelopeType.PREKEY_INIT,
                 h.submitFake().batches().get(0).get(0).envelopeType());

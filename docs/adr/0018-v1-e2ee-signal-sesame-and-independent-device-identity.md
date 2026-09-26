@@ -329,7 +329,7 @@ Implemented foundation includes:
 - device revocation with server-session termination;
 - Samvaad-owned validation/authorization seams and regression coverage for concurrency and security boundaries.
 
-The implementation intentionally does **not** yet provide production-complete E2EE message confidentiality. ADR 0020 has since implemented the server-side ciphertext envelope/mailbox/history transport, while the Samvaad-owned client crypto/session boundary and deterministic fake implementation are now present for contract testing. The real Signal/Sesame adapter, production persistent cryptographic state, target-specific Web/Android/TUI cryptographic clients, and encrypted history backup/restoration remain future implementation work.
+The implementation intentionally does **not** yet provide production-complete E2EE message confidentiality. ADR 0020 has since implemented the server-side ciphertext envelope/mailbox/history transport, while the Samvaad-owned client crypto/session boundary and deterministic fake implementation are now present for contract testing. ADR 0022 has since established the client persistent store boundary (unified durability contract plus JVM reference implementation). The real Signal/Sesame adapter, platform-specific persistent cryptographic backends beyond the JVM reference store, target-specific Web/Android/TUI cryptographic clients, and encrypted history backup/restoration remain future implementation work.
 
 ## Implementation entry condition
 

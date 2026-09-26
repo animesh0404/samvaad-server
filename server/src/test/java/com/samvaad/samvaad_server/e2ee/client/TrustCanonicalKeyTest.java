@@ -217,7 +217,7 @@ class TrustCanonicalKeyTest {
         CryptoTestFixtures.Harness h = CryptoTestFixtures.harness(sender, fake);
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
                 new PinnedFingerprintAdapter(fake, "CONSTANT"),
-                h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.stores(), h.claimFake(), h.submitFake());
         UUID bob = UUID.randomUUID();
         UUID peer = UUID.randomUUID();
         h.claimFake().register(bob, peer, 1, "bob-phone", 9);
@@ -242,7 +242,7 @@ class TrustCanonicalKeyTest {
         CryptoTestFixtures.Harness h = CryptoTestFixtures.harness(sender, fake);
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
                 new VaryingFingerprintAdapter(fake),
-                h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.stores(), h.claimFake(), h.submitFake());
         UUID bob = UUID.randomUUID();
         UUID peer = UUID.randomUUID();
         h.claimFake().register(bob, peer, 1, "bob-phone", 9);

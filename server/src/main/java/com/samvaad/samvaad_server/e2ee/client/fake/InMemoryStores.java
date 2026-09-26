@@ -116,8 +116,20 @@ public final class InMemoryStores {
 
         @Override
         public void saveSlot(CryptoTypes.OutboundSlot slot) {
+            if (slot.state() == CryptoTypes.OutboundSlotState.COMMITTED) {
+                // Structural enforcement: COMMITTED rows are written only by
+                // commitOutboundCiphertext, together with the advanced session.
+                throw new IllegalStateException(
+                        "COMMITTED slots must be written via commitOutboundCiphertext");
+            }
             String k = key(slot.messageRequestId(), slot.recipientDeviceId());
             CryptoTypes.OutboundSlot existing = slots.get(k);
+            checkBundleContinuity(existing, slot);
+            slots.put(k, slot);
+        }
+
+        private static void checkBundleContinuity(
+                CryptoTypes.OutboundSlot existing, CryptoTypes.OutboundSlot slot) {
             if (existing != null && existing.claimedBundle() != null && slot.claimedBundle() != null
                     && !existing.claimRequestId().equals(slot.claimRequestId())) {
                 throw new IllegalArgumentException("slot claimRequestId changed; OTPK confusion");
@@ -134,7 +146,6 @@ public final class InMemoryStores {
                                     != slot.claimedBundle().signalDeviceId())) {
                 throw new IllegalArgumentException("slot address changed; routing confusion");
             }
-            slots.put(k, slot);
         }
 
         @Override
@@ -196,7 +207,183 @@ public final class InMemoryStores {
                         "atomic commit must advance exactly the previously committed session");
             }
             sessions.put(advancedSession.peerDeviceId(), advancedSession);
-            saveSlot(committedSlot);
+            CryptoTypes.OutboundSlot existingSlot =
+                    slots.get(key(committedSlot.messageRequestId(), committedSlot.recipientDeviceId()));
+            checkBundleContinuity(existingSlot, committedSlot);
+            slots.put(
+                    key(committedSlot.messageRequestId(), committedSlot.recipientDeviceId()),
+                    committedSlot);
+        }
+    }
+
+    /**
+     * Unified in-memory {@link com.samvaad.samvaad_server.e2ee.client.ClientCryptoStore}
+     * composing one of each single-concern store. Single-writer test scope:
+     * the two atomic boundaries are serialized on this facade, while direct
+     * pokes at the composed views (as tests do) bypass that monitor and are
+     * therefore only safe single-threaded.
+     */
+    public static final class Combined
+            implements com.samvaad.samvaad_server.e2ee.client.ClientCryptoStore {
+        private final DeviceKeys keys;
+        private final Sessions sessions;
+        private final Trust trust;
+
+        public Combined(DeviceKeys keys, Sessions sessions, Trust trust) {
+            this.keys = java.util.Objects.requireNonNull(keys, "keys");
+            this.sessions = java.util.Objects.requireNonNull(sessions, "sessions");
+            this.trust = java.util.Objects.requireNonNull(trust, "trust");
+        }
+
+        public DeviceKeys keys() {
+            return keys;
+        }
+
+        public Sessions sessions() {
+            return sessions;
+        }
+
+        public Trust trust() {
+            return trust;
+        }
+
+        @Override
+        public void saveSession(CryptoTypes.SessionRecord record) {
+            sessions.saveSession(record);
+        }
+
+        @Override
+        public Optional<CryptoTypes.SessionRecord> loadSession(UUID peerDeviceId) {
+            return sessions.loadSession(peerDeviceId);
+        }
+
+        @Override
+        public void deleteSession(UUID peerDeviceId) {
+            sessions.deleteSession(peerDeviceId);
+        }
+
+        @Override
+        public List<CryptoTypes.SessionRecord> allSessions() {
+            return sessions.allSessions();
+        }
+
+        @Override
+        public void saveSlot(CryptoTypes.OutboundSlot slot) {
+            sessions.saveSlot(slot);
+        }
+
+        @Override
+        public Optional<CryptoTypes.OutboundSlot> loadSlot(
+                UUID messageRequestId, UUID recipientDeviceId) {
+            return sessions.loadSlot(messageRequestId, recipientDeviceId);
+        }
+
+        @Override
+        public List<CryptoTypes.OutboundSlot> slotsForMessage(UUID messageRequestId) {
+            return sessions.slotsForMessage(messageRequestId);
+        }
+
+        @Override
+        public List<CryptoTypes.OutboundSlot> pendingSlots() {
+            return sessions.pendingSlots();
+        }
+
+        @Override
+        public synchronized void commitOutboundCiphertext(
+                CryptoTypes.SessionRecord advancedSession, CryptoTypes.OutboundSlot committedSlot) {
+            sessions.commitOutboundCiphertext(advancedSession, committedSlot);
+        }
+
+        @Override
+        public synchronized void commitInboundEstablishment(
+                CryptoTypes.SessionRecord inboundSession, Integer consumedOneTimePrekeyIdOrNull) {
+            if (inboundSession == null) {
+                throw new IllegalArgumentException("inbound commit requires a session");
+            }
+            if (inboundSession.state() != CryptoTypes.LocalSessionState.READY
+                    || inboundSession.sessionBlob() == null) {
+                throw new IllegalArgumentException("inbound commit requires a READY session with a blob");
+            }
+            sessions.saveSession(inboundSession);
+            if (consumedOneTimePrekeyIdOrNull != null) {
+                keys.forgetOneTimePrivate(consumedOneTimePrekeyIdOrNull);
+            }
+        }
+
+        @Override
+        public void provision(
+                SignalAdapter.LocalIdentity identity, SignalAdapter.SignedPrekeyPair signedPrekey) {
+            keys.provision(identity, signedPrekey);
+        }
+
+        @Override
+        public boolean isProvisioned() {
+            return keys.isProvisioned();
+        }
+
+        @Override
+        public UUID ownDeviceId() {
+            return keys.ownDeviceId();
+        }
+
+        @Override
+        public int registrationId() {
+            return keys.registrationId();
+        }
+
+        @Override
+        public byte[] identityPublicKey() {
+            return keys.identityPublicKey();
+        }
+
+        @Override
+        public SignalAdapter.SealedPrivateHandle identityPrivate() {
+            return keys.identityPrivate();
+        }
+
+        @Override
+        public SignalAdapter.SignedPrekeyPair signedPrekey() {
+            return keys.signedPrekey();
+        }
+
+        @Override
+        public void putOneTimePrivate(int prekeyId, SignalAdapter.SealedPrivateHandle privateHandle) {
+            keys.putOneTimePrivate(prekeyId, privateHandle);
+        }
+
+        @Override
+        public Optional<SignalAdapter.SealedPrivateHandle> oneTimePrivate(int prekeyId) {
+            return keys.oneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public void forgetOneTimePrivate(int prekeyId) {
+            keys.forgetOneTimePrivate(prekeyId);
+        }
+
+        @Override
+        public CryptoTypes.TrustRecord observe(UUID peerDeviceId, byte[] identityPublicKey) {
+            return trust.observe(peerDeviceId, identityPublicKey);
+        }
+
+        @Override
+        public Optional<CryptoTypes.TrustRecord> load(UUID peerDeviceId) {
+            return trust.load(peerDeviceId);
+        }
+
+        @Override
+        public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
+            trust.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
+        }
+
+        @Override
+        public void rejectKeyChange(UUID peerDeviceId) {
+            trust.rejectKeyChange(peerDeviceId);
+        }
+
+        @Override
+        public void markRevoked(UUID peerDeviceId) {
+            trust.markRevoked(peerDeviceId);
         }
     }
 

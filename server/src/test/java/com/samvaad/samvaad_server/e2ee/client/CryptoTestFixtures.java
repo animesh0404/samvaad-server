@@ -166,7 +166,8 @@ public final class CryptoTestFixtures {
             InMemoryStores.Trust trust,
             ClaimFake claimFake,
             SubmitFake submitFake,
-            SamvaadCryptoService service) {
+            SamvaadCryptoService service,
+            ClientCryptoStore stores) {
     }
 
     public static Harness harness(UUID ownDeviceId) {
@@ -178,11 +179,12 @@ public final class CryptoTestFixtures {
         keys.provision(adapter.generateIdentity(), adapter.generateSignedPrekey(new FakeSignalAdapter.FakeHandle(UUID.randomUUID()), 11));
         InMemoryStores.Sessions sessions = new InMemoryStores.Sessions();
         InMemoryStores.Trust trust = new InMemoryStores.Trust();
+        ClientCryptoStore stores = new InMemoryStores.Combined(keys, sessions, trust);
         ClaimFake claimFake = new ClaimFake();
         SubmitFake submitFake = new SubmitFake();
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
-                adapter, keys, sessions, trust, claimFake, submitFake);
-        return new Harness(adapter, keys, sessions, trust, claimFake, submitFake, service);
+                adapter, stores, claimFake, submitFake);
+        return new Harness(adapter, keys, sessions, trust, claimFake, submitFake, service, stores);
     }
 
     /**

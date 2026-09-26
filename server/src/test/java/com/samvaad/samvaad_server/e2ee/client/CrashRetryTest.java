@@ -42,7 +42,7 @@ class CrashRetryTest {
 
         // Simulated process restart: new service over the SAME durable stores.
         SamvaadCryptoService recovered = new SamvaadCryptoServiceImpl(
-                h.adapter(), h.keys(), h.sessions(), h.trust(), h.claimFake(), h.submitFake());
+                h.adapter(), h.stores(), h.claimFake(), h.submitFake());
         SamvaadCryptoService.FanoutResult r2 =
                 recovered.sendToDevices(msg, sender, "m".getBytes(), directory, Set.of());
         assertEquals(SamvaadCryptoService.DeviceOutcome.SENT, r2.outcomes().get(peer));

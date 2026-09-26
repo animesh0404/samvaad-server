@@ -22,23 +22,17 @@ import java.util.UUID;
 public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
 
     private final SignalAdapter adapter;
-    private final DeviceKeyStore deviceKeys;
-    private final SessionStore sessions;
-    private final TrustStore trust;
+    private final ClientCryptoStore stores;
     private final ClaimClient claims;
     private final SubmitClient submitter;
 
     public SamvaadCryptoServiceImpl(
             SignalAdapter adapter,
-            DeviceKeyStore deviceKeys,
-            SessionStore sessions,
-            TrustStore trust,
+            ClientCryptoStore stores,
             ClaimClient claims,
             SubmitClient submitter) {
         this.adapter = Objects.requireNonNull(adapter, "adapter");
-        this.deviceKeys = Objects.requireNonNull(deviceKeys, "deviceKeys");
-        this.sessions = Objects.requireNonNull(sessions, "sessions");
-        this.trust = Objects.requireNonNull(trust, "trust");
+        this.stores = Objects.requireNonNull(stores, "stores");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.submitter = Objects.requireNonNull(submitter, "submitter");
     }
@@ -55,7 +49,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         Objects.requireNonNull(plaintextAssoc, "plaintextAssoc");
         Objects.requireNonNull(directoryActive, "directoryActive");
         Objects.requireNonNull(explicitlyRevoked, "explicitlyRevoked");
-        if (!deviceKeys.isProvisioned()) {
+        if (!stores.isProvisioned()) {
             throw new IllegalStateException("own device not provisioned");
         }
 
@@ -128,20 +122,20 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             return DeviceOutcome.SENT;
         }
         CryptoTypes.OutboundSlot ackedCheck =
-                sessions.loadSlot(messageRequestId, peer).orElse(null);
+                stores.loadSlot(messageRequestId, peer).orElse(null);
         if (ackedCheck != null && ackedCheck.state() == CryptoTypes.OutboundSlotState.ACKED) {
             return DeviceOutcome.SENT;
         }
 
         // 1. Trust gate on the listed canonical identity key bytes.
-        CryptoTypes.TrustRecord verdict = trust.observe(peer, listed.identityPublicKey());
+        CryptoTypes.TrustRecord verdict = stores.observe(peer, listed.identityPublicKey());
         if (verdict.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
             persistSlot(new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
                     claimRequestId, CryptoTypes.OutboundSlotState.FAILED_PAUSED, null, null, null, null));
             return DeviceOutcome.PAUSED_KEY_CHANGED;
         }
         if (verdict.state() == CryptoTypes.TrustState.REVOKED_EXPLICIT) {
-            sessions.deleteSession(peer);
+            stores.deleteSession(peer);
             return DeviceOutcome.SKIPPED_REVOKED;
         }
         if (!adapter.verifySignedPrekey(
@@ -156,7 +150,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         // rejected by the store; resume reuses the persisted claimed bundle.
         // (COMMITTED/ACKED slots were already handled by the replay gate
         // above and never reach this point.)
-        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        CryptoTypes.OutboundSlot slot = stores.loadSlot(messageRequestId, peer).orElse(null);
         if (slot == null) {
             slot = new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
                     claimRequestId, CryptoTypes.OutboundSlotState.PENDING, null, null, null, null);
@@ -166,7 +160,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         // 3. Claim once per slot, and ONLY when no usable session exists.
         // A READY session with matching identity key bytes reuses directly: no claim,
         // no OTPK consumption. Resume replays the SAME claimRequestId.
-        CryptoTypes.SessionRecord session = sessions.loadSession(peer).orElse(null);
+        CryptoTypes.SessionRecord session = stores.loadSession(peer).orElse(null);
         boolean sessionUsable = session != null
                 && session.state() == CryptoTypes.LocalSessionState.READY
                 && session.peerIdentityPublicKey() != null
@@ -182,7 +176,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             }
             // Trust-check the claimed bundle too; a claim race could return a
             // rotated identity. Comparison is on canonical key bytes.
-            CryptoTypes.TrustRecord recheck = trust.observe(peer, bundle.identityPublicKey());
+            CryptoTypes.TrustRecord recheck = stores.observe(peer, bundle.identityPublicKey());
             if (recheck.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
                 persistSlot(withState(slot, CryptoTypes.OutboundSlotState.FAILED_PAUSED));
                 return DeviceOutcome.PAUSED_KEY_CHANGED;
@@ -208,18 +202,18 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             if (!sessionUsable) {
                 try {
                     SignalAdapter.EstablishedSession established =
-                            adapter.establishOutbound(deviceKeys.identityPrivate(), bundle);
+                            adapter.establishOutbound(stores.identityPrivate(), bundle);
                     CryptoTypes.EstablishmentMode mode = bundle.hasOneTimePrekey()
                             ? CryptoTypes.EstablishmentMode.WITH_ONE_TIME_PREKEY
                             : CryptoTypes.EstablishmentMode.SIGNED_PREKEY_FALLBACK;
-                    sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                    stores.saveSession(new CryptoTypes.SessionRecord(peer,
                             bundle.identityPublicKey(), bundle.registrationId(),
                             CryptoTypes.LocalSessionState.READY, mode,
                             established.sessionBlob(), 0, 0));
-                    session = sessions.loadSession(peer).orElseThrow();
+                    session = stores.loadSession(peer).orElseThrow();
                     establishedJustNow = true;
                 } catch (CryptoException.SessionCorruptException e) {
-                    sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                    stores.saveSession(new CryptoTypes.SessionRecord(peer,
                             bundle.identityPublicKey(), bundle.registrationId(),
                             CryptoTypes.LocalSessionState.CORRUPT, null, null, 0, 0));
                     return DeviceOutcome.FAILED_CORRUPT;
@@ -232,7 +226,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                     session.establishedVia(), envelopeType, bundle, null);
             persistSlot(slot);
         } else {
-            session = sessions.loadSession(peer).orElseThrow();
+            session = stores.loadSession(peer).orElseThrow();
         }
 
         // 5. Encrypt on the committed session; atomically commit the advanced
@@ -253,11 +247,11 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                     messageRequestId, senderDeviceId, peer, claimRequestId,
                     CryptoTypes.OutboundSlotState.COMMITTED, committed.establishedVia(),
                     slot.envelopeType(), claimed, encrypted.envelopeCiphertext());
-            sessions.commitOutboundCiphertext(advanced, committedSlot);
+            stores.commitOutboundCiphertext(advanced, committedSlot);
             batch.add(toEnvelope(messageRequestId, senderDeviceId, committedSlot));
             return DeviceOutcome.SENT;
         } catch (CryptoException.SessionCorruptException e) {
-            sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+            stores.saveSession(new CryptoTypes.SessionRecord(peer,
                     committed.peerIdentityPublicKey(), committed.peerRegistrationId(),
                     CryptoTypes.LocalSessionState.CORRUPT, committed.establishedVia(), null, 0, 0));
             return DeviceOutcome.FAILED_CORRUPT;
@@ -270,7 +264,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         Objects.requireNonNull(peerDeviceId, "peerDeviceId");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(envelopeCiphertext, "envelopeCiphertext");
-        CryptoTypes.SessionRecord session = sessions.loadSession(peerDeviceId).orElse(null);
+        CryptoTypes.SessionRecord session = stores.loadSession(peerDeviceId).orElse(null);
         byte[] current = session == null ? null : session.sessionBlob();
         try {
             SignalAdapter.DecryptResult result;
@@ -280,10 +274,10 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                 // private key bytes cross this boundary. Resolution is a peek:
                 // the reported consumed ID is forgotten exactly once below,
                 // after the inbound session is durably committed.
-                SignalAdapter.OtpkResolver otpks = deviceKeys::requireOneTimePrivate;
+                SignalAdapter.OtpkResolver otpks = stores::requireOneTimePrivate;
                 result = adapter.decryptPrekeyInit(
-                        deviceKeys.identityPrivate(),
-                        deviceKeys.signedPrekey().privateHandle(),
+                        stores.identityPrivate(),
+                        stores.signedPrekey().privateHandle(),
                         otpks,
                         current,
                         envelopeCiphertext);
@@ -301,21 +295,27 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             int regId = session == null ? 0 : session.peerRegistrationId();
             CryptoTypes.EstablishmentMode via =
                     session == null ? null : session.establishedVia();
-            sessions.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
-                    CryptoTypes.LocalSessionState.READY, via, result.updatedSessionBlob(), enc, dec));
-            if (kind == CryptoTypes.EnvelopeType.PREKEY_INIT
-                    && result.consumedOneTimePrekeyIdOrNull() != null) {
-                // Exactly-once consumption: the OTPK referenced by this
-                // envelope is forgotten now that the inbound session is
-                // durable. Replay of the same envelope fails closed at
-                // resolution time and never consumes another OTPK.
-                deviceKeys.forgetOneTimePrivate(result.consumedOneTimePrekeyIdOrNull());
+            if (kind == CryptoTypes.EnvelopeType.PREKEY_INIT) {
+                // Atomic inbound commit: the READY session and the OTPK
+                // consumption become durable together, or neither does. A
+                // crash leaves no half-state: retry either re-resolves the
+                // same OTPK (commit never happened) or fails closed at
+                // resolution time (commit happened) without consuming
+                // another OTPK, while the converged session stays usable.
+                stores.commitInboundEstablishment(
+                        new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
+                                CryptoTypes.LocalSessionState.READY, via,
+                                result.updatedSessionBlob(), enc, dec),
+                        result.consumedOneTimePrekeyIdOrNull());
+            } else {
+                stores.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
+                        CryptoTypes.LocalSessionState.READY, via, result.updatedSessionBlob(), enc, dec));
             }
             return result.plaintextAssoc();
         } catch (CryptoException.SessionCorruptException e) {
             byte[] peerKey = session == null ? null : session.peerIdentityPublicKey();
             int regId = session == null ? 0 : session.peerRegistrationId();
-            sessions.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
+            stores.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
                     CryptoTypes.LocalSessionState.CORRUPT, null, null, 0, 0));
             throw e;
         }
@@ -325,23 +325,23 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
     public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
         Objects.requireNonNull(peerDeviceId, "peerDeviceId");
         Objects.requireNonNull(newIdentityPublicKey, "newIdentityPublicKey");
-        trust.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
-        sessions.deleteSession(peerDeviceId);
+        stores.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
+        stores.deleteSession(peerDeviceId);
     }
 
     @Override
     public void rejectKeyChange(UUID peerDeviceId) {
-        trust.rejectKeyChange(peerDeviceId);
+        stores.rejectKeyChange(peerDeviceId);
     }
 
     @Override
     public void revokePeerDevice(UUID peerDeviceId) {
-        trust.markRevoked(peerDeviceId);
-        sessions.deleteSession(peerDeviceId);
+        stores.markRevoked(peerDeviceId);
+        stores.deleteSession(peerDeviceId);
     }
 
     private void persistSlot(CryptoTypes.OutboundSlot slot) {
-        sessions.saveSlot(slot);
+        stores.saveSlot(slot);
     }
 
     /**
@@ -356,7 +356,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             UUID senderDeviceId,
             UUID peer,
             List<CryptoTypes.OutboundEnvelope> batch) {
-        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        CryptoTypes.OutboundSlot slot = stores.loadSlot(messageRequestId, peer).orElse(null);
         if (slot == null) {
             return false;
         }
@@ -404,7 +404,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
     }
 
     private void markAcked(UUID messageRequestId, UUID senderDeviceId, UUID peer) {
-        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        CryptoTypes.OutboundSlot slot = stores.loadSlot(messageRequestId, peer).orElse(null);
         if (slot == null) {
             return;
         }

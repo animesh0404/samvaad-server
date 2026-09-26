@@ -42,6 +42,13 @@ public interface SessionStore {
      * claimRequestId) is allowed for forward state transitions only; changing
      * the claimed bundle for an existing slot is rejected to prevent OTPK
      * confusion.
+     *
+     * <p>Structural rule: implementations MUST reject slots in state {@code
+     * COMMITTED}. COMMITTED rows (which always carry ciphertext) are written
+     * exclusively by {@link #commitOutboundCiphertext}, so no normal code
+     * path can persist a committed slot without its matching advanced
+     * session. Later transitions of an already-committed slot (e.g. {@code
+     * ACKED}, which retains the ciphertext) remain valid single writes.
      */
     void saveSlot(CryptoTypes.OutboundSlot slot);
 
