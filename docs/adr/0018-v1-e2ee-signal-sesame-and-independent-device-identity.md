@@ -329,10 +329,10 @@ Implemented foundation includes:
 - device revocation with server-session termination;
 - Samvaad-owned validation/authorization seams and regression coverage for concurrency and security boundaries.
 
-The implementation intentionally does **not** yet provide full E2EE message confidentiality. Signal/Sesame session establishment, client-side persistent cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, per-device synchronization, encrypted history backup/restoration, and target-specific Web/Android/TUI cryptographic clients remain future implementation work.
+The implementation intentionally does **not** yet provide production-complete E2EE message confidentiality. ADR 0020 has since implemented the server-side ciphertext envelope/mailbox/history transport, while the Samvaad-owned client crypto/session boundary and deterministic fake implementation are now present for contract testing. The real Signal/Sesame adapter, production persistent cryptographic state, target-specific Web/Android/TUI cryptographic clients, and encrypted history backup/restoration remain future implementation work.
 
 ## Implementation entry condition
 
 The initial Signal-family feasibility validation has established the Java 25 server-side libsignal path and its glibc runtime requirement. The implementation path still requires validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints before production adoption. The exact backup file format and key-derivation serialization remain implementation details, while the V1 cipher choice is fixed above.
 
-The next implementation slice is **V1 E2EE Device & Signal/Sesame Foundation**, beginning with protocol-boundary design and remaining target-specific feasibility validation rather than message UI work.
+The next implementation slice is the **production Signal/Sesame integration**, beginning with hardening the existing Samvaad-owned crypto boundary and then implementing/validating the real adapter and platform-specific persistent cryptographic stores.

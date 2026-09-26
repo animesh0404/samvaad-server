@@ -22,9 +22,11 @@ The server provides authentication and persisted sessions, user/profile operatio
 
 Administrative hard deletion is implemented as explicit transactional cleanup rather than database `ON DELETE CASCADE`. A deletion locks the user row, removes sessions, profile, friend requests, sent messages, conversations involving the user and their messages, then removes the user row. The existing RESTRICT foreign keys remain database backstops. Successful deletion is `204 No Content`; a residual concurrent deletion conflict is `409 Conflict`.
 
-## V1 E2EE Device & Prekey Foundation
+## V1 E2EE implementation state
 
-The server-side E2EE device/enrollment/prekey/recovery foundation is implemented. Full E2EE message confidentiality remains unimplemented and is governed by ADR 0018.
+The server-side E2EE device/enrollment/prekey/recovery foundation is implemented. ADR 0020's ciphertext mailbox/history transport is also implemented: encrypted message envelopes are accepted and stored opaquely, per-device mailboxes can be fetched/acknowledged, ciphertext history is retained, and per-device synchronization cursors are supported.
+
+The Samvaad-owned client crypto/session boundary defined by the E2EE ADRs is now present as a contract-tested design slice, including the `SignalAdapter` seam, crypto types, local store contracts, trust/session orchestration, crash/retry state-machine contracts, and a deterministic fake adapter. This is not yet a production Signal/libsignal implementation, so end-to-end cryptographic confidentiality is not yet production-complete.
 
 ## Web Admin
 

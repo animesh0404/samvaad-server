@@ -3,7 +3,8 @@
 ## Status
 
 Accepted. Executable spec: `FingerprintContractTest` (JDK primitives
-only). No production code changed; no library selected.
+only). The Samvaad-owned client crypto seam now references this contract;
+production Signal integration remains pending.
 
 ## Context
 

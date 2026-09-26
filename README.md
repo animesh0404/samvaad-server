@@ -100,7 +100,7 @@ See `docs/development/setup.md` for the full packaging and deployment reference.
 
 ## Current Status
 
-The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, the current administrative user-deletion slice, and the V1 E2EE device/prekey foundation are implemented and tested. Realtime V1 has also been manually verified end-to-end.**
+The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, the current administrative user-deletion slice, the V1 E2EE device/prekey foundation, and the V1 E2EE ciphertext mailbox/history transport are implemented and tested. The Samvaad-owned client crypto/session contract and deterministic fake implementation slice are also present for contract testing. Realtime V1 has also been manually verified end-to-end.**
 
 Currently implemented:
 
@@ -117,6 +117,8 @@ Currently implemented:
 - **Message Reads**: Participants can fetch messages through `GET /api/conversations/direct/{conversationId}/messages` using the exclusive `afterSequence` cursor.
 - **Realtime Messaging V1**: WebSocket + STOMP transport at `/ws`, authenticated STOMP `CONNECT` using the existing access JWT/session model, participant-only conversation subscriptions, `/app/chat.send`, `/topic/conversations/{conversationId}`, reuse of the existing message persistence/idempotency/authorization logic, and broadcast only after successful persistence. The first slice uses Spring's in-memory simple broker. A manual Alice-to-Bob smoke test has verified live delivery without polling.
 - **Web Admin**: Angular 22 + TypeScript + Tailwind CSS administration UI with dashboard, user listing, user creation, user detail, and user deletion flows. Web Admin login uses `clientPlatform: "WEB"`; only `ADMIN` accounts are allowed to establish a Web Admin session. Valid non-admin credentials are rejected at the login page and do not retain tokens/session state.
+- **E2EE Transport**: V1 ciphertext message submission, per-device envelopes, durable mailbox delivery/acknowledgement, permanent ciphertext history, and per-device conversation synchronization cursors are implemented as specified by ADR 0020. The server remains cryptographically blind to message content.
+- **E2EE Client Crypto Boundary**: Samvaad-owned `SignalAdapter`, crypto types, local-store contracts, trust/session orchestration, crash/retry state-machine contracts, and a deterministic fake adapter are implemented for contract testing. This is not yet a production Signal/libsignal implementation.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
@@ -128,8 +130,9 @@ Currently implemented:
 - Message editing/deletion/replies.
 - Blocking, unfriend, archiving, and mute preferences.
 - Horizontal scaling/external brokers and a general event bus.
-- **V1 E2EE device/prekey foundation**: independent cryptographic device records, enrollment/recovery state machine, trusted-device approval seam, device revocation/session termination, five-device cap, one-time prekey upload/claim, recipient device directory, and account-level recovery-code handling.
-- **Full E2EE messaging is not yet implemented**: Signal/Sesame session establishment, client-side persistent cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, encrypted history synchronization, and encrypted history backup/restoration remain future slices.
+- **V1 E2EE Device & Prekey Foundation** is implemented: independent cryptographic device records, enrollment/recovery state machine, trusted-device approval seam, device revocation/session termination, five-device cap, one-time prekey upload/claim, recipient device directory, and account-level recovery-code handling.
+- **V1 E2EE Ciphertext Transport** is implemented: encrypted message envelope submission, per-device mailbox/history transport, acknowledgement, permanent ciphertext retention, and synchronization cursors.
+- **End-to-end cryptographic confidentiality is not yet production-complete**: the Samvaad-owned client crypto boundary and deterministic fake implementation are present, but the real Signal/Sesame adapter, persistent platform-specific cryptographic stores, and production Web/Android/TUI cryptographic clients remain future implementation work. Encrypted history backup/restoration also remains future work.
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
@@ -256,4 +259,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**V1 E2EE messaging implementation**: the server-side device, enrollment, recovery-code, prekey, and device-directory foundation is implemented. The next E2EE work is the Samvaad-owned crypto/session boundary and target-specific Signal-family integration, followed by encrypted message envelopes and migration of the current plaintext message contract. Public deployment edge configuration, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard remain separate deployment work.
+**V1 E2EE crypto implementation**: the server-side device/prekey foundation and ciphertext mailbox/history transport are implemented, and the Samvaad-owned crypto/session boundary has been defined with a deterministic fake implementation. The next E2EE work is to harden that boundary and then implement/validate the real Signal/Sesame adapter and platform-specific persistent cryptographic stores before production encrypted messaging replaces the current plaintext message path. Public deployment edge configuration, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard remain separate deployment work.
