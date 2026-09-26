@@ -1,0 +1,369 @@
+package com.samvaad.samvaad_server.e2ee.client;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Deterministic orchestration of the crash-safe send machine. No real
+ * cryptography; all math delegates to {@link SignalAdapter}.
+ *
+ * <p>Refinement over the first draft: a COMMITTED envelope's bytes are
+ * immutable for the slot — submit retries resubmit identical bytes (server
+ * requestId idempotent). Re-encryption happens only when no envelope was
+ * committed yet, and always on the currently committed session, never by
+ * restoring an older blob. This is what prevents ratchet divergence.
+ */
+public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
+
+    private final SignalAdapter adapter;
+    private final DeviceKeyStore deviceKeys;
+    private final SessionStore sessions;
+    private final TrustStore trust;
+    private final ClaimClient claims;
+    private final SubmitClient submitter;
+
+    public SamvaadCryptoServiceImpl(
+            SignalAdapter adapter,
+            DeviceKeyStore deviceKeys,
+            SessionStore sessions,
+            TrustStore trust,
+            ClaimClient claims,
+            SubmitClient submitter) {
+        this.adapter = Objects.requireNonNull(adapter, "adapter");
+        this.deviceKeys = Objects.requireNonNull(deviceKeys, "deviceKeys");
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.trust = Objects.requireNonNull(trust, "trust");
+        this.claims = Objects.requireNonNull(claims, "claims");
+        this.submitter = Objects.requireNonNull(submitter, "submitter");
+    }
+
+    @Override
+    public FanoutResult sendToDevices(
+            UUID messageRequestId,
+            UUID senderDeviceId,
+            byte[] plaintextAssoc,
+            List<CryptoTypes.RecipientBundle> directoryActive,
+            Set<UUID> explicitlyRevoked) {
+        Objects.requireNonNull(messageRequestId, "messageRequestId");
+        Objects.requireNonNull(senderDeviceId, "senderDeviceId");
+        Objects.requireNonNull(plaintextAssoc, "plaintextAssoc");
+        Objects.requireNonNull(directoryActive, "directoryActive");
+        Objects.requireNonNull(explicitlyRevoked, "explicitlyRevoked");
+        if (!deviceKeys.isProvisioned()) {
+            throw new IllegalStateException("own device not provisioned");
+        }
+
+        Map<UUID, DeviceOutcome> outcomes = new LinkedHashMap<>();
+        List<CryptoTypes.OutboundEnvelope> batch = new ArrayList<>();
+
+        for (CryptoTypes.RecipientBundle listed : directoryActive) {
+            UUID peer = listed.deviceId();
+            if (explicitlyRevoked.contains(peer)) {
+                revokePeerDevice(peer);
+                persistSlot(new CryptoTypes.OutboundSlot(
+                        messageRequestId, senderDeviceId, peer,
+                        CryptoTypes.deriveClaimRequestId(messageRequestId, senderDeviceId, peer),
+                        CryptoTypes.OutboundSlotState.FAILED_REVOKED, null, null, null, null));
+                outcomes.put(peer, DeviceOutcome.SKIPPED_REVOKED);
+                continue;
+            }
+            DeviceOutcome outcome = sendToOne(messageRequestId, senderDeviceId, plaintextAssoc, listed, batch);
+            outcomes.put(peer, outcome);
+        }
+        for (UUID peer : explicitlyRevoked) {
+            if (outcomes.containsKey(peer)) {
+                continue;
+            }
+            revokePeerDevice(peer);
+            outcomes.put(peer, DeviceOutcome.SKIPPED_REVOKED);
+        }
+
+        if (!batch.isEmpty()) {
+            try {
+                submitter.submit(messageRequestId, List.copyOf(batch));
+                for (CryptoTypes.OutboundEnvelope env : batch) {
+                    markAcked(messageRequestId, senderDeviceId, env.recipientDeviceId());
+                }
+            } catch (CryptoException.TransientException e) {
+                // COMMITTED envelopes stay as-is; a later retry resubmits the
+                // identical bytes. Outcomes below already SENT-candidate become
+                // DEFERRED; slots remain COMMITTED (not rolled back).
+                for (CryptoTypes.OutboundEnvelope env : batch) {
+                    outcomes.put(env.recipientDeviceId(), DeviceOutcome.DEFERRED_TRANSIENT);
+                }
+            }
+        }
+        return new FanoutResult(messageRequestId, Map.copyOf(outcomes));
+    }
+
+    private DeviceOutcome sendToOne(
+            UUID messageRequestId,
+            UUID senderDeviceId,
+            byte[] plaintextAssoc,
+            CryptoTypes.RecipientBundle listed,
+            List<CryptoTypes.OutboundEnvelope> batch) {
+        UUID peer = listed.deviceId();
+        UUID claimRequestId =
+                CryptoTypes.deriveClaimRequestId(messageRequestId, senderDeviceId, peer);
+
+        // 1. Trust gate on the listed identity.
+        String listedFingerprint = adapter.fingerprint(listed.identityPublicKey());
+        CryptoTypes.TrustRecord verdict = trust.observe(peer, listedFingerprint);
+        if (verdict.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
+            persistSlot(new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
+                    claimRequestId, CryptoTypes.OutboundSlotState.FAILED_PAUSED, null, null, null, null));
+            return DeviceOutcome.PAUSED_KEY_CHANGED;
+        }
+        if (verdict.state() == CryptoTypes.TrustState.REVOKED_EXPLICIT) {
+            sessions.deleteSession(peer);
+            return DeviceOutcome.SKIPPED_REVOKED;
+        }
+        if (!adapter.verifySignedPrekey(
+                listed.identityPublicKey(), listed.signedPrekey(), listed.signedPrekeySignature())) {
+            persistSlot(new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
+                    claimRequestId, CryptoTypes.OutboundSlotState.FAILED_TRANSIENT, null, null, null, null));
+            return DeviceOutcome.DEFERRED_TRANSIENT;
+        }
+
+        // 2. Resume or start the slot. Same slot key => same claimRequestId =>
+        // same server-consumed OTPK. A changed bundle for an existing slot is
+        // rejected by the store; resume reuses the persisted claimed bundle.
+        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        if (slot != null && slot.state() == CryptoTypes.OutboundSlotState.ACKED) {
+            return DeviceOutcome.SENT;
+        }
+        if (slot != null
+                && slot.state().ordinal() >= CryptoTypes.OutboundSlotState.COMMITTED.ordinal()
+                && slot.state() != CryptoTypes.OutboundSlotState.SUBMITTED
+                && slot.envelopeCiphertext() != null) {
+            // Crash between COMMIT and SUBMIT: resubmit identical bytes.
+            batch.add(toEnvelope(messageRequestId, senderDeviceId, slot));
+            return DeviceOutcome.SENT;
+        }
+        if (slot == null) {
+            slot = new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
+                    claimRequestId, CryptoTypes.OutboundSlotState.PENDING, null, null, null, null);
+            persistSlot(slot);
+        }
+
+        // 3. Claim once per slot, and ONLY when no usable session exists.
+        // A READY session with matching fingerprint reuses directly: no claim,
+        // no OTPK consumption. Resume replays the SAME claimRequestId.
+        CryptoTypes.SessionRecord session = sessions.loadSession(peer).orElse(null);
+        boolean sessionUsable = session != null
+                && session.state() == CryptoTypes.LocalSessionState.READY
+                && session.peerIdentityPublicKey() != null
+                && Arrays.equals(session.peerIdentityPublicKey(), listed.identityPublicKey());
+        CryptoTypes.RecipientBundle bundle =
+                slot != null ? slot.claimedBundle() : null;
+        if (bundle == null && !sessionUsable) {
+            try {
+                bundle = claims.claim(peer, claimRequestId);
+            } catch (CryptoException.TransientException | CryptoException.ClaimFailedException e) {
+                persistSlot(withState(slot, CryptoTypes.OutboundSlotState.FAILED_TRANSIENT));
+                return DeviceOutcome.DEFERRED_TRANSIENT;
+            }
+            // Trust-check the claimed bundle too; a claim race could return a
+            // rotated identity.
+            String claimedFingerprint = adapter.fingerprint(bundle.identityPublicKey());
+            CryptoTypes.TrustRecord recheck = trust.observe(peer, claimedFingerprint);
+            if (recheck.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
+                persistSlot(withState(slot, CryptoTypes.OutboundSlotState.FAILED_PAUSED));
+                return DeviceOutcome.PAUSED_KEY_CHANGED;
+            }
+            slot = new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
+                    claimRequestId, CryptoTypes.OutboundSlotState.CLAIMED, null, null, bundle, null);
+            persistSlot(slot);
+        } else if (bundle == null) {
+            // Session reuse: the listed bundle supplies header fields only;
+            // no OTPK is consumed.
+            bundle = listed;
+        }
+
+        // 4. Establish once per slot; reuse the committed session afterwards.
+        // Envelope type rule (frozen): PREKEY_INIT iff this slot establishes
+        // the session (first ciphertext ever on it); RATCHET iff a usable
+        // session predates this slot. A virgin (0/0 counters) resumed session
+        // can only come from this slot's crashed attempt, so it is PREKEY_INIT.
+        boolean establishedJustNow = false;
+        boolean alreadyCommitted =
+                slot.state().ordinal() >= CryptoTypes.OutboundSlotState.SESSION_READY.ordinal();
+        if (!sessionUsable || !alreadyCommitted) {
+            if (!sessionUsable) {
+                try {
+                    SignalAdapter.EstablishedSession established =
+                            adapter.establishOutbound(deviceKeys.identityPrivate(), bundle);
+                    CryptoTypes.EstablishmentMode mode = bundle.hasOneTimePrekey()
+                            ? CryptoTypes.EstablishmentMode.WITH_ONE_TIME_PREKEY
+                            : CryptoTypes.EstablishmentMode.SIGNED_PREKEY_FALLBACK;
+                    sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                            bundle.identityPublicKey(), bundle.registrationId(),
+                            CryptoTypes.LocalSessionState.READY, mode,
+                            established.sessionBlob(), 0, 0));
+                    session = sessions.loadSession(peer).orElseThrow();
+                    establishedJustNow = true;
+                } catch (CryptoException.SessionCorruptException e) {
+                    sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                            bundle.identityPublicKey(), bundle.registrationId(),
+                            CryptoTypes.LocalSessionState.CORRUPT, null, null, 0, 0));
+                    return DeviceOutcome.FAILED_CORRUPT;
+                }
+            }
+            CryptoTypes.EnvelopeType envelopeType =
+                    resolveEnvelopeType(slot.envelopeType(), establishedJustNow, session);
+            slot = new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
+                    claimRequestId, CryptoTypes.OutboundSlotState.SESSION_READY,
+                    session.establishedVia(), envelopeType, bundle, null);
+            persistSlot(slot);
+        } else {
+            session = sessions.loadSession(peer).orElseThrow();
+        }
+
+        // 5. Encrypt on the committed session; commit envelope + advanced blob.
+        final CryptoTypes.RecipientBundle claimed = bundle;
+        final CryptoTypes.SessionRecord committed = session;
+        try {
+            SignalAdapter.EncryptResult encrypted = adapter.encrypt(committed.sessionBlob(), plaintextAssoc);
+            sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                    committed.peerIdentityPublicKey(), committed.peerRegistrationId(),
+                    CryptoTypes.LocalSessionState.READY, committed.establishedVia(),
+                    encrypted.updatedSessionBlob(),
+                    committed.encryptCounter() + 1, committed.decryptCounter()));
+            CryptoTypes.OutboundSlot committedSlot = new CryptoTypes.OutboundSlot(
+                    messageRequestId, senderDeviceId, peer, claimRequestId,
+                    CryptoTypes.OutboundSlotState.COMMITTED, committed.establishedVia(),
+                    slot.envelopeType(), claimed, encrypted.envelopeCiphertext());
+            persistSlot(committedSlot);
+            batch.add(toEnvelope(messageRequestId, senderDeviceId, committedSlot));
+            return DeviceOutcome.SENT;
+        } catch (CryptoException.SessionCorruptException e) {
+            sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+                    committed.peerIdentityPublicKey(), committed.peerRegistrationId(),
+                    CryptoTypes.LocalSessionState.CORRUPT, committed.establishedVia(), null, 0, 0));
+            return DeviceOutcome.FAILED_CORRUPT;
+        }
+    }
+
+    @Override
+    public byte[] decrypt(
+            UUID senderDeviceId, UUID peerDeviceId, CryptoTypes.EnvelopeType kind, byte[] envelopeCiphertext) {
+        Objects.requireNonNull(peerDeviceId, "peerDeviceId");
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(envelopeCiphertext, "envelopeCiphertext");
+        CryptoTypes.SessionRecord session = sessions.loadSession(peerDeviceId).orElse(null);
+        byte[] current = session == null ? null : session.sessionBlob();
+        try {
+            SignalAdapter.DecryptResult result;
+            if (kind == CryptoTypes.EnvelopeType.PREKEY_INIT) {
+                result = adapter.decryptPrekeyInit(
+                        deviceKeys.identityPrivate(),
+                        deviceKeys.signedPrekey().privateHandle(),
+                        List.of(),
+                        current,
+                        envelopeCiphertext);
+            } else if (kind == CryptoTypes.EnvelopeType.RATCHET) {
+                if (current == null) {
+                    throw new CryptoException.SessionCorruptException("no session for ratchet message");
+                }
+                result = adapter.decrypt(current, envelopeCiphertext);
+            } else {
+                throw new CryptoException.ClaimFailedException("unknown envelope type");
+            }
+            long enc = session == null ? 0 : session.encryptCounter();
+            long dec = session == null ? 0 : session.decryptCounter() + 1;
+            byte[] peerKey = session == null ? null : session.peerIdentityPublicKey();
+            int regId = session == null ? 0 : session.peerRegistrationId();
+            CryptoTypes.EstablishmentMode via =
+                    session == null ? null : session.establishedVia();
+            sessions.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
+                    CryptoTypes.LocalSessionState.READY, via, result.updatedSessionBlob(), enc, dec));
+            return result.plaintextAssoc();
+        } catch (CryptoException.SessionCorruptException e) {
+            byte[] peerKey = session == null ? null : session.peerIdentityPublicKey();
+            int regId = session == null ? 0 : session.peerRegistrationId();
+            sessions.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
+                    CryptoTypes.LocalSessionState.CORRUPT, null, null, 0, 0));
+            throw e;
+        }
+    }
+
+    @Override
+    public void acceptKeyChange(UUID peerDeviceId, String newFingerprint) {
+        trust.acceptKeyChange(peerDeviceId, newFingerprint);
+        sessions.deleteSession(peerDeviceId);
+    }
+
+    @Override
+    public void rejectKeyChange(UUID peerDeviceId) {
+        trust.rejectKeyChange(peerDeviceId);
+    }
+
+    @Override
+    public void revokePeerDevice(UUID peerDeviceId) {
+        trust.markRevoked(peerDeviceId);
+        sessions.deleteSession(peerDeviceId);
+    }
+
+    private void persistSlot(CryptoTypes.OutboundSlot slot) {
+        sessions.saveSlot(slot);
+    }
+
+    private static CryptoTypes.OutboundSlot withState(
+            CryptoTypes.OutboundSlot slot, CryptoTypes.OutboundSlotState state) {
+        return new CryptoTypes.OutboundSlot(slot.messageRequestId(), slot.senderDeviceId(),
+                slot.recipientDeviceId(), slot.claimRequestId(), state,
+                slot.establishmentMode(), slot.envelopeType(),
+                slot.claimedBundle(), slot.envelopeCiphertext());
+    }
+
+    /**
+     * Frozen envelope-type rule: a persisted type never changes; a slot that
+     * established its session produces PREKEY_INIT; otherwise a virgin
+     * (never-used) resumed session also means this slot established it
+     * before crashing, so PREKEY_INIT; any previously-used session means
+     * RATCHET.
+     */
+    private static CryptoTypes.EnvelopeType resolveEnvelopeType(
+            CryptoTypes.EnvelopeType persisted,
+            boolean establishedJustNow,
+            CryptoTypes.SessionRecord session) {
+        if (persisted != null) {
+            return persisted;
+        }
+        if (establishedJustNow) {
+            return CryptoTypes.EnvelopeType.PREKEY_INIT;
+        }
+        if (session.encryptCounter() == 0 && session.decryptCounter() == 0) {
+            return CryptoTypes.EnvelopeType.PREKEY_INIT;
+        }
+        return CryptoTypes.EnvelopeType.RATCHET;
+    }
+
+    private void markAcked(UUID messageRequestId, UUID senderDeviceId, UUID peer) {
+        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        if (slot == null) {
+            return;
+        }
+        persistSlot(withState(slot, CryptoTypes.OutboundSlotState.ACKED));
+    }
+
+    private CryptoTypes.OutboundEnvelope toEnvelope(
+            UUID messageRequestId, UUID senderDeviceId, CryptoTypes.OutboundSlot slot) {
+        CryptoTypes.EnvelopeType envelopeType =
+                Objects.requireNonNull(slot.envelopeType(), "slot envelope type required for envelope");
+        return new CryptoTypes.OutboundEnvelope(
+                CryptoTypes.ENVELOPE_FORMAT_VERSION,
+                CryptoTypes.CRYPTO_SUITE,
+                envelopeType,
+                messageRequestId,
+                senderDeviceId,
+                slot.recipientDeviceId(),
+                slot.envelopeCiphertext());
+    }
+}
