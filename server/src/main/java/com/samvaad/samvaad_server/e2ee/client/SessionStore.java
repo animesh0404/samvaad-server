@@ -51,4 +51,26 @@ public interface SessionStore {
 
     /** Un-acked slots pending recovery after restart. */
     List<CryptoTypes.OutboundSlot> pendingSlots();
+
+    /**
+     * Durable atomic commit of one outbound encrypt result: the advanced
+     * session blob AND the {@code COMMITTED} slot carrying the corresponding
+     * ciphertext become visible together, or neither does.
+     *
+     * <p>Callers MUST use this boundary (never a separate
+     * {@link #saveSession} + {@link #saveSlot} pair) for the
+     * encrypt-to-COMMITTED transition. Otherwise a crash between the two
+     * writes leaves a durable session-advanced/ciphertext-missing state, and
+     * recovery re-encryption on the advanced ratchet diverges from any
+     * redelivered bytes.
+     *
+     * <p>Contract: {@code committedSlot} must be in state {@code COMMITTED}
+     * with a non-null ciphertext; {@code advancedSession} must belong to the
+     * same peer and advance the previously committed session's encrypt
+     * counter by exactly one. Violations fail with {@link
+     * IllegalArgumentException}; a store that cannot make both writes atomic
+     * must fail rather than persist a partial commit.
+     */
+    void commitOutboundCiphertext(
+            CryptoTypes.SessionRecord advancedSession, CryptoTypes.OutboundSlot committedSlot);
 }

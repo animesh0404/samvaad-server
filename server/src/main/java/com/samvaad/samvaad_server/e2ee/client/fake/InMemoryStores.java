@@ -163,26 +163,66 @@ public final class InMemoryStores {
             });
             return out;
         }
+
+        /**
+         * Atomic commit for the fake slice: both rows are installed under one
+         * monitor, so a crash inside this method (modelled by throwing before
+         * entry) can never leave a session-advanced/ciphertext-missing state
+         * visible to recovery. Production backends must provide the same
+         * all-or-nothing boundary (single transaction).
+         */
+        @Override
+        public synchronized void commitOutboundCiphertext(
+                CryptoTypes.SessionRecord advancedSession, CryptoTypes.OutboundSlot committedSlot) {
+            if (advancedSession == null || committedSlot == null) {
+                throw new IllegalArgumentException("atomic commit requires session and slot");
+            }
+            if (committedSlot.state() != CryptoTypes.OutboundSlotState.COMMITTED) {
+                throw new IllegalArgumentException("atomic commit requires a COMMITTED slot");
+            }
+            if (committedSlot.envelopeCiphertext() == null) {
+                throw new IllegalArgumentException("atomic commit requires committed ciphertext");
+            }
+            if (!advancedSession.peerDeviceId().equals(committedSlot.recipientDeviceId())) {
+                throw new IllegalArgumentException("atomic commit peer mismatch");
+            }
+            CryptoTypes.SessionRecord previous = sessions.get(advancedSession.peerDeviceId());
+            if (previous == null
+                    || advancedSession.encryptCounter() != previous.encryptCounter() + 1
+                    || advancedSession.decryptCounter() != previous.decryptCounter()
+                    || !Arrays.equals(
+                            advancedSession.peerIdentityPublicKey(), previous.peerIdentityPublicKey())) {
+                throw new IllegalStateException(
+                        "atomic commit must advance exactly the previously committed session");
+            }
+            sessions.put(advancedSession.peerDeviceId(), advancedSession);
+            saveSlot(committedSlot);
+        }
     }
 
     public static final class Trust implements TrustStore {
         private final Map<UUID, CryptoTypes.TrustRecord> records = new ConcurrentHashMap<>();
 
         @Override
-        public CryptoTypes.TrustRecord observe(UUID peerDeviceId, String fingerprint) {
+        public CryptoTypes.TrustRecord observe(UUID peerDeviceId, byte[] identityPublicKey) {
+            java.util.Objects.requireNonNull(peerDeviceId, "peerDeviceId");
+            java.util.Objects.requireNonNull(identityPublicKey, "identityPublicKey");
             CryptoTypes.TrustRecord existing = records.get(peerDeviceId);
             if (existing == null) {
-                CryptoTypes.TrustRecord fresh =
-                        new CryptoTypes.TrustRecord(peerDeviceId, fingerprint, CryptoTypes.TrustState.TRUSTED);
+                CryptoTypes.TrustRecord fresh = new CryptoTypes.TrustRecord(
+                        peerDeviceId,
+                        Arrays.copyOf(identityPublicKey, identityPublicKey.length),
+                        CryptoTypes.TrustState.TRUSTED);
                 records.put(peerDeviceId, fresh);
                 return fresh;
             }
             if (existing.state() == CryptoTypes.TrustState.REVOKED_EXPLICIT) {
                 return existing;
             }
-            if (existing.fingerprint() != null && !existing.fingerprint().equals(fingerprint)) {
+            if (existing.identityPublicKey() != null
+                    && !Arrays.equals(existing.identityPublicKey(), identityPublicKey)) {
                 CryptoTypes.TrustRecord paused = new CryptoTypes.TrustRecord(
-                        peerDeviceId, existing.fingerprint(), CryptoTypes.TrustState.PAUSED_KEY_CHANGED);
+                        peerDeviceId, existing.identityPublicKey(), CryptoTypes.TrustState.PAUSED_KEY_CHANGED);
                 records.put(peerDeviceId, paused);
                 return paused;
             }
@@ -195,25 +235,28 @@ public final class InMemoryStores {
         }
 
         @Override
-        public void acceptKeyChange(UUID peerDeviceId, String newFingerprint) {
-            records.put(peerDeviceId,
-                    new CryptoTypes.TrustRecord(peerDeviceId, newFingerprint, CryptoTypes.TrustState.TRUSTED));
+        public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
+            java.util.Objects.requireNonNull(peerDeviceId, "peerDeviceId");
+            java.util.Objects.requireNonNull(newIdentityPublicKey, "newIdentityPublicKey");
+            records.put(peerDeviceId, new CryptoTypes.TrustRecord(peerDeviceId,
+                    Arrays.copyOf(newIdentityPublicKey, newIdentityPublicKey.length),
+                    CryptoTypes.TrustState.TRUSTED));
         }
 
         @Override
         public void rejectKeyChange(UUID peerDeviceId) {
             CryptoTypes.TrustRecord existing = records.get(peerDeviceId);
-            String fp = existing == null ? null : existing.fingerprint();
+            byte[] key = existing == null ? null : existing.identityPublicKey();
             records.put(peerDeviceId,
-                    new CryptoTypes.TrustRecord(peerDeviceId, fp, CryptoTypes.TrustState.PAUSED_KEY_CHANGED));
+                    new CryptoTypes.TrustRecord(peerDeviceId, key, CryptoTypes.TrustState.PAUSED_KEY_CHANGED));
         }
 
         @Override
         public void markRevoked(UUID peerDeviceId) {
             CryptoTypes.TrustRecord existing = records.get(peerDeviceId);
-            String fp = existing == null ? null : existing.fingerprint();
+            byte[] key = existing == null ? null : existing.identityPublicKey();
             records.put(peerDeviceId,
-                    new CryptoTypes.TrustRecord(peerDeviceId, fp, CryptoTypes.TrustState.REVOKED_EXPLICIT));
+                    new CryptoTypes.TrustRecord(peerDeviceId, key, CryptoTypes.TrustState.REVOKED_EXPLICIT));
         }
     }
 

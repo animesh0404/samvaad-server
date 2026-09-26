@@ -97,11 +97,23 @@ public final class FakeSignalAdapter implements SignalAdapter {
     public DecryptResult decryptPrekeyInit(
             SealedPrivateHandle ownIdentityPrivate,
             SealedPrivateHandle ownSignedPrivate,
-            List<SealedPrivateHandle> ownOneTimePrivates,
+            OtpkResolver otpks,
             byte[] currentSessionBlobOrNull,
             byte[] envelopeCiphertext) {
         decryptCalls.incrementAndGet();
         maybeCorrupt();
+        // The referenced OTPK ID is parsed from this adapter's own framing
+        // (the real adapter reads the typed Signal prekey-init fields). An
+        // envelope carrying one-time-prekey material resolves exactly that
+        // handle — unknown/consumed IDs fail closed via the resolver and
+        // never substitute another OTPK. Fallback envelopes (no OTPK marker)
+        // resolve nothing.
+        java.util.OptionalInt referenced = extractOneTimePrekeyId(envelopeCiphertext);
+        Integer consumed = null;
+        if (referenced.isPresent()) {
+            otpks.resolve(referenced.getAsInt());
+            consumed = referenced.getAsInt();
+        }
         // Convergence: keep the existing outbound session usable by deriving
         // the inbound state from it when present, else create fresh state.
         String base = currentSessionBlobOrNull == null
@@ -109,7 +121,7 @@ public final class FakeSignalAdapter implements SignalAdapter {
                 : new String(currentSessionBlobOrNull, StandardCharsets.UTF_8) + "+in";
         byte[] updated = base.getBytes(StandardCharsets.UTF_8);
         sessions.put(base, 1);
-        return new DecryptResult(updated, plainOf(envelopeCiphertext));
+        return new DecryptResult(updated, plainOf(envelopeCiphertext), consumed);
     }
 
     @Override
@@ -137,7 +149,7 @@ public final class FakeSignalAdapter implements SignalAdapter {
         String base = new String(sessionBlob, StandardCharsets.UTF_8);
         String next = base + "#d" + decryptCalls.get();
         return new DecryptResult(
-                next.getBytes(StandardCharsets.UTF_8), plainOf(envelopeCiphertext));
+                next.getBytes(StandardCharsets.UTF_8), plainOf(envelopeCiphertext), null);
     }
 
     public int establishCalls() {
@@ -169,8 +181,35 @@ public final class FakeSignalAdapter implements SignalAdapter {
         }
     }
 
-    private static byte[] plainOf(byte[] envelopeCiphertext) {
+    /**
+     * Extracts the OTPK ID referenced by a fake prekey-init envelope, if any.
+     * Fake-only framing lookup (the real adapter reads typed Signal fields):
+     * the sender-side session segment precedes the plaintext, so the first
+     * {@code :otpk:<digits>} marker identifies the consumed prekey.
+     */
+    static java.util.OptionalInt extractOneTimePrekeyId(byte[] envelopeCiphertext) {
         String s = new String(envelopeCiphertext, StandardCharsets.UTF_8);
+        String marker = ":otpk:";
+        int at = s.indexOf(marker);
+        if (at < 0) {
+            return java.util.OptionalInt.empty();
+        }
+        int start = at + marker.length();
+        int end = start;
+        while (end < s.length() && Character.isDigit(s.charAt(end))) {
+            end++;
+        }
+        if (end == start) {
+            return java.util.OptionalInt.empty();
+        }
+        try {
+            return java.util.OptionalInt.of(Integer.parseInt(s.substring(start, end)));
+        } catch (NumberFormatException e) {
+            return java.util.OptionalInt.empty();
+        }
+    }
+
+    private static byte[] plainOf(byte[] envelopeCiphertext) {        String s = new String(envelopeCiphertext, StandardCharsets.UTF_8);
         String prefix = "fake-ct:";
         if (s.startsWith(prefix)) {
             // fake-ct:<session>:<plain>

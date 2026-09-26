@@ -243,11 +243,20 @@ public final class CryptoTypes {
         }
     }
 
-    /** Durable trust record; fingerprint is adapter-defined display string. */
-    public record TrustRecord(UUID peerDeviceId, String fingerprint, TrustState state) {
+    /**
+     * Durable trust record. The canonical identity public key bytes are the
+     * authoritative trust primitive: comparisons are byte-equality on these
+     * bytes only. Human-verifiable fingerprints are a derived display form
+     * (see {@link SignalAdapter#fingerprint(byte[])} and ADR-0021) and are
+     * never persisted or compared here. Private keys never appear in this
+     * contract.
+     */
+    public record TrustRecord(UUID peerDeviceId, byte[] identityPublicKey, TrustState state) {
         public TrustRecord {
             Objects.requireNonNull(peerDeviceId, "peerDeviceId");
             Objects.requireNonNull(state, "state");
+            identityPublicKey =
+                    identityPublicKey == null ? null : Arrays.copyOf(identityPublicKey, identityPublicKey.length);
         }
     }
 

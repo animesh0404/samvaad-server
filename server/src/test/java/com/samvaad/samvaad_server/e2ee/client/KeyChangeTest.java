@@ -43,9 +43,10 @@ class KeyChangeTest {
         assertEquals(SamvaadCryptoService.DeviceOutcome.PAUSED_KEY_CHANGED, r3.outcomes().get(peer));
 
         // Accept purges the old session and re-establishes on next send.
-        String newFp = h.adapter().fingerprint(CryptoTestFixtures.key("carol-v2:id"));
+        // Acceptance takes the canonical identity key bytes, not a display string.
+        byte[] newKey = CryptoTestFixtures.key("carol-v2:id");
         h.claimFake().register(carol, peer, 1, "carol-v2", 3);
-        h.service().acceptKeyChange(peer, newFp);
+        h.service().acceptKeyChange(peer, newKey);
         assertTrue(h.sessions().loadSession(peer).isEmpty());
         UUID msg4 = UUID.randomUUID();
         SamvaadCryptoService.FanoutResult r4 = h.service().sendToDevices(msg4, sender,

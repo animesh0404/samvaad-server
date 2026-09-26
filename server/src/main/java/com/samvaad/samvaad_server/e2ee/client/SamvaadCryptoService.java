@@ -21,9 +21,15 @@ import java.util.UUID;
  * <p>Retry/crash rules: resume with the SAME claimRequestId and SAME claimed
  * bundle (replayed claim); never consume a second OTPK for the same slot;
  * never create a second session for the same slot after SESSION_READY — reuse
- * the committed blob; failed submit does NOT roll the ratchet back, retry
- * re-encrypts on the advanced state. Local re-establishment before submit is
- * allowed only with the SAME bundle and only one envelope is ever submitted.
+ * the committed blob; failed submit does NOT roll the ratchet back and does
+ * NOT re-encrypt: retry resubmits the identical committed bytes. Local
+ * re-establishment before commit is allowed only with the SAME bundle and
+ * only one envelope is ever submitted per slot.
+ *
+ * <p>Committed-slot precedence: a retry for a message with an already
+ * COMMITTED slot replays the exact committed envelope before (and regardless
+ * of) current directory/device/trust evaluation; later identity or trust
+ * changes never re-encrypt a committed message.
  *
  * <p>Presence rules: directory miss = NOT_RETURNED_TRANSIENT (retain session
  * + trust, defer slot); only explicit revocation = terminal purge.
@@ -91,8 +97,11 @@ public interface SamvaadCryptoService {
      */
     byte[] decrypt(UUID senderDeviceId, UUID peerDeviceId, CryptoTypes.EnvelopeType kind, byte[] envelopeCiphertext);
 
-    /** Explicit user verification path after a key-change pause. */
-    void acceptKeyChange(UUID peerDeviceId, String newFingerprint);
+    /**
+     * Explicit user verification path after a key-change pause. Accepts the
+     * canonical identity public key bytes (never a display string).
+     */
+    void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey);
 
     void rejectKeyChange(UUID peerDeviceId);
 

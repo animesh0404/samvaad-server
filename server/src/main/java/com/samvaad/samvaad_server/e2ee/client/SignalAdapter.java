@@ -1,6 +1,5 @@
 package com.samvaad.samvaad_server.e2ee.client;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -55,7 +54,31 @@ public interface SignalAdapter {
     }
 
     /** Result of one decrypt call; caller persists the updated session blob. */
-    record DecryptResult(byte[] updatedSessionBlob, byte[] plaintextAssoc) {
+    record DecryptResult(
+            byte[] updatedSessionBlob,
+            byte[] plaintextAssoc,
+            Integer consumedOneTimePrekeyIdOrNull) {
+    }
+
+    /**
+     * Samvaad-owned lookup of sealed one-time-prekey private handles by
+     * prekey ID, for inbound prekey-init processing.
+     *
+     * <p>The adapter parses the incoming envelope's referenced OTPK ID from
+     * its own typed Signal fields (never from Samvaad-layer parsing) and
+     * resolves exactly that handle through this callback. Resolution is a
+     * peek: it must NOT consume. The caller consumes (forgets) the reported
+     * {@link DecryptResult#consumedOneTimePrekeyIdOrNull} exactly once after
+     * the inbound session is durably committed.
+     *
+     * <p>Unknown or already-consumed IDs fail closed with {@link
+     * CryptoException.ClaimFailedException}; the resolver must never
+     * substitute a different OTPK, so replay of a consumed OTPK is a
+     * deterministic rejection, never a second consumption.
+     */
+    @FunctionalInterface
+    interface OtpkResolver {
+        SealedPrivateHandle resolve(int oneTimePrekeyId);
     }
 
     LocalIdentity generateIdentity();
@@ -64,7 +87,11 @@ public interface SignalAdapter {
 
     OneTimePrekeyPair generateOneTimePrekey(int prekeyId);
 
-    /** Stable display fingerprint of an identity public key. */
+    /**
+     * Stable display fingerprint of an identity public key, for human
+     * out-of-band verification UI only. Trust decisions compare canonical
+     * key bytes, never this string.
+     */
     String fingerprint(byte[] identityPublicKey);
 
     /** Verify signed-prekey signature against the identity key. */
@@ -82,11 +109,17 @@ public interface SignalAdapter {
      * Inbound processing of a PREKEY_INIT envelope. Must NOT destroy a
      * concurrently existing outbound session for the same peer: implementations
      * converge (Sesame-style) so both directions remain decryptable.
+     *
+     * <p>The adapter extracts the referenced one-time-prekey ID from the
+     * envelope itself and resolves exactly that private handle via {@code
+     * otpks}; a bundle without one-time-prekey material (signed-prekey
+     * fallback) resolves nothing and reports a null consumed ID. Raw private
+     * key bytes never cross this boundary in either direction.
      */
     DecryptResult decryptPrekeyInit(
             SealedPrivateHandle ownIdentityPrivate,
             SealedPrivateHandle ownSignedPrivate,
-            List<SealedPrivateHandle> ownOneTimePrivates,
+            OtpkResolver otpks,
             byte[] currentSessionBlobOrNull,
             byte[] envelopeCiphertext);
 

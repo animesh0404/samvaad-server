@@ -33,9 +33,16 @@ public final class CryptoTestFixtures {
     /** Full claimed bundle with OTPK body (Kyber triple constant per device). */
     public static CryptoTypes.RecipientBundle claimed(
             UUID userId, UUID deviceId, int signalDeviceId, String seed, int regId, int otpId) {
+        return claimed(userId, deviceId, signalDeviceId, seed, regId, otpId, key(seed + ":otpk:" + otpId));
+    }
+
+    /** Full claimed bundle with an explicit OTPK body (e.g. a device-uploaded public). */
+    public static CryptoTypes.RecipientBundle claimed(
+            UUID userId, UUID deviceId, int signalDeviceId, String seed, int regId,
+            int otpId, byte[] otpPublic) {
         return new CryptoTypes.RecipientBundle(deviceId, userId, signalDeviceId, regId,
                 key(seed + ":id"), 11, key(seed + ":spk"), key(seed + ":sig"),
-                otpId, key(seed + ":otpk:" + otpId),
+                otpId, otpPublic,
                 8100 + signalDeviceId, key(seed + ":kyb"), key(seed + ":ksig"));
     }
 
@@ -54,7 +61,15 @@ public final class CryptoTestFixtures {
         private final Map<UUID, Integer> signalIds = new ConcurrentHashMap<>();
         private final Set<UUID> exhausted = ConcurrentHashMap.newKeySet();
         private final Map<String, CryptoTypes.RecipientBundle> replay = new ConcurrentHashMap<>();
-        private final AtomicInteger otpCounter = new AtomicInteger(5000);
+        /**
+         * Server-side pool of device-uploaded OTPK publics, mirroring the
+         * real directory: each fresh claimRequestId pops exactly one entry,
+         * so one server OTPK is consumed per slot and retries replay the
+         * same bundle. Empty pool (or exhausted flag) models an empty pool
+         * and yields signed-prekey fallback.
+         */
+        private final Map<UUID, java.util.Queue<SignalAdapter.OneTimePrekeyPair>> otpkPool =
+                new ConcurrentHashMap<>();
         private final AtomicInteger calls = new AtomicInteger();
 
         public void register(UUID userId, UUID deviceId, int signalDeviceId, String seed, int regId) {
@@ -62,6 +77,18 @@ public final class CryptoTestFixtures {
             regIds.put(deviceId, regId);
             userIds.put(deviceId, userId);
             signalIds.put(deviceId, signalDeviceId);
+        }
+
+        /** Server-side upload: public parts only, privates stay on the device. */
+        public void uploadOneTimePrekeys(
+                UUID deviceId, List<SignalAdapter.OneTimePrekeyPair> pairs) {
+            otpkPool.computeIfAbsent(deviceId, k -> new java.util.ArrayDeque<>()).addAll(pairs);
+        }
+
+        /** Uploaded OTPK publics still available for this device. */
+        public int availableOneTimePrekeys(UUID deviceId) {
+            java.util.Queue<SignalAdapter.OneTimePrekeyPair> q = otpkPool.get(deviceId);
+            return q == null ? 0 : q.size();
         }
 
         public void setExhausted(UUID deviceId, boolean value) {
@@ -84,9 +111,17 @@ public final class CryptoTestFixtures {
             int regId = regIds.getOrDefault(recipientDeviceId, 7);
             UUID userId = userIds.getOrDefault(recipientDeviceId, recipientDeviceId);
             int signalId = signalIds.getOrDefault(recipientDeviceId, 1);
-            CryptoTypes.RecipientBundle bundle = exhausted.contains(recipientDeviceId)
-                    ? claimedFallback(userId, recipientDeviceId, signalId, seed, regId)
-                    : claimed(userId, recipientDeviceId, signalId, seed, regId, otpCounter.getAndIncrement());
+            SignalAdapter.OneTimePrekeyPair otpk = null;
+            if (!exhausted.contains(recipientDeviceId)) {
+                java.util.Queue<SignalAdapter.OneTimePrekeyPair> q = otpkPool.get(recipientDeviceId);
+                if (q != null) {
+                    otpk = q.poll();
+                }
+            }
+            CryptoTypes.RecipientBundle bundle = otpk != null
+                    ? claimed(userId, recipientDeviceId, signalId, seed, regId,
+                            otpk.prekeyId(), otpk.publicKey())
+                    : claimedFallback(userId, recipientDeviceId, signalId, seed, regId);
             replay.put(k, bundle);
             return bundle;
         }
@@ -135,7 +170,10 @@ public final class CryptoTestFixtures {
     }
 
     public static Harness harness(UUID ownDeviceId) {
-        FakeSignalAdapter adapter = new FakeSignalAdapter();
+        return harness(ownDeviceId, new FakeSignalAdapter());
+    }
+
+    public static Harness harness(UUID ownDeviceId, FakeSignalAdapter adapter) {
         InMemoryStores.DeviceKeys keys = new InMemoryStores.DeviceKeys(ownDeviceId, 42);
         keys.provision(adapter.generateIdentity(), adapter.generateSignedPrekey(new FakeSignalAdapter.FakeHandle(UUID.randomUUID()), 11));
         InMemoryStores.Sessions sessions = new InMemoryStores.Sessions();
@@ -145,5 +183,23 @@ public final class CryptoTestFixtures {
         SamvaadCryptoService service = new SamvaadCryptoServiceImpl(
                 adapter, keys, sessions, trust, claimFake, submitFake);
         return new Harness(adapter, keys, sessions, trust, claimFake, submitFake, service);
+    }
+
+    /**
+     * Honest OTPK issuance for inbound tests: generates {@code count} real
+     * pairs from the owner's adapter, keeps the sealed privates in the
+     * owner's device store, and uploads the public parts to the server view
+     * used by senders. Returns the issued pairs in pool (FIFO claim) order.
+     */
+    public static List<SignalAdapter.OneTimePrekeyPair> uploadOtpks(
+            Harness owner, ClaimFake serverView, UUID deviceId, int firstId, int count) {
+        List<SignalAdapter.OneTimePrekeyPair> pairs = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            SignalAdapter.OneTimePrekeyPair pair = owner.adapter().generateOneTimePrekey(firstId + i);
+            owner.keys().putOneTimePrivate(pair.prekeyId(), pair.privateHandle());
+            pairs.add(pair);
+        }
+        serverView.uploadOneTimePrekeys(deviceId, pairs);
+        return List.copyOf(pairs);
     }
 }

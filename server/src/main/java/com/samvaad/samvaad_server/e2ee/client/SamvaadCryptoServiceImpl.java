@@ -65,6 +65,10 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         for (CryptoTypes.RecipientBundle listed : directoryActive) {
             UUID peer = listed.deviceId();
             if (explicitlyRevoked.contains(peer)) {
+                if (replayIfCommitted(messageRequestId, senderDeviceId, peer, batch)) {
+                    outcomes.put(peer, DeviceOutcome.SENT);
+                    continue;
+                }
                 revokePeerDevice(peer);
                 persistSlot(new CryptoTypes.OutboundSlot(
                         messageRequestId, senderDeviceId, peer,
@@ -78,6 +82,10 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         }
         for (UUID peer : explicitlyRevoked) {
             if (outcomes.containsKey(peer)) {
+                continue;
+            }
+            if (replayIfCommitted(messageRequestId, senderDeviceId, peer, batch)) {
+                outcomes.put(peer, DeviceOutcome.SENT);
                 continue;
             }
             revokePeerDevice(peer);
@@ -112,9 +120,21 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         UUID claimRequestId =
                 CryptoTypes.deriveClaimRequestId(messageRequestId, senderDeviceId, peer);
 
-        // 1. Trust gate on the listed identity.
-        String listedFingerprint = adapter.fingerprint(listed.identityPublicKey());
-        CryptoTypes.TrustRecord verdict = trust.observe(peer, listedFingerprint);
+        // 0. Committed-slot replay takes precedence over ALL current
+        // directory/device/trust state: an already-committed envelope is
+        // replayed byte-identically and never re-encrypted, even if the
+        // recipient's identity or trust verdict changed after the commit.
+        if (replayIfCommitted(messageRequestId, senderDeviceId, peer, batch)) {
+            return DeviceOutcome.SENT;
+        }
+        CryptoTypes.OutboundSlot ackedCheck =
+                sessions.loadSlot(messageRequestId, peer).orElse(null);
+        if (ackedCheck != null && ackedCheck.state() == CryptoTypes.OutboundSlotState.ACKED) {
+            return DeviceOutcome.SENT;
+        }
+
+        // 1. Trust gate on the listed canonical identity key bytes.
+        CryptoTypes.TrustRecord verdict = trust.observe(peer, listed.identityPublicKey());
         if (verdict.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
             persistSlot(new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
                     claimRequestId, CryptoTypes.OutboundSlotState.FAILED_PAUSED, null, null, null, null));
@@ -134,18 +154,9 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         // 2. Resume or start the slot. Same slot key => same claimRequestId =>
         // same server-consumed OTPK. A changed bundle for an existing slot is
         // rejected by the store; resume reuses the persisted claimed bundle.
+        // (COMMITTED/ACKED slots were already handled by the replay gate
+        // above and never reach this point.)
         CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
-        if (slot != null && slot.state() == CryptoTypes.OutboundSlotState.ACKED) {
-            return DeviceOutcome.SENT;
-        }
-        if (slot != null
-                && slot.state().ordinal() >= CryptoTypes.OutboundSlotState.COMMITTED.ordinal()
-                && slot.state() != CryptoTypes.OutboundSlotState.SUBMITTED
-                && slot.envelopeCiphertext() != null) {
-            // Crash between COMMIT and SUBMIT: resubmit identical bytes.
-            batch.add(toEnvelope(messageRequestId, senderDeviceId, slot));
-            return DeviceOutcome.SENT;
-        }
         if (slot == null) {
             slot = new CryptoTypes.OutboundSlot(messageRequestId, senderDeviceId, peer,
                     claimRequestId, CryptoTypes.OutboundSlotState.PENDING, null, null, null, null);
@@ -153,7 +164,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         }
 
         // 3. Claim once per slot, and ONLY when no usable session exists.
-        // A READY session with matching fingerprint reuses directly: no claim,
+        // A READY session with matching identity key bytes reuses directly: no claim,
         // no OTPK consumption. Resume replays the SAME claimRequestId.
         CryptoTypes.SessionRecord session = sessions.loadSession(peer).orElse(null);
         boolean sessionUsable = session != null
@@ -170,9 +181,8 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                 return DeviceOutcome.DEFERRED_TRANSIENT;
             }
             // Trust-check the claimed bundle too; a claim race could return a
-            // rotated identity.
-            String claimedFingerprint = adapter.fingerprint(bundle.identityPublicKey());
-            CryptoTypes.TrustRecord recheck = trust.observe(peer, claimedFingerprint);
+            // rotated identity. Comparison is on canonical key bytes.
+            CryptoTypes.TrustRecord recheck = trust.observe(peer, bundle.identityPublicKey());
             if (recheck.state() == CryptoTypes.TrustState.PAUSED_KEY_CHANGED) {
                 persistSlot(withState(slot, CryptoTypes.OutboundSlotState.FAILED_PAUSED));
                 return DeviceOutcome.PAUSED_KEY_CHANGED;
@@ -225,21 +235,25 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             session = sessions.loadSession(peer).orElseThrow();
         }
 
-        // 5. Encrypt on the committed session; commit envelope + advanced blob.
+        // 5. Encrypt on the committed session; atomically commit the advanced
+        // session blob together with the envelope carrying its ciphertext.
+        // The two rows become durable together or not at all: recovery can
+        // never observe a durable session-advanced/ciphertext-missing state,
+        // so retry never re-encrypts on an advanced ratchet.
         final CryptoTypes.RecipientBundle claimed = bundle;
         final CryptoTypes.SessionRecord committed = session;
         try {
             SignalAdapter.EncryptResult encrypted = adapter.encrypt(committed.sessionBlob(), plaintextAssoc);
-            sessions.saveSession(new CryptoTypes.SessionRecord(peer,
+            CryptoTypes.SessionRecord advanced = new CryptoTypes.SessionRecord(peer,
                     committed.peerIdentityPublicKey(), committed.peerRegistrationId(),
                     CryptoTypes.LocalSessionState.READY, committed.establishedVia(),
                     encrypted.updatedSessionBlob(),
-                    committed.encryptCounter() + 1, committed.decryptCounter()));
+                    committed.encryptCounter() + 1, committed.decryptCounter());
             CryptoTypes.OutboundSlot committedSlot = new CryptoTypes.OutboundSlot(
                     messageRequestId, senderDeviceId, peer, claimRequestId,
                     CryptoTypes.OutboundSlotState.COMMITTED, committed.establishedVia(),
                     slot.envelopeType(), claimed, encrypted.envelopeCiphertext());
-            persistSlot(committedSlot);
+            sessions.commitOutboundCiphertext(advanced, committedSlot);
             batch.add(toEnvelope(messageRequestId, senderDeviceId, committedSlot));
             return DeviceOutcome.SENT;
         } catch (CryptoException.SessionCorruptException e) {
@@ -261,10 +275,16 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         try {
             SignalAdapter.DecryptResult result;
             if (kind == CryptoTypes.EnvelopeType.PREKEY_INIT) {
+                // The adapter parses the referenced OTPK ID from the envelope
+                // and resolves exactly that sealed handle from our store; no
+                // private key bytes cross this boundary. Resolution is a peek:
+                // the reported consumed ID is forgotten exactly once below,
+                // after the inbound session is durably committed.
+                SignalAdapter.OtpkResolver otpks = deviceKeys::requireOneTimePrivate;
                 result = adapter.decryptPrekeyInit(
                         deviceKeys.identityPrivate(),
                         deviceKeys.signedPrekey().privateHandle(),
-                        List.of(),
+                        otpks,
                         current,
                         envelopeCiphertext);
             } else if (kind == CryptoTypes.EnvelopeType.RATCHET) {
@@ -283,6 +303,14 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                     session == null ? null : session.establishedVia();
             sessions.saveSession(new CryptoTypes.SessionRecord(peerDeviceId, peerKey, regId,
                     CryptoTypes.LocalSessionState.READY, via, result.updatedSessionBlob(), enc, dec));
+            if (kind == CryptoTypes.EnvelopeType.PREKEY_INIT
+                    && result.consumedOneTimePrekeyIdOrNull() != null) {
+                // Exactly-once consumption: the OTPK referenced by this
+                // envelope is forgotten now that the inbound session is
+                // durable. Replay of the same envelope fails closed at
+                // resolution time and never consumes another OTPK.
+                deviceKeys.forgetOneTimePrivate(result.consumedOneTimePrekeyIdOrNull());
+            }
             return result.plaintextAssoc();
         } catch (CryptoException.SessionCorruptException e) {
             byte[] peerKey = session == null ? null : session.peerIdentityPublicKey();
@@ -294,8 +322,10 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
     }
 
     @Override
-    public void acceptKeyChange(UUID peerDeviceId, String newFingerprint) {
-        trust.acceptKeyChange(peerDeviceId, newFingerprint);
+    public void acceptKeyChange(UUID peerDeviceId, byte[] newIdentityPublicKey) {
+        Objects.requireNonNull(peerDeviceId, "peerDeviceId");
+        Objects.requireNonNull(newIdentityPublicKey, "newIdentityPublicKey");
+        trust.acceptKeyChange(peerDeviceId, newIdentityPublicKey);
         sessions.deleteSession(peerDeviceId);
     }
 
@@ -312,6 +342,34 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
 
     private void persistSlot(CryptoTypes.OutboundSlot slot) {
         sessions.saveSlot(slot);
+    }
+
+    /**
+     * Committed-slot replay gate. If the slot for this message already holds
+     * committed ciphertext, the exact envelope is queued for resubmission and
+     * this returns true — the caller must then skip all directory, device,
+     * and trust evaluation for this peer. ACKED slots report success without
+     * resubmission. Returns false when no committed result exists.
+     */
+    private boolean replayIfCommitted(
+            UUID messageRequestId,
+            UUID senderDeviceId,
+            UUID peer,
+            List<CryptoTypes.OutboundEnvelope> batch) {
+        CryptoTypes.OutboundSlot slot = sessions.loadSlot(messageRequestId, peer).orElse(null);
+        if (slot == null) {
+            return false;
+        }
+        if (slot.state() == CryptoTypes.OutboundSlotState.ACKED) {
+            return true;
+        }
+        if (slot.envelopeCiphertext() != null
+                && (slot.state() == CryptoTypes.OutboundSlotState.COMMITTED
+                        || slot.state() == CryptoTypes.OutboundSlotState.SUBMITTED)) {
+            batch.add(toEnvelope(messageRequestId, senderDeviceId, slot));
+            return true;
+        }
+        return false;
     }
 
     private static CryptoTypes.OutboundSlot withState(

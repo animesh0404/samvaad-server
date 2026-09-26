@@ -20,9 +20,13 @@ class ConcurrentFirstMessageTest {
         CryptoTestFixtures.Harness a = CryptoTestFixtures.harness(aDevice);
         CryptoTestFixtures.Harness b = CryptoTestFixtures.harness(bDevice);
 
-        // Each side knows the other's public bundle seed.
+        // Each side knows the other's public bundle seed and holds the private
+        // halves of the OTPKs the other side will claim: the server view is
+        // stocked from each owner's honestly issued batch.
         a.claimFake().register(bUser, bDevice, 1, "b-phone", 2);
         b.claimFake().register(aUser, aDevice, 1, "a-phone", 1);
+        CryptoTestFixtures.uploadOtpks(b, a.claimFake(), bDevice, 100, 5);
+        CryptoTestFixtures.uploadOtpks(a, b.claimFake(), aDevice, 200, 5);
 
         UUID msgA = UUID.randomUUID();
         UUID msgB = UUID.randomUUID();

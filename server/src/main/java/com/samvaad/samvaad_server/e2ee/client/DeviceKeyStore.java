@@ -41,8 +41,32 @@ public interface DeviceKeyStore {
     /** Register a locally generated OTPK private handle for later inbound use. */
     void putOneTimePrivate(int prekeyId, SignalAdapter.SealedPrivateHandle privateHandle);
 
+    /**
+     * Peek at the sealed private handle for one OTPK ID without consuming
+     * it. Used by the inbound prekey-init resolver: lookup only, consumption
+     * happens via {@link #forgetOneTimePrivate} after the inbound session is
+     * durably committed.
+     */
     Optional<SignalAdapter.SealedPrivateHandle> oneTimePrivate(int prekeyId);
 
-    /** Forget an OTPK private after its public counterpart is consumed. */
+    /**
+     * Resolve-or-fail for inbound establishment: returns the sealed handle
+     * for exactly the requested OTPK ID, or fails closed with {@link
+     * CryptoException.ClaimFailedException} when the ID is unknown or
+     * already consumed. Never substitutes a different OTPK.
+     */
+    default SignalAdapter.SealedPrivateHandle requireOneTimePrivate(int prekeyId) {
+        return oneTimePrivate(prekeyId).orElseThrow(() -> new CryptoException.ClaimFailedException(
+                "unknown or already-consumed one-time prekey: " + prekeyId));
+    }
+
+    /**
+     * Forget an OTPK private after its public counterpart is consumed.
+     *
+     * <p>Exactly-once protocol: the inbound path forgets the adapter-reported
+     * consumed ID exactly once per successful establishment. Forgetting an
+     * absent ID is a no-op. Replay of an already-consumed ID fails at
+     * resolution time and must never consume another OTPK.
+     */
     void forgetOneTimePrivate(int prekeyId);
 }
