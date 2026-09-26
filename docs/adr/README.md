@@ -40,3 +40,4 @@ an earlier ADR only by explicitly naming it.
 | [0018](0018-v1-e2ee-signal-sesame-and-independent-device-identity.md) | V1 E2EE, Signal/Sesame, and independent device identity |
 | [0019](0019-v1-pqxdh-kyber-public-material-foundation.md) | V1 PQXDH last-resort Kyber public-material foundation |
 | [0020](0020-v1-e2ee-ciphertext-mailbox-history.md) | V1 E2EE ciphertext mailbox and history transport |
+| [0021](0021-v1-e2ee-identity-fingerprint-contract.md) | V1 E2EE identity fingerprint contract |
