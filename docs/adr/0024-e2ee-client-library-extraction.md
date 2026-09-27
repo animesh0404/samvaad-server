@@ -15,6 +15,12 @@ The server module now consumes the published GitHub Packages artifact
 `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`. No sibling
 checkout is required.
 
+Amended (2026-09-28, see Amendment below; interim GitHub Packages
+decision preserved as history): GitHub Packages consumption is retired.
+The server module now consumes the Maven Central artifact
+`io.github.animesh0404:e2ee-client:0.1.0` through `mavenCentral()`,
+with no credentials required.
+
 Extends ADR 0018 (Signal/Sesame direction), ADR 0022 (persistent store
 boundary), and ADR 0023 (JVM Signal adapter, Kyber mandate, key custody).
 Supersedes nothing.
@@ -95,3 +101,38 @@ on the Spring Boot server application.
   AGPL source-availability implications; nothing in this amendment
   re-licenses the server or defers the open AGPL licensing/product
   decision recorded in ADR 0019.
+
+## Amendment (2026-09-28): E2EE client from Maven Central (final)
+
+The interim GitHub Packages consumption recorded above is retired. The
+server module now consumes the publicly published Maven Central
+artifact:
+
+```groovy
+implementation 'io.github.animesh0404:e2ee-client:0.1.0'
+```
+
+- HISTORICAL: composite build (`includeBuild` + substitution) →
+  interim GitHub Packages (`com.samvaad:e2ee-client:0.1.0` from
+  `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`,
+  authenticated with `GITHUB_ACTOR` / `GITHUB_TOKEN`).
+- FINAL: Maven Central → `io.github.animesh0404:e2ee-client:0.1.0`
+  (library tag `v0.1.0`; previously `com.samvaad:e2ee-client:0.1.0`).
+- Repository: Maven Central, resolved through the existing
+  `mavenCentral()` configuration in `server/build.gradle`. No GitHub
+  Packages repository is configured anymore.
+- Credentials: Maven Central resolution requires no GitHub credentials.
+  `GITHUB_ACTOR` / `GITHUB_TOKEN` are no longer required for
+  `e2ee-client` resolution, in local development, Docker builds, or CI.
+- The temporary composite-build consumption (`includeBuild` +
+  substitution in `server/settings.gradle`) remains retired, as decided
+  above.
+- The final dependency is a normal external Maven dependency; its
+  runtime dependency (`org.signal:libsignal-client:0.86.5`) resolves
+  from Maven Central with it.
+- No Java source, API, version, cryptographic-architecture, or
+  behavior change: this is a repository-resolution and coordinate
+  change only, verified by `dependencyInsight` / `dependencies` on
+  `runtimeClasspath`. The AGPL-3.0-only / source-availability position
+  stated above is unchanged; nothing in this amendment re-licenses the
+  server or introduces a new licensing decision.

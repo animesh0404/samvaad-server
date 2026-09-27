@@ -68,78 +68,38 @@ test -n "$SAMVAAD_JWT_SECRET" && echo "JWT secret loaded" || echo "JWT secret mi
 
 `.env` and `.envrc` live at the repository root, are local-only, and are excluded by `.gitignore`. `server/.env.example` is safe to commit and must contain only a placeholder value.
 
-### E2EE client artifact (GitHub Packages)
+### E2EE client artifact (Maven Central)
 
 The server depends on the published artifact
-`implementation 'com.samvaad:e2ee-client:0.1.0'` (library tag `v0.1.0`,
-source at `https://github.com/animesh0404/samvaad-e2ee-lib`), resolved
-from `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`
-(ADR 0024). The temporary composite-build consumption
-(`includeBuild('../../samvaad-e2ee-lib')`) is retired; no sibling
-checkout is required.
+`implementation 'io.github.animesh0404:e2ee-client:0.1.0'` (library tag
+`v0.1.0`, source at `https://github.com/animesh0404/samvaad-e2ee-lib`),
+resolved anonymously from Maven Central (ADR 0024). No credentials are
+required for normal builds: no `GITHUB_ACTOR` / `GITHUB_TOKEN` setup, no
+sibling checkout, and no Docker build secrets.
 
-GitHub Packages Maven requires authentication even for reads; anonymous
-resolution does not work. `server/build.gradle` reads credentials from
-the environment only (`GITHUB_ACTOR` / `GITHUB_TOKEN`); no token is
-hardcoded or committed. Export them in your shell before running any
-Gradle command that resolves dependencies:
-
-```bash
-export GITHUB_ACTOR=<your-github-username>
-export GITHUB_TOKEN=<token-with-read:packages-scope>
-```
-
-In GitHub Actions the repository-provided `GITHUB_TOKEN` works as-is.
-Verify without printing the token:
-
-```bash
-test -n "$GITHUB_ACTOR" && test -n "$GITHUB_TOKEN" && echo "GitHub Packages credentials present" || echo "GitHub Packages credentials missing"
-```
-
-Do not put these tokens in `.env`, `server/.env.example`, or any
-committed file.
-
-### Docker builds (BuildKit secrets)
+### Docker builds
 
 Every Docker image build runs the Gradle build inside the `Dockerfile`,
-so it needs the same `GITHUB_ACTOR` / `GITHUB_TOKEN` variables — exported
-in the shell that invokes the build, exactly as above. The `Dockerfile`
-consumes them ONLY through BuildKit secret mounts
-(`--mount=type=secret,id=github_actor` /
-`--mount=type=secret,id=github_token` on the `gradle bootJar` step):
-never `ARG`, never `ENV`, never `COPY`. Secret mounts are not persisted
-in any layer, and the final runtime stage starts `FROM` a clean JRE image
-and copies only the built JAR — so `docker history`, `docker inspect`,
-and the runtime filesystem contain no credentials. The Gradle step
-itself never prints secret values.
-
-Exact invocations (from the repository root, with the variables exported):
+which resolves the same Maven Central artifact with no authentication.
+Invoke builds plainly from the repository root:
 
 ```bash
-# Portable local artifact (scripts/build.sh forwards the secrets itself):
+# Portable local artifact:
 ./scripts/build.sh
 
-# Versioned release image (scripts/release-image.sh forwards the secrets itself):
+# Versioned release image:
 ./scripts/release-image.sh 0.0.1
 
-# Raw buildx (same mechanism the scripts use):
-docker buildx build --load -t samvaad-server:local \
-  --secret id=github_actor,env=GITHUB_ACTOR \
-  --secret id=github_token,env=GITHUB_TOKEN \
-  .
+# Raw buildx:
+docker buildx build --load -t samvaad-server:local .
 
-# Iterative Compose development loop (compose.dev.yaml maps the same
-# environment variables to build secrets; no flags needed):
+# Iterative Compose development loop:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
 There is currently no GitHub Actions workflow that builds this image, so
-there is nothing to wire there. If one is added later, it must map the
-repository-provided `GITHUB_TOKEN` (which already carries package-read
-access for the repository) into the build step environment and pass the
-same `--secret id=...,env=...` flags (or the equivalent
-`docker/build-push-action` `secrets:` entries) — no separate
-credential-management system, and still never `ARG`/`ENV` for the token.
+there is nothing to wire there. If one is added later, it needs no
+package credentials: Maven Central resolution is anonymous.
 
 The library is AGPL-3.0-only (as is its transitive
 `org.signal:libsignal-client:0.86.5` dependency); the corresponding
@@ -376,9 +336,7 @@ Build the portable local image artifact from the repository root (local/offline 
 ./scripts/build.sh
 ```
 
-`scripts/build.sh` requires `GITHUB_ACTOR` / `GITHUB_TOKEN` exported (see
-"E2EE client artifact" above) and forwards them as BuildKit secrets; the
-token never enters the image. This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local Docker image store, and writes:
+This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local Docker image store, and writes:
 
 ```text
 server/build/samvaad-server.tar.gz
@@ -389,9 +347,7 @@ The generated `server/build/` directory is ignored by Git.
 ### Local Docker development loop
 
 To run the application container built from local source (instead of the
-published release image), export `GITHUB_ACTOR` / `GITHUB_TOKEN` first
-(see "E2EE client artifact" above — `compose.dev.yaml` passes them as
-BuildKit build secrets), then use the tracked development override, which
+published release image), use the tracked development override, which
 reuses the entire `compose.yaml` topology and only swaps image identity,
 build source, container/project names, and the PostgreSQL volume:
 
