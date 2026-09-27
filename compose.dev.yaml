@@ -24,6 +24,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # GitHub Packages authentication (ADR 0024): the Gradle build inside
+      # the Dockerfile resolves `com.samvaad:e2ee-client:0.1.0` from GitHub
+      # Packages, which requires authentication even for reads. These
+      # BuildKit secrets are mounted from the caller's environment
+      # (GITHUB_ACTOR/GITHUB_TOKEN must be exported before running
+      # compose --build); they are never baked into the image or committed.
+      secrets:
+        - github_actor
+        - github_token
     container_name: samvaad-dev-app
     volumes:
       - ./application.yaml:/config/application.yaml
@@ -45,3 +54,11 @@ services:
 volumes:
   samvaad-dev-data:
   samvaad-dev-tls:
+
+# Build-only secrets (see the `app.build.secrets` above). Sourced from the
+# caller's environment at build time; never stored in this file.
+secrets:
+  github_actor:
+    environment: GITHUB_ACTOR
+  github_token:
+    environment: GITHUB_TOKEN

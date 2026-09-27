@@ -97,9 +97,49 @@ test -n "$GITHUB_ACTOR" && test -n "$GITHUB_TOKEN" && echo "GitHub Packages cred
 ```
 
 Do not put these tokens in `.env`, `server/.env.example`, or any
-committed file. Docker builds that resolve Gradle dependencies need the
-same variables available at build time (BuildKit secrets / `--build-arg`
-forwarding, never baked into layers).
+committed file.
+
+### Docker builds (BuildKit secrets)
+
+Every Docker image build runs the Gradle build inside the `Dockerfile`,
+so it needs the same `GITHUB_ACTOR` / `GITHUB_TOKEN` variables — exported
+in the shell that invokes the build, exactly as above. The `Dockerfile`
+consumes them ONLY through BuildKit secret mounts
+(`--mount=type=secret,id=github_actor` /
+`--mount=type=secret,id=github_token` on the `gradle bootJar` step):
+never `ARG`, never `ENV`, never `COPY`. Secret mounts are not persisted
+in any layer, and the final runtime stage starts `FROM` a clean JRE image
+and copies only the built JAR — so `docker history`, `docker inspect`,
+and the runtime filesystem contain no credentials. The Gradle step
+itself never prints secret values.
+
+Exact invocations (from the repository root, with the variables exported):
+
+```bash
+# Portable local artifact (scripts/build.sh forwards the secrets itself):
+./scripts/build.sh
+
+# Versioned release image (scripts/release-image.sh forwards the secrets itself):
+./scripts/release-image.sh 0.0.1
+
+# Raw buildx (same mechanism the scripts use):
+docker buildx build --load -t samvaad-server:local \
+  --secret id=github_actor,env=GITHUB_ACTOR \
+  --secret id=github_token,env=GITHUB_TOKEN \
+  .
+
+# Iterative Compose development loop (compose.dev.yaml maps the same
+# environment variables to build secrets; no flags needed):
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+```
+
+There is currently no GitHub Actions workflow that builds this image, so
+there is nothing to wire there. If one is added later, it must map the
+repository-provided `GITHUB_TOKEN` (which already carries package-read
+access for the repository) into the build step environment and pass the
+same `--secret id=...,env=...` flags (or the equivalent
+`docker/build-push-action` `secrets:` entries) — no separate
+credential-management system, and still never `ARG`/`ENV` for the token.
 
 The library is AGPL-3.0-only (as is its transitive
 `org.signal:libsignal-client:0.86.5` dependency); the corresponding
@@ -336,7 +376,9 @@ Build the portable local image artifact from the repository root (local/offline 
 ./scripts/build.sh
 ```
 
-This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local Docker image store, and writes:
+`scripts/build.sh` requires `GITHUB_ACTOR` / `GITHUB_TOKEN` exported (see
+"E2EE client artifact" above) and forwards them as BuildKit secrets; the
+token never enters the image. This uses Docker Buildx/BuildKit, loads `samvaad-server:latest` into the local Docker image store, and writes:
 
 ```text
 server/build/samvaad-server.tar.gz
@@ -347,7 +389,9 @@ The generated `server/build/` directory is ignored by Git.
 ### Local Docker development loop
 
 To run the application container built from local source (instead of the
-published release image), use the tracked development override, which
+published release image), export `GITHUB_ACTOR` / `GITHUB_TOKEN` first
+(see "E2EE client artifact" above — `compose.dev.yaml` passes them as
+BuildKit build secrets), then use the tracked development override, which
 reuses the entire `compose.yaml` topology and only swaps image identity,
 build source, container/project names, and the PostgreSQL volume:
 

@@ -84,10 +84,30 @@ fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# GitHub Packages authentication (ADR 0024): the Gradle build inside the
+# Dockerfile resolves `com.samvaad:e2ee-client:0.1.0` from GitHub Packages,
+# which requires authentication even for reads. Credentials are forwarded
+# as BuildKit secrets (never ARG/ENV, never baked into the image):
+#   export GITHUB_ACTOR=<your-github-username>
+#   export GITHUB_TOKEN=<token-with-read:packages-scope>
+# (In GitHub Actions, GITHUB_TOKEN is provided by the workflow and mapped
+# to the step environment; see docs/development/setup.md.)
+if [ -z "${GITHUB_ACTOR:-}" ] || [ -z "${GITHUB_TOKEN:-}" ]; then
+  echo "ERROR: GITHUB_ACTOR and GITHUB_TOKEN must be exported in the environment." >&2
+  echo "The Dockerfile resolves com.samvaad:e2ee-client:0.1.0 from GitHub Packages," >&2
+  echo "which requires authentication even for reads (GITHUB_TOKEN needs" >&2
+  echo "'read:packages' scope). Tokens are passed as BuildKit secrets only and" >&2
+  echo "are never stored in the image. See docs/development/setup.md." >&2
+  exit 1
+fi
+
 echo "Building Samvaad release image (${IMAGE})..."
 # BuildKit/buildx, mirroring scripts/build.sh. --load keeps the tagged image
 # in the local image store so the tag can be inspected before pushing.
-if docker buildx build --load -t "${IMAGE}" "${ROOT}"; then
+if docker buildx build --load -t "${IMAGE}" \
+    --secret id=github_actor,env=GITHUB_ACTOR \
+    --secret id=github_token,env=GITHUB_TOKEN \
+    "${ROOT}"; then
   echo "Build succeeded: ${IMAGE}"
 else
   echo "ERROR: Docker build failed; nothing was pushed." >&2
