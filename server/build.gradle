@@ -15,6 +15,24 @@ java {
 
 repositories {
 	mavenCentral()
+	// V1 Signal/Sesame crypto (ADR-0018, ADR-0024): `com.samvaad:e2ee-client`
+	// is consumed as the published GitHub Packages artifact
+	// `com.samvaad:e2ee-client:0.1.0` from
+	// `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`
+	// (library tag `v0.1.0`). GitHub Packages Maven requires
+	// authentication even for reads: credentials come only from the
+	// environment (`GITHUB_ACTOR` / `GITHUB_TOKEN`), never hardcoded and
+	// never committed. Provide any GitHub username as `GITHUB_ACTOR` and a
+	// personal access token with `read:packages` scope as `GITHUB_TOKEN`
+	// (in GitHub Actions the repository-provided `GITHUB_TOKEN` works
+	// as-is). Anonymous resolution is not assumed to work.
+	maven {
+		url = uri('https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib')
+		credentials {
+			username = System.getenv('GITHUB_ACTOR')
+			password = System.getenv('GITHUB_TOKEN')
+		}
+	}
 }
 
 dependencies {
@@ -31,8 +49,9 @@ dependencies {
 	// library (standalone `samvaad-e2ee-lib` repository) owns the
 	// SamvaadCryptoService/SignalAdapter seam and the only
 	// libsignal-client reference (0.86.5, see samvaad-e2ee-lib/build.gradle).
-	// Resolved to the sibling repository via the composite in
-	// settings.gradle; no published artifact required.
+	// Resolved from GitHub Packages as the published artifact
+	// `com.samvaad:e2ee-client:0.1.0` (library tag `v0.1.0`); the
+	// temporary composite-build consumption is retired.
 	implementation 'com.samvaad:e2ee-client:0.1.0'
 	// Bouncy Castle: self-signed TLS certificate generation for
 	// application-managed HTTPS (ADR 0017). Pure-JVM X.509 issuance; the

@@ -68,6 +68,45 @@ test -n "$SAMVAAD_JWT_SECRET" && echo "JWT secret loaded" || echo "JWT secret mi
 
 `.env` and `.envrc` live at the repository root, are local-only, and are excluded by `.gitignore`. `server/.env.example` is safe to commit and must contain only a placeholder value.
 
+### E2EE client artifact (GitHub Packages)
+
+The server depends on the published artifact
+`implementation 'com.samvaad:e2ee-client:0.1.0'` (library tag `v0.1.0`,
+source at `https://github.com/animesh0404/samvaad-e2ee-lib`), resolved
+from `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`
+(ADR 0024). The temporary composite-build consumption
+(`includeBuild('../../samvaad-e2ee-lib')`) is retired; no sibling
+checkout is required.
+
+GitHub Packages Maven requires authentication even for reads; anonymous
+resolution does not work. `server/build.gradle` reads credentials from
+the environment only (`GITHUB_ACTOR` / `GITHUB_TOKEN`); no token is
+hardcoded or committed. Export them in your shell before running any
+Gradle command that resolves dependencies:
+
+```bash
+export GITHUB_ACTOR=<your-github-username>
+export GITHUB_TOKEN=<token-with-read:packages-scope>
+```
+
+In GitHub Actions the repository-provided `GITHUB_TOKEN` works as-is.
+Verify without printing the token:
+
+```bash
+test -n "$GITHUB_ACTOR" && test -n "$GITHUB_TOKEN" && echo "GitHub Packages credentials present" || echo "GitHub Packages credentials missing"
+```
+
+Do not put these tokens in `.env`, `server/.env.example`, or any
+committed file. Docker builds that resolve Gradle dependencies need the
+same variables available at build time (BuildKit secrets / `--build-arg`
+forwarding, never baked into layers).
+
+The library is AGPL-3.0-only (as is its transitive
+`org.signal:libsignal-client:0.86.5` dependency); the corresponding
+source for the consumed artifact is the library repository at tag
+`v0.1.0`. The open AGPL licensing/product decision (ADR 0019) is
+unchanged by this consumption change.
+
 ---
 
 ## Database Configuration

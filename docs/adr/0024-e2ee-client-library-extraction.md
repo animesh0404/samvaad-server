@@ -5,11 +5,15 @@
 Accepted. Extraction completed: the library now lives in the standalone
 `samvaad-e2ee-lib` repository (sibling checkout, no longer an `e2ee-client/`
 directory in this repository). Coordinates are unchanged
-(`com.samvaad:e2ee-client:0.1.0`); the server module consumes them through
-a composite build (`includeBuild('../../samvaad-e2ee-lib')` with an
-explicit `dependencySubstitution` rule in `server/settings.gradle`,
-because the library repository's root project is named
-`samvaad-e2ee-lib` while its artifact remains `e2ee-client`).
+(`com.samvaad:e2ee-client:0.1.0`).
+
+Amended: the temporary composite-build consumption
+(`includeBuild('../../samvaad-e2ee-lib')` with an explicit
+`dependencySubstitution` rule in `server/settings.gradle`) is retired.
+The server module now consumes the published GitHub Packages artifact
+`com.samvaad:e2ee-client:0.1.0` (library tag `v0.1.0`) from
+`https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`. No sibling
+checkout is required.
 
 Extends ADR 0018 (Signal/Sesame direction), ADR 0022 (persistent store
 boundary), and ADR 0023 (JVM Signal adapter, Kyber mandate, key custody).
@@ -42,8 +46,12 @@ on the Spring Boot server application.
    `samvaad-e2ee-lib/src/test`. Pure client proofs moved with the code;
    server transport/integration tests stay in the server module.
 3. The server module drops its direct libsignal dependency and depends on
-   `com.samvaad:e2ee-client:0.1.0`, resolved locally via the composite
-   build. No published artifact is required for local development.
+   the published `com.samvaad:e2ee-client:0.1.0` artifact resolved from
+   GitHub Packages
+   (`https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`, library
+   tag `v0.1.0`). The temporary composite-build consumption is retired;
+   no sibling checkout is required for normal builds. The dependency
+   coordinate is unchanged.
 4. No protocol, persistence-format, wire-format, fingerprint, trust-state,
    or key-custody behavior changes in this slice: extraction only.
 
@@ -52,7 +60,38 @@ on the Spring Boot server application.
 - The server keeps byte-identical E2EE behavior while compiling against
   the extracted library; its full suite (including E2EE transport tests)
   must stay green.
-- Future TUI crypto-runtime work consumes `e2ee-client` through a composite
-  build of its own, without touching STOMP/realtime or plaintext flows.
+- Future TUI crypto-runtime work consumes `e2ee-client` through its own
+  migration to the published artifact, without touching STOMP/realtime
+  or plaintext flows.
 - `e2ee-client` versioning (`0.1.0`) becomes the shared contract coordinate;
-  publishing (if ever needed) is deferred.
+  the server resolves the exact published coordinate
+  `com.samvaad:e2ee-client:0.1.0` from GitHub Packages.
+
+## Amendment: GitHub Packages consumption (this slice)
+
+- Repository: `https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`
+  (see `samvaad-e2ee-lib` ADR 0002 for why GitHub Packages is used
+  instead of Maven Central). Exact consumed coordinate:
+  `implementation 'com.samvaad:e2ee-client:0.1.0'` (library tag `v0.1.0`).
+- No Java source, API, version, or architectural change: this is a
+  repository-resolution change only (composite `includeBuild` +
+  substitution removed from `server/settings.gradle`; Maven repository
+  declared in `server/build.gradle`).
+- Credentials (local development and CI): GitHub Packages Maven requires
+  authentication even for reads; anonymous resolution is not assumed to
+  work. `server/build.gradle` reads `GITHUB_ACTOR` / `GITHUB_TOKEN` from
+  the environment only — no credentials are hardcoded or committed.
+  Provide any GitHub username as `GITHUB_ACTOR` and a personal access
+  token with `read:packages` scope as `GITHUB_TOKEN` (in GitHub Actions
+  the repository-provided `GITHUB_TOKEN` works as-is). See
+  `docs/development/setup.md`.
+- License / source availability: the consumed library is published as
+  AGPL-3.0-only (see its `LICENSE`, per-file
+  `SPDX-License-Identifier: AGPL-3.0-only`, and published POM), and it
+  links `org.signal:libsignal-client:0.86.5` (AGPL-3.0-only; no Signal
+  source vendored). The corresponding source for the exact consumed
+  artifact is `https://github.com/animesh0404/samvaad-e2ee-lib` at tag
+  `v0.1.0`. Downstream distribution must preserve the already-identified
+  AGPL source-availability implications; nothing in this amendment
+  re-licenses the server or defers the open AGPL licensing/product
+  decision recorded in ADR 0019.
