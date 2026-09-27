@@ -212,7 +212,11 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
                             established.sessionBlob(), 0, 0));
                     session = stores.loadSession(peer).orElseThrow();
                     establishedJustNow = true;
-                } catch (CryptoException.SessionCorruptException e) {
+                } catch (CryptoException.SessionCorruptException | CryptoException.ClaimFailedException e) {
+                    // Deterministic establishment failure (corrupt session or
+                    // an invalid bundle the real adapter refused): quarantine
+                    // this slot's outcome without aborting the fan-out.
+                    // Retry re-establishes; it never skips the claim replay.
                     stores.saveSession(new CryptoTypes.SessionRecord(peer,
                             bundle.identityPublicKey(), bundle.registrationId(),
                             CryptoTypes.LocalSessionState.CORRUPT, null, null, 0, 0));
@@ -234,10 +238,18 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
         // The two rows become durable together or not at all: recovery can
         // never observe a durable session-advanced/ciphertext-missing state,
         // so retry never re-encrypts on an advanced ratchet.
+        //
+        // Wire type: the adapter's report is authoritative when present. A
+        // reused session can still yield PREKEY_INIT bytes (the library
+        // repeats the prekey message until the peer's first reply), which no
+        // Samvaad-side heuristic can classify; null defers to the heuristic.
         final CryptoTypes.RecipientBundle claimed = bundle;
         final CryptoTypes.SessionRecord committed = session;
         try {
             SignalAdapter.EncryptResult encrypted = adapter.encrypt(committed.sessionBlob(), plaintextAssoc);
+            CryptoTypes.EnvelopeType wireType = encrypted.envelopeType() != null
+                    ? encrypted.envelopeType()
+                    : slot.envelopeType();
             CryptoTypes.SessionRecord advanced = new CryptoTypes.SessionRecord(peer,
                     committed.peerIdentityPublicKey(), committed.peerRegistrationId(),
                     CryptoTypes.LocalSessionState.READY, committed.establishedVia(),
@@ -246,7 +258,7 @@ public final class SamvaadCryptoServiceImpl implements SamvaadCryptoService {
             CryptoTypes.OutboundSlot committedSlot = new CryptoTypes.OutboundSlot(
                     messageRequestId, senderDeviceId, peer, claimRequestId,
                     CryptoTypes.OutboundSlotState.COMMITTED, committed.establishedVia(),
-                    slot.envelopeType(), claimed, encrypted.envelopeCiphertext());
+                    wireType, claimed, encrypted.envelopeCiphertext());
             stores.commitOutboundCiphertext(advanced, committedSlot);
             batch.add(toEnvelope(messageRequestId, senderDeviceId, committedSlot));
             return DeviceOutcome.SENT;

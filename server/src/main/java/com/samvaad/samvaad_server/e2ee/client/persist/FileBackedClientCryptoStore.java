@@ -90,6 +90,7 @@ public final class FileBackedClientCryptoStore implements ClientCryptoStore {
             UUID identityHandle,
             int signedPrekeyId,
             byte[] signedPrekeyPublic,
+            byte[] signedPrekeySignature,
             UUID signedHandle) {
     }
 
@@ -135,6 +136,7 @@ public final class FileBackedClientCryptoStore implements ClientCryptoStore {
                     identity.identityPrivate().handleId(),
                     signedPrekey.prekeyId(),
                     copy(signedPrekey.publicKey()),
+                    copy(signedPrekey.signature()),
                     signedPrekey.privateHandle().handleId());
             persistSnapshot();
         } finally {
@@ -192,6 +194,7 @@ public final class FileBackedClientCryptoStore implements ClientCryptoStore {
             return new SignalAdapter.SignedPrekeyPair(
                     device.signedPrekeyId(),
                     copy(device.signedPrekeyPublic()),
+                    copy(device.signedPrekeySignature()),
                     new PersistentHandle(device.signedHandle()));
         } finally {
             lock.readLock().unlock();
@@ -547,6 +550,7 @@ public final class FileBackedClientCryptoStore implements ClientCryptoStore {
                         UUID.fromString(reqText(deviceNode, "identityHandle")),
                         reqInt(deviceNode, "signedPrekeyId"),
                         reqBytes(deviceNode, "signedPrekeyPublic"),
+                        optBytes(deviceNode, "signedPrekeySignature"),
                         UUID.fromString(reqText(deviceNode, "signedHandle")));
             }
             for (SnapshotJson.Val entry : asArray(root.get("oneTimePrivates")).items()) {
@@ -667,6 +671,7 @@ public final class FileBackedClientCryptoStore implements ClientCryptoStore {
             deviceNode.put("identityHandle", new SnapshotJson.Str(device.identityHandle().toString()));
             deviceNode.put("signedPrekeyId", new SnapshotJson.Num(device.signedPrekeyId()));
             deviceNode.put("signedPrekeyPublic", new SnapshotJson.Str(encode(device.signedPrekeyPublic())));
+            putBytes(deviceNode, "signedPrekeySignature", device.signedPrekeySignature());
             deviceNode.put("signedHandle", new SnapshotJson.Str(device.signedHandle().toString()));
             root.put("device", deviceNode);
         }

@@ -38,19 +38,46 @@ public interface SignalAdapter {
     }
 
     /** Locally generated signed prekey pair. */
-    record SignedPrekeyPair(int prekeyId, byte[] publicKey, SealedPrivateHandle privateHandle) {
+    record SignedPrekeyPair(
+            int prekeyId, byte[] publicKey, byte[] signature, SealedPrivateHandle privateHandle) {
     }
 
     /** Locally generated one-time prekey pair. */
     record OneTimePrekeyPair(int prekeyId, byte[] publicKey, SealedPrivateHandle privateHandle) {
     }
 
+    /**
+     * Locally generated last-resort Kyber prekey pair (ADR-0019 triple).
+     *
+     * <p>The public triple ({@code prekeyId}, {@code publicKey}, {@code
+     * signature}) is what crosses enrollment into the server directory and
+     * returns inside claimed bundles; the private half stays sealed. The
+     * signature is the identity key's signature over the serialized Kyber
+     * public key, verifiable by any V1 peer without library-specific calls
+     * beyond the adapter.
+     */
+    record KyberPrekeyPair(
+            int prekeyId, byte[] publicKey, byte[] signature, SealedPrivateHandle privateHandle) {
+    }
+
     /** Result of outbound X3DH; blob must be durably committed before encrypt. */
     record EstablishedSession(byte[] sessionBlob, CryptoTypes.EstablishmentMode mode) {
     }
 
-    /** Result of one encrypt call; caller persists the updated session blob. */
-    record EncryptResult(byte[] updatedSessionBlob, byte[] envelopeCiphertext) {
+    /**
+     * Result of one encrypt call; caller persists the updated session blob.
+     *
+     * <p>{@code envelopeType} is the authoritative wire type of the produced
+     * bytes when non-null: libsignal repeats the prekey message (same OTPK
+     * reference) until the peer's first reply advances the session, so a
+     * reused session can still yield PREKEY_INIT bytes and only the producer
+     * can classify them. Null defers to the Samvaad heuristic (fake/testing
+     * adapters); real adapters must always report.
+     */
+    record EncryptResult(
+            byte[] updatedSessionBlob,
+            byte[] envelopeCiphertext,
+            CryptoTypes.EnvelopeType envelopeType) {
     }
 
     /** Result of one decrypt call; caller persists the updated session blob. */
@@ -86,6 +113,15 @@ public interface SignalAdapter {
     SignedPrekeyPair generateSignedPrekey(SealedPrivateHandle identityPrivate, int prekeyId);
 
     OneTimePrekeyPair generateOneTimePrekey(int prekeyId);
+
+    /**
+     * Generates this device's long-lived last-resort Kyber pair. The
+     * selected libsignal line mandates Kyber material in every session
+     * bundle (X3DH-only bundles are rejected), so a V1 device cannot
+     * establish or receive sessions without one; one-time Kyber pools
+     * remain deferred.
+     */
+    KyberPrekeyPair generateKyberPrekey(SealedPrivateHandle identityPrivate, int prekeyId);
 
     /**
      * Stable display fingerprint of an identity public key, for human

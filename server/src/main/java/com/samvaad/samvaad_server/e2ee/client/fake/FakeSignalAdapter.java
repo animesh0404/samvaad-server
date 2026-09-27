@@ -43,6 +43,7 @@ public final class FakeSignalAdapter implements SignalAdapter {
         UUID id = UUID.randomUUID();
         return new SignedPrekeyPair(prekeyId,
                 ("fake-spub:" + prekeyId + ":" + id).getBytes(StandardCharsets.UTF_8),
+                ("fake-ssig:" + prekeyId + ":" + id).getBytes(StandardCharsets.UTF_8),
                 new FakeHandle(id));
     }
 
@@ -51,6 +52,15 @@ public final class FakeSignalAdapter implements SignalAdapter {
         UUID id = UUID.randomUUID();
         return new OneTimePrekeyPair(prekeyId,
                 ("fake-opub:" + prekeyId + ":" + id).getBytes(StandardCharsets.UTF_8),
+                new FakeHandle(id));
+    }
+
+    @Override
+    public KyberPrekeyPair generateKyberPrekey(SealedPrivateHandle identityPrivate, int prekeyId) {
+        UUID id = UUID.randomUUID();
+        return new KyberPrekeyPair(prekeyId,
+                ("fake-kpub:" + prekeyId + ":" + id).getBytes(StandardCharsets.UTF_8),
+                ("fake-ksig:" + prekeyId + ":" + id).getBytes(StandardCharsets.UTF_8),
                 new FakeHandle(id));
     }
 
@@ -135,8 +145,9 @@ public final class FakeSignalAdapter implements SignalAdapter {
         String next = base + "#e" + encryptCalls.get();
         sessions.put(next, 1);
         String cipher = "fake-ct:" + next + ":" + new String(plaintextAssoc, StandardCharsets.UTF_8);
+        // Fake defers classification to the Samvaad heuristic (null report).
         return new EncryptResult(
-                next.getBytes(StandardCharsets.UTF_8), cipher.getBytes(StandardCharsets.UTF_8));
+                next.getBytes(StandardCharsets.UTF_8), cipher.getBytes(StandardCharsets.UTF_8), null);
     }
 
     @Override

@@ -71,6 +71,15 @@ public final class CryptoTestFixtures {
         private final Map<UUID, java.util.Queue<SignalAdapter.OneTimePrekeyPair>> otpkPool =
                 new ConcurrentHashMap<>();
         private final AtomicInteger calls = new AtomicInteger();
+        /**
+         * Pinned real bundles (e.g. assembled from a real adapter's outputs
+         * for interoperability tests): served verbatim, bypassing the pool.
+         */
+        private final Map<UUID, CryptoTypes.RecipientBundle> pinned = new ConcurrentHashMap<>();
+
+        public void pinBundle(UUID deviceId, CryptoTypes.RecipientBundle bundle) {
+            pinned.put(deviceId, bundle);
+        }
 
         public void register(UUID userId, UUID deviceId, int signalDeviceId, String seed, int regId) {
             seeds.put(deviceId, seed);
@@ -102,6 +111,10 @@ public final class CryptoTestFixtures {
         @Override
         public CryptoTypes.RecipientBundle claim(UUID recipientDeviceId, UUID claimRequestId) {
             calls.incrementAndGet();
+            CryptoTypes.RecipientBundle pinnedBundle = pinned.get(recipientDeviceId);
+            if (pinnedBundle != null) {
+                return pinnedBundle;
+            }
             String k = recipientDeviceId + ":" + claimRequestId;
             CryptoTypes.RecipientBundle hit = replay.get(k);
             if (hit != null) {

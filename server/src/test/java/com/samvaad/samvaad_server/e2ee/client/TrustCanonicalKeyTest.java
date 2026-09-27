@@ -58,6 +58,11 @@ class TrustCanonicalKeyTest {
         }
 
         @Override
+        public KyberPrekeyPair generateKyberPrekey(SealedPrivateHandle identityPrivate, int prekeyId) {
+            return delegate.generateKyberPrekey(identityPrivate, prekeyId);
+        }
+
+        @Override
         public String fingerprint(byte[] identityPublicKey) {
             return pinned;
         }
@@ -121,6 +126,11 @@ class TrustCanonicalKeyTest {
         @Override
         public OneTimePrekeyPair generateOneTimePrekey(int prekeyId) {
             return pinned.generateOneTimePrekey(prekeyId);
+        }
+
+        @Override
+        public KyberPrekeyPair generateKyberPrekey(SealedPrivateHandle identityPrivate, int prekeyId) {
+            return pinned.generateKyberPrekey(identityPrivate, prekeyId);
         }
 
         @Override

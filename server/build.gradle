@@ -27,6 +27,12 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	// Real V1 Signal/Sesame crypto (ADR-0018): libsignal-client behind the
+	// Samvaad-owned SignalAdapter seam. Only the adapter implementation may
+	// reference library types. Pinned to 0.86.5: the newest version
+	// published to Maven Central (later 0.10x lines are not on Central) and
+	// the line ADR-0018 validated on Java 25.
+	implementation 'org.signal:libsignal-client:0.86.5'
 	// Bouncy Castle: self-signed TLS certificate generation for
 	// application-managed HTTPS (ADR 0017). Pure-JVM X.509 issuance; the
 	// JDK exposes no supported public API for creating certificates.
