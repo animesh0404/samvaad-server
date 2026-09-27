@@ -28,10 +28,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	// V1 Signal/Sesame crypto (ADR-0018, ADR-0024): the reusable JVM client
-	// library owns the SamvaadCryptoService/SignalAdapter seam and the only
-	// libsignal-client reference (0.86.5, see e2ee-client/build.gradle).
-	// Resolved to the sibling build via the composite in settings.gradle;
-	// no published artifact required.
+	// library (standalone `samvaad-e2ee-lib` repository) owns the
+	// SamvaadCryptoService/SignalAdapter seam and the only
+	// libsignal-client reference (0.86.5, see samvaad-e2ee-lib/build.gradle).
+	// Resolved to the sibling repository via the composite in
+	// settings.gradle; no published artifact required.
 	implementation 'com.samvaad:e2ee-client:0.1.0'
 	// Bouncy Castle: self-signed TLS certificate generation for
 	// application-managed HTTPS (ADR 0017). Pure-JVM X.509 issuance; the

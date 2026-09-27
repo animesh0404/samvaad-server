@@ -2,10 +2,14 @@
 
 ## Status
 
-Accepted. Implementation: the `e2ee-client` Gradle build at the repository
-root (`com.samvaad:e2ee-client:0.1.0`), consumed by the server module through
-a composite build (`includeBuild('../e2ee-client')` in
-`server/settings.gradle`).
+Accepted. Extraction completed: the library now lives in the standalone
+`samvaad-e2ee-lib` repository (sibling checkout, no longer an `e2ee-client/`
+directory in this repository). Coordinates are unchanged
+(`com.samvaad:e2ee-client:0.1.0`); the server module consumes them through
+a composite build (`includeBuild('../../samvaad-e2ee-lib')` with an
+explicit `dependencySubstitution` rule in `server/settings.gradle`,
+because the library repository's root project is named
+`samvaad-e2ee-lib` while its artifact remains `e2ee-client`).
 
 Extends ADR 0018 (Signal/Sesame direction), ADR 0022 (persistent store
 boundary), and ADR 0023 (JVM Signal adapter, Kyber mandate, key custody).
@@ -35,8 +39,8 @@ on the Spring Boot server application.
    JDK-only, as do the vault and fingerprint implementations.
 2. Test doubles (`fake/FakeSignalAdapter`, `fake/InMemoryStores`) do NOT
    ship in the library; equivalent fixtures live under
-   `e2ee-client/src/test`. Pure client proofs move with the code; server
-   transport/integration tests stay in the server module.
+   `samvaad-e2ee-lib/src/test`. Pure client proofs moved with the code;
+   server transport/integration tests stay in the server module.
 3. The server module drops its direct libsignal dependency and depends on
    `com.samvaad:e2ee-client:0.1.0`, resolved locally via the composite
    build. No published artifact is required for local development.
