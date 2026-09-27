@@ -4,8 +4,10 @@ import com.samvaad.samvaad_server.e2ee.client.CryptoException;
 import com.samvaad.samvaad_server.e2ee.client.CryptoTypes;
 import com.samvaad.samvaad_server.e2ee.client.SignalAdapter;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,10 +55,13 @@ import org.signal.libsignal.protocol.state.SignedPreKeyStore;
  *
  * <p>Private-key custody: generated private objects live in an in-process
  * registry keyed by handle UUID, so store reopenings in the same process
- * keep resolving (the file store persists only the handle reference).
- * A full process restart empties the registry — new establishment and new
- * inbound prekey-init then fail closed until the platform keystore
- * re-provisions private material (documented pending work); persisted
+ * keep resolving (the file store persists only the handle reference). When
+ * a {@link PrivateKeyVault} is attached, every generation is additionally
+ * sealed into encrypted persistent custody, and registry misses are
+ * recovered from the vault on demand — so a full process restart restores
+ * identity, signed-prekey, OTPK, and last-resort Kyber material, and fresh
+ * establishment plus inbound prekey-init keep working. Without a vault, a
+ * restart empties the registry and those operations fail closed; persisted
  * sessions still decrypt ratchet messages and committed ciphertext still
  * replays, neither of which needs private keys.
  *
@@ -93,19 +98,38 @@ public final class LibSignalAdapter implements SignalAdapter {
     }
 
     private final int localRegistrationId;
+    private final PrivateKeyVault vault;
     private final Map<UUID, StoredKey> keys = new ConcurrentHashMap<>();
-    /** This device's last-resort Kyber pair (inbound needs it; no handle param carries it). */
-    private volatile KyberEntry deviceKyber;
+    /**
+     * This device's last-resort Kyber pair (inbound needs it; no handle
+     * param carries it). Single last-resort invariant: regenerating replaces
+     * the vault entry, so recovery stays unambiguous.
+     */
+    private volatile KyberDevice deviceKyber;
+
+    private record KyberDevice(UUID handleId, KyberEntry entry) {
+    }
 
     /**
      * @param localRegistrationId this device's registration id, stable for
      *                            the device lifetime (same value it uploads)
      */
     public LibSignalAdapter(int localRegistrationId) {
+        this(localRegistrationId, null);
+    }
+
+    /**
+     * @param localRegistrationId this device's registration id, stable for
+     *                            the device lifetime (same value it uploads)
+     * @param vault persistent private-key custody, or null for in-process
+     *              only (restart loses private material)
+     */
+    public LibSignalAdapter(int localRegistrationId, PrivateKeyVault vault) {
         if (localRegistrationId < 1) {
             throw new IllegalArgumentException("registration id starts at 1");
         }
         this.localRegistrationId = localRegistrationId;
+        this.vault = vault;
     }
 
     // ---- generation ----
@@ -114,6 +138,7 @@ public final class LibSignalAdapter implements SignalAdapter {
     public LocalIdentity generateIdentity() {
         IdentityKeyPair pair = IdentityKeyPair.generate();
         UUID id = UUID.randomUUID();
+        seal(id, PrivateKeyVault.KeyKind.IDENTITY, pair.serialize());
         keys.put(id, new IdentityEntry(pair));
         return new LocalIdentity(pair.getPublicKey().serialize(), new SignalHandle(id));
     }
@@ -126,6 +151,8 @@ public final class LibSignalAdapter implements SignalAdapter {
                 identity.getPrivateKey().calculateSignature(signed.getPublicKey().serialize());
         long timestamp = System.currentTimeMillis();
         UUID id = UUID.randomUUID();
+        seal(id, PrivateKeyVault.KeyKind.SIGNED,
+                new SignedPreKeyRecord(prekeyId, timestamp, signed, signature).serialize());
         keys.put(id, new SignedEntry(prekeyId, timestamp, signed, signature.clone()));
         return new SignedPrekeyPair(
                 prekeyId, signed.getPublicKey().serialize(), signature.clone(), new SignalHandle(id));
@@ -135,6 +162,7 @@ public final class LibSignalAdapter implements SignalAdapter {
     public OneTimePrekeyPair generateOneTimePrekey(int prekeyId) {
         ECKeyPair pair = ECKeyPair.generate();
         UUID id = UUID.randomUUID();
+        seal(id, PrivateKeyVault.KeyKind.OTPK, new PreKeyRecord(prekeyId, pair).serialize());
         keys.put(id, new OtpkEntry(prekeyId, pair));
         return new OneTimePrekeyPair(
                 prekeyId, pair.getPublicKey().serialize(), new SignalHandle(id));
@@ -147,10 +175,18 @@ public final class LibSignalAdapter implements SignalAdapter {
         byte[] signature =
                 identity.getPrivateKey().calculateSignature(pair.getPublicKey().serialize());
         long timestamp = System.currentTimeMillis();
-        KyberEntry entry = new KyberEntry(prekeyId, timestamp, pair, signature.clone());
         UUID id = UUID.randomUUID();
+        seal(id, PrivateKeyVault.KeyKind.KYBER,
+                new KyberPreKeyRecord(prekeyId, timestamp, pair, signature).serialize());
+        KyberEntry entry = new KyberEntry(prekeyId, timestamp, pair, signature.clone());
         keys.put(id, entry);
-        deviceKyber = entry;
+        KyberDevice previous = deviceKyber;
+        deviceKyber = new KyberDevice(id, entry);
+        if (vault != null && previous != null && !previous.handleId().equals(id)) {
+            // Single last-resort invariant: retire the superseded entry so
+            // recovery stays unambiguous.
+            vault.remove(previous.handleId());
+        }
         return new KyberPrekeyPair(
                 prekeyId, pair.getPublicKey().serialize(), signature.clone(), new SignalHandle(id));
     }
@@ -294,7 +330,10 @@ public final class LibSignalAdapter implements SignalAdapter {
             }
             IdentityKeyPair identity = identityOf(ownIdentityPrivate);
             SignedEntry signed = signedOf(ownSignedPrivate);
-            KyberEntry kyber = deviceKyber;
+            KyberEntry kyber = deviceKyber == null ? null : deviceKyber.entry();
+            if (kyber == null) {
+                kyber = recoverDeviceKyber();
+            }
             if (kyber == null) {
                 throw new CryptoException.SessionCorruptException(
                         "device kyber key unavailable in this process");
@@ -368,9 +407,96 @@ public final class LibSignalAdapter implements SignalAdapter {
 
     // ---- registry ----
 
+    /**
+     * Seals freshly generated material into persistent custody. Consumes
+     * (zeroes) the supplied plaintext array. A vault failure fails the
+     * generation itself: no handle for unsealed material is ever returned.
+     */
+    private void seal(UUID handleId, PrivateKeyVault.KeyKind kind, byte[] plaintext) {
+        if (vault == null) {
+            return;
+        }
+        try {
+            vault.store(handleId, kind, plaintext);
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
+    }
+
+    /**
+     * Recovers one entry from persistent custody into the registry. Returns
+     * null when no vault is attached or the handle is unknown there; fails
+     * closed on tampering or kind mismatch.
+     */
+    private StoredKey recoverFromVault(
+            UUID handleId, PrivateKeyVault.KeyKind expected, String role) {
+        if (vault == null) {
+            return null;
+        }
+        PrivateKeyVault.SealedEntry sealed = vault.load(handleId);
+        if (sealed == null) {
+            return null;
+        }
+        byte[] plaintext = sealed.plaintext();
+        try {
+            if (sealed.kind() != expected) {
+                throw new IllegalArgumentException(
+                        "handle is not " + role + " (vault kind mismatch)");
+            }
+            StoredKey recovered = switch (expected) {
+                case IDENTITY -> new IdentityEntry(new IdentityKeyPair(plaintext));
+                case SIGNED -> {
+                    SignedPreKeyRecord record = new SignedPreKeyRecord(plaintext);
+                    yield new SignedEntry(
+                            record.getId(), record.getTimestamp(), record.getKeyPair(),
+                            record.getSignature());
+                }
+                case OTPK -> {
+                    PreKeyRecord record = new PreKeyRecord(plaintext);
+                    yield new OtpkEntry(record.getId(), record.getKeyPair());
+                }
+                case KYBER -> {
+                    KyberPreKeyRecord record = new KyberPreKeyRecord(plaintext);
+                    yield new KyberEntry(
+                            record.getId(), record.getTimestamp(), record.getKeyPair(),
+                            record.getSignature());
+                }
+            };
+            keys.put(handleId, recovered);
+            return recovered;
+        } catch (InvalidKeyException | InvalidMessageException e) {
+            throw new CryptoException.SessionCorruptException(
+                    "vault entry undecryptable as " + role);
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
+    }
+
+    /** Recovers the lone last-resort Kyber entry; ambiguous/absent stays null. */
+    private KyberEntry recoverDeviceKyber() {
+        if (vault == null) {
+            return null;
+        }
+        Set<UUID> candidates = vault.handlesOfKind(PrivateKeyVault.KeyKind.KYBER);
+        if (candidates.size() != 1) {
+            return null;
+        }
+        UUID handleId = candidates.iterator().next();
+        StoredKey recovered = recoverFromVault(handleId, PrivateKeyVault.KeyKind.KYBER, "a kyber key");
+        if (recovered instanceof KyberEntry entry) {
+            deviceKyber = new KyberDevice(handleId, entry);
+            return entry;
+        }
+        return null;
+    }
+
     private IdentityKeyPair identityOf(SealedPrivateHandle handle) {
         Objects.requireNonNull(handle, "identity handle");
         StoredKey key = keys.get(handle.handleId());
+        if (key == null) {
+            key = recoverFromVault(
+                    handle.handleId(), PrivateKeyVault.KeyKind.IDENTITY, "an identity key");
+        }
         if (key == null) {
             throw new CryptoException.SessionCorruptException(
                     "identity key unavailable in this process; re-provision platform key material");
@@ -385,6 +511,10 @@ public final class LibSignalAdapter implements SignalAdapter {
         Objects.requireNonNull(handle, "signed prekey handle");
         StoredKey key = keys.get(handle.handleId());
         if (key == null) {
+            key = recoverFromVault(
+                    handle.handleId(), PrivateKeyVault.KeyKind.SIGNED, "a signed prekey");
+        }
+        if (key == null) {
             throw new CryptoException.SessionCorruptException(
                     "signed prekey unavailable in this process");
         }
@@ -397,6 +527,10 @@ public final class LibSignalAdapter implements SignalAdapter {
     private ECKeyPair otpkOf(SealedPrivateHandle handle) {
         Objects.requireNonNull(handle, "one-time prekey handle");
         StoredKey key = keys.get(handle.handleId());
+        if (key == null) {
+            key = recoverFromVault(
+                    handle.handleId(), PrivateKeyVault.KeyKind.OTPK, "a one-time prekey");
+        }
         if (key == null) {
             throw new CryptoException.SessionCorruptException(
                     "one-time prekey unavailable in this process");
