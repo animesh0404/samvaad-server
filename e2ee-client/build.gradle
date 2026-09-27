@@ -1,0 +1,38 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'com.samvaad'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Real V1 Signal/Sesame crypto (server ADR-0018): libsignal-client behind
+    // the Samvaad-owned SignalAdapter seam. Only LibSignalAdapter may
+    // reference library types, so `implementation` (not `api`) is sufficient.
+    // Pinned to 0.86.5: the newest version published to Maven Central
+    // (later 0.10x lines are not on Central) and the line validated on
+    // Java 25. No Spring, no Jackson, no JPA: plain JVM library, JDK-only
+    // persistence/vault/fingerprint code.
+    implementation 'org.signal:libsignal-client:0.86.5'
+    testImplementation platform('org.junit:junit-bom:6.1.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

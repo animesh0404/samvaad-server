@@ -43,3 +43,4 @@ an earlier ADR only by explicitly naming it.
 | [0021](0021-v1-e2ee-identity-fingerprint-contract.md) | V1 E2EE identity fingerprint contract |
 | [0022](0022-v1-e2ee-client-persistent-store-boundary.md) | V1 E2EE client persistent store boundary |
 | [0023](0023-jvm-signal-adapter-and-kyber-mandate.md) | JVM Signal adapter and mandatory last-resort Kyber |
+| [0024](0024-e2ee-client-library-extraction.md) | Reusable JVM E2EE client library (`e2ee-client`) |
