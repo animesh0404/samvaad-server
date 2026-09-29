@@ -2,9 +2,7 @@
 
 ## Status
 
-Accepted. Contract: `ClientCryptoStore` with the file-backed JVM reference
-implementation (`client.persist`) and recovery coverage in
-`PersistentStoreRecoveryTest`. No SignalAdapter exists yet.
+Accepted. Contract: `ClientCryptoStore` with the file-backed JVM reference implementation (`client.persist`) and recovery coverage in `PersistentStoreRecoveryTest`. The real SignalAdapter implementation is defined by ADR-0023 and uses this persistence boundary.
 
 Extends ADR 0018, which remains the locked decision for V1 E2EE
 identity/enrollment, and ADR 0021, which remains the locked trust primitive
@@ -71,4 +69,6 @@ TUI) have their own storage anyway.
 - OTPK issuance high-water durability (stays with `PrekeyManager`/platform).
 - Snapshot migration paths (rejected explicitly until a versioned upgrade
   is designed).
-- Real Signal/Sesame adapter, backup/restoration (unchanged).
+- Platform adapters beyond the JVM reference store.
+- Backup/restoration.
+- OS/platform-specific keystore mappings beyond the current JVM vault implementation.

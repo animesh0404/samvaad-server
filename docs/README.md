@@ -26,7 +26,7 @@ Administrative hard deletion is implemented as explicit transactional cleanup ra
 
 The server-side E2EE device/enrollment/prekey/recovery foundation is implemented. ADR 0020's ciphertext mailbox/history transport is also implemented: encrypted message envelopes are accepted and stored opaquely, per-device mailboxes can be fetched/acknowledged, ciphertext history is retained, and per-device synchronization cursors are supported.
 
-The Samvaad-owned client crypto/session boundary defined by the E2EE ADRs is now present as a contract-tested design slice, including the `SignalAdapter` seam, crypto types, local store contracts, trust/session orchestration, crash/retry state-machine contracts, and a deterministic fake adapter. The JVM real Signal adapter (libsignal-client 0.86.5, ADR-0023) is implemented with two-device interoperability coverage; platform-specific (Web/Android/TUI) cryptographic clients remain future work, so end-to-end cryptographic confidentiality is not yet production-complete on those targets.
+The Samvaad-owned client crypto/session boundary defined by the E2EE ADRs is implemented, including the `SignalAdapter` seam, crypto types, persistent store contracts, trust/session orchestration, crash/retry state-machine contracts, and the real JVM `LibSignalAdapter` (libsignal-client 0.86.5). The extracted library is published as `io.github.animesh0404:e2ee-client:0.1.0` and consumed by the server from Maven Central. The TUI consumes the same library and has encrypted send/inbound processing plus recovery rebind. Browser/Android adapters and encrypted history backup/restore remain future work.
 
 ## Web Admin
 
@@ -60,7 +60,7 @@ Realtime V1 provides:
 
 A manual smoke test has verified authenticated clients connecting, subscribing to the same conversation, and realtime message delivery without polling. See [Realtime V1 Smoke Test](verification/realtime-smoke-test.md).
 
-The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. The V1 E2EE device/prekey foundation is implemented and governed by ADR 0018. Full E2EE messaging remains the next implementation area: Signal/Sesame session establishment, client cryptographic state, encrypted message envelopes/mailboxes, ciphertext history, synchronization, and encrypted backup remain unimplemented.
+The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. The V1 E2EE device/prekey/recovery foundation, real JVM Signal adapter, ciphertext mailbox/history transport, and synchronization primitives are implemented. The remaining E2EE rollout work is target expansion, E2EE-only application enforcement, encrypted first-contact migration, recovery/rotation UX, and encrypted history backup/restore.
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 

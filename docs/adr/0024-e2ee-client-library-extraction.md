@@ -2,18 +2,12 @@
 
 ## Status
 
-Accepted. Extraction completed: the library now lives in the standalone
-`samvaad-e2ee-lib` repository (sibling checkout, no longer an `e2ee-client/`
-directory in this repository). Coordinates are unchanged
-(`com.samvaad:e2ee-client:0.1.0`).
+Accepted. Extraction completed: the library now lives in the standalone `samvaad-e2ee-lib` repository (no longer an `e2ee-client/` directory in this repository). The final published coordinate is `io.github.animesh0404:e2ee-client:0.1.0` from Maven Central.
 
 Amended: the temporary composite-build consumption
 (`includeBuild('../../samvaad-e2ee-lib')` with an explicit
 `dependencySubstitution` rule in `server/settings.gradle`) is retired.
-The server module now consumes the published GitHub Packages artifact
-`com.samvaad:e2ee-client:0.1.0` (library tag `v0.1.0`) from
-`https://maven.pkg.github.com/animesh0404/samvaad-e2ee-lib`. No sibling
-checkout is required.
+The historical GitHub Packages consumption is retired. The server module consumes the published Maven Central artifact `io.github.animesh0404:e2ee-client:0.1.0` with no GitHub credentials or sibling checkout required.
 
 Amended (2026-09-28, see Amendment below; interim GitHub Packages
 decision preserved as history): GitHub Packages consumption is retired.

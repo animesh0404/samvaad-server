@@ -2,9 +2,7 @@
 
 ## Status
 
-Accepted. Executable spec: `FingerprintContractTest` (JDK primitives
-only). The Samvaad-owned client crypto seam now references this contract;
-production Signal integration remains pending.
+Accepted. Executable spec: `FingerprintContractTest` (JDK primitives only). The Samvaad-owned client crypto seam references this contract, and the real JVM Signal implementation consumes it through ADR-0023.
 
 ## Context
 

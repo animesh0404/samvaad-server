@@ -27,7 +27,7 @@ The intended responsibilities are:
 - asynchronous/offline encrypted-message delivery;
 - multi-device fan-out and device/session lifecycle management.
 
-The selected Signal-family implementation must satisfy the Samvaad-owned crypto boundary and be validated for Java, browser, Android, and TUI targets before production adoption. The initial Java feasibility spike validated libsignal-client 0.86.5 on Java 25 with a glibc-based Temurin runtime; the browser, Android, and TUI paths still require target-specific validation.
+The selected Signal-family implementation must satisfy the Samvaad-owned crypto boundary and be validated per target before production adoption. libsignal-client 0.86.5 is implemented and validated on the JVM/Java 25 path, including TUI use through the extracted e2ee-client library. Browser and Android adapters remain target-specific future work.
 
 ### 2. Samvaad uses independent cryptographic devices
 

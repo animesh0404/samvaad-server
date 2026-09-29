@@ -122,7 +122,7 @@ Implemented deployment details include the multi-stage Dockerfile, Alpine Temuri
 
 COMPLETE — SERVER-SIDE FOUNDATION IMPLEMENTED.
 
-The architecture remains governed by ADR 0018. This slice establishes the server-side E2EE trust/device foundation; it does not yet encrypt message content.
+The architecture remains governed by ADR 0018. The server-side E2EE trust/device foundation and ciphertext transport are implemented; the server never encrypts or decrypts message content.
 
 The V1 messaging confidentiality direction is fixed by [ADR 0018](adr/0018-v1-e2ee-signal-sesame-and-independent-device-identity.md).
 

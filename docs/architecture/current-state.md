@@ -11,7 +11,8 @@
 - Friend-request lifecycle and accepted-request-as-friendship model.
 - Authenticated friends list read through `GET /api/friends`, derived from accepted friend-request relationships.
 - Direct conversation persistence with normalized participant pairs and database uniqueness.
-- Plain-text direct messages with server timestamps, monotonic per-conversation sequences, and request-ID idempotency.
+- Legacy plain-text direct messages remain implemented for compatibility, with server timestamps, monotonic per-conversation sequences, and request-ID idempotency.
+- E2EE direct-message transport accepts per-device ciphertext envelopes, retains ciphertext history, exposes per-device mailboxes/acknowledgements, and maintains per-device synchronization cursors.
 - Atomic conversation/first-message creation and database-backed concurrency invariants.
 - HTTP direct message send, conversation listing, and participant-only message reads.
 - WebSocket/STOMP realtime transport:
@@ -126,12 +127,7 @@ ADR 0018 defines the V1 E2EE enrollment state machine. The server-side device/en
 - Recovery creates a new cryptographic device identity. It does not recreate a revoked/lost device identity. Encrypted chat-history restoration remains a separate recovery mechanism.
 - The implementation enforces the five-device non-REVOKED limit, PENDING/ACTIVE/REVOKED lifecycle, session-to-device binding, trusted-device approval authorization seam, device revocation/session termination, one-time prekey upload/claim, friendship-gated device discovery, and account-level recovery-code handling.
 
-The implemented slice is the E2EE device/prekey foundation plus ciphertext
-transport (ADR 0020): batched submission, durable per-device history, per-device
-mailbox with acknowledgement, per-device processed-cursors, and server-assigned
-sequencing over the reused pair-scoped conversations. Signal/Sesame session
-establishment, actual message encryption, client cryptographic state, and
-encrypted backup/restoration remain unimplemented.
+The implemented E2EE slice includes device/prekey/recovery state, ciphertext transport, and the real JVM Signal client implementation through the extracted e2ee-client library: batched submission, durable per-device history, per-device mailbox with acknowledgement, per-device synchronization cursors, server-assigned sequencing, and real Signal/PQXDH session establishment/encryption/decryption in the client boundary. The server remains blind to message content. Encrypted backup/restoration and non-JVM platform adapters remain unimplemented.
 
 ## Realtime V1 boundary
 

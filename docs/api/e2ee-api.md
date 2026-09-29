@@ -86,6 +86,16 @@ carries the device's last-resort Kyber public material on **every**
 claim, including replays and empty-pool fallbacks. The Kyber key is
 reusable and is never consumed by the claim.
 
+## `POST /api/e2ee/devices/{deviceId}/bind` — recovery rebind
+
+`200 OK` returns the existing `DeviceDto` after an authenticated unbound session is bound to the named ACTIVE device. Request body:
+
+```json
+{"recoveryCode":"<one-time-code>"}
+```
+
+The caller must own the device, the device must be ACTIVE, and the caller's session must not already be bound to a device. The server consumes the recovery code and binds the session atomically. No new device is created and no private cryptographic material crosses the API. Invalid/blank or already-consumed codes fail without consuming another code; foreign, inactive, or already-bound targets use the existing exception/error contract.
+
 ## Other endpoints
 
 `POST /api/e2ee/devices/{deviceId}/approve`,

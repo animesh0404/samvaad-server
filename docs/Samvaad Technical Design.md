@@ -1,6 +1,6 @@
 # Samvaad — Technical Design
 
-> **Status:** Phases 1–5 and Realtime V1 are implemented. The realtime transport is now part of the current server architecture.
+> **Status:** Phases 1–5, Realtime V1, the E2EE device/recovery foundation, ciphertext transport, and the JVM Signal client implementation are implemented. Realtime transport and E2EE ciphertext transport are part of the current server architecture.
 > **Focus:** Backend/domain/protocol/persistence/concurrency.
 > **Rule:** Architectural invariants are fixed by ADRs; low-level mechanics are decided when implementation creates a concrete need.
 

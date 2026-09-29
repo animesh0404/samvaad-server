@@ -100,7 +100,7 @@ See `docs/development/setup.md` for the full packaging and deployment reference.
 
 ## Current Status
 
-The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, the current administrative user-deletion slice, the V1 E2EE device/prekey foundation, and the V1 E2EE ciphertext mailbox/history transport are implemented and tested. The Samvaad-owned client crypto/session contract and deterministic fake implementation slice are also present for contract testing. Realtime V1 has also been manually verified end-to-end.**
+The project is in active development. **Phases 1–5, Realtime V1, Friends List API, the Web Admin panel, application packaging, Docker deployment, the administrative user-deletion slice, the V1 E2EE device/prekey/recovery foundation, ciphertext mailbox/history transport, and the JVM Signal client implementation are implemented and tested. The reusable E2EE client library is published separately and consumed from Maven Central. Realtime V1 has also been manually verified end-to-end.**
 
 Currently implemented:
 
@@ -118,7 +118,7 @@ Currently implemented:
 - **Realtime Messaging V1**: WebSocket + STOMP transport at `/ws`, authenticated STOMP `CONNECT` using the existing access JWT/session model, participant-only conversation subscriptions, `/app/chat.send`, `/topic/conversations/{conversationId}`, reuse of the existing message persistence/idempotency/authorization logic, and broadcast only after successful persistence. The first slice uses Spring's in-memory simple broker. A manual Alice-to-Bob smoke test has verified live delivery without polling.
 - **Web Admin**: Angular 22 + TypeScript + Tailwind CSS administration UI with dashboard, user listing, user creation, user detail, and user deletion flows. Web Admin login uses `clientPlatform: "WEB"`; only `ADMIN` accounts are allowed to establish a Web Admin session. Valid non-admin credentials are rejected at the login page and do not retain tokens/session state.
 - **E2EE Transport**: V1 ciphertext message submission, per-device envelopes, durable mailbox delivery/acknowledgement, permanent ciphertext history, and per-device conversation synchronization cursors are implemented as specified by ADR 0020. The server remains cryptographically blind to message content.
-- **E2EE Client Crypto Boundary**: Samvaad-owned `SignalAdapter`, crypto types, local-store contracts, trust/session orchestration, crash/retry state-machine contracts, and a deterministic fake adapter are implemented for contract testing. The JVM real Signal adapter (libsignal-client 0.86.5, ADR-0023) is implemented with two-device interoperability coverage; platform-specific clients remain future work.
+- **E2EE Client Crypto Boundary**: The Samvaad-owned `SignalAdapter`, crypto types, persistent-store contracts, trust/session orchestration, crash/retry state-machine contracts, and real JVM `LibSignalAdapter` (libsignal-client 0.86.5) are implemented and covered by real two-device interoperability/integration tests. The reusable JVM implementation is published as `io.github.animesh0404:e2ee-client:0.1.0` and consumed from Maven Central. Browser/Android platform adapters remain future work.
 - **Persistence & Migrations**: PostgreSQL database integration managed via Liquibase changelogs.
 - **JPA Auditing**: Basic entity change auditing.
 
@@ -132,7 +132,7 @@ Currently implemented:
 - Horizontal scaling/external brokers and a general event bus.
 - **V1 E2EE Device & Prekey Foundation** is implemented: independent cryptographic device records, enrollment/recovery state machine, trusted-device approval seam, device revocation/session termination, five-device cap, one-time prekey upload/claim, recipient device directory, and account-level recovery-code handling.
 - **V1 E2EE Ciphertext Transport** is implemented: encrypted message envelope submission, per-device mailbox/history transport, acknowledgement, permanent ciphertext retention, and synchronization cursors.
-- **End-to-end cryptographic confidentiality is not yet production-complete**: the Samvaad-owned client crypto boundary and deterministic fake implementation are present, but the real Signal/Sesame adapter, persistent platform-specific cryptographic stores, and production Web/Android/TUI cryptographic clients remain future implementation work. Encrypted history backup/restoration also remains future work.
+- **End-to-end cryptographic rollout is not yet complete across every target**: the real JVM Signal adapter and the TUI's reusable E2EE client path are implemented, while browser/Android adapters and encrypted history backup/restoration remain future work. The server itself remains cryptographically blind: it stores/routes ciphertext and never receives client private keys.
 
 Friend-gated profile visibility remains deferred; it was intentionally not activated as part of Phase 3.
 
@@ -259,4 +259,4 @@ The authoritative documentation lives under [`docs/`](docs/):
 
 ## Next Implementation Area
 
-**V1 E2EE crypto implementation**: the server-side device/prekey foundation and ciphertext mailbox/history transport are implemented, and the Samvaad-owned crypto/session boundary has been defined with a deterministic fake implementation. The next E2EE work is to harden that boundary and then implement/validate the real Signal/Sesame adapter and platform-specific persistent cryptographic stores before production encrypted messaging replaces the current plaintext message path. Public deployment edge configuration, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard remain separate deployment work.
+**V1 E2EE rollout**: the server-side device/prekey/recovery foundation and ciphertext mailbox/history transport are implemented, and the real JVM Signal adapter is integrated through the extracted E2EE client library. The TUI has encrypted send/inbound mailbox/history processing and recovery rebind. Remaining E2EE work includes enforcing E2EE-only application messaging, encrypted first-contact migration, browser/Android adapters, recovery/rotation UX, and encrypted history backup/restore. Public deployment edge configuration, certificate/domain configuration, deployment upgrade policy, and the future first-time setup wizard remain separate deployment work.

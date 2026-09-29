@@ -36,7 +36,7 @@ The V1 E2EE enrollment flow distinguishes first-device bootstrap from recovery-r
 
 The enrollment state machine defined by ADR 0018 is implemented in the server-side E2EE foundation. The implemented boundary covers device enrollment state, trusted-device approval authorization, recovery-required enrollment, session-to-device binding, device revocation/session termination, one-time prekey handling, recipient device discovery, and account-level recovery-code handling.
 
-This is not yet full E2EE message confidentiality. Signal/Sesame session establishment, client-side cryptographic state, encrypted message envelopes/mailboxes, ciphertext message persistence, history synchronization, and encrypted history backup/restoration remain unimplemented. The current direct-message content path therefore remains server-readable plaintext until the subsequent messaging-encryption slice replaces it.
+The E2EE message-confidentiality path is implemented for the JVM/TUI client boundary: real Signal/PQXDH session establishment, local private-key custody, encrypted per-device envelopes, ciphertext mailbox/history transport, and synchronization are covered by the current implementation and tests. The server remains blind to message content. The legacy plaintext direct-message transport still exists as a separate compatibility path; it has not yet been retired or made inaccessible to every client. Browser/Android adapters and encrypted history backup/restoration remain future work.
 
 ## Deferred / future
 
