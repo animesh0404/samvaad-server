@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.e2ee.device;
 
+import com.samvaad.samvaad_server.e2ee.dto.BindDeviceRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.ClaimPrekeyRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.ClaimPrekeyResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.DeviceDto;
@@ -61,6 +62,13 @@ public class E2eeDeviceController {
     public DeviceDto approveDevice(@PathVariable UUID deviceId) {
         AuthenticatedUser caller = CurrentUser.require();
         return deviceService.approveDevice(caller.userId(), caller.sessionId(), deviceId);
+    }
+
+    @PostMapping("/devices/{deviceId}/bind")
+    public DeviceDto bindDevice(@PathVariable UUID deviceId,
+            @Valid @RequestBody BindDeviceRequestDto request) {
+        AuthenticatedUser caller = CurrentUser.require();
+        return deviceService.bindDevice(caller.userId(), caller.sessionId(), deviceId, request);
     }
 
     @PutMapping("/devices/{deviceId}/one-time-prekeys")

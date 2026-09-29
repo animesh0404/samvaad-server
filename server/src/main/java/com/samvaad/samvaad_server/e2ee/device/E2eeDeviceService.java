@@ -5,6 +5,7 @@ import com.samvaad.samvaad_server.e2ee.E2eeMapper;
 import com.samvaad.samvaad_server.e2ee.E2eePolicy;
 import com.samvaad.samvaad_server.e2ee.auth.DeviceApprovalAuthorizer;
 import com.samvaad.samvaad_server.e2ee.crypto.KeyMaterialEnvelopeValidator;
+import com.samvaad.samvaad_server.e2ee.dto.BindDeviceRequestDto;
 import com.samvaad.samvaad_server.e2ee.dto.ClaimPrekeyResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.DeviceDto;
 import com.samvaad.samvaad_server.e2ee.dto.DeviceListDto;
@@ -187,6 +188,38 @@ public class E2eeDeviceService {
                 callerUserId, deviceId,
                 callerDevice != null ? callerDevice.getDeviceId() : null);
         return E2eeMapper.toDeviceDto(approved, prekeyRepo.countByDeviceAndConsumedAtIsNull(approved));
+    }
+
+    @OperationalLog("e2ee.device.bind")
+    @Transactional
+    public DeviceDto bindDevice(
+            UUID callerUserId, UUID callerSessionId, UUID deviceId, BindDeviceRequestDto request) {
+        if (request == null || request.getRecoveryCode() == null
+                || request.getRecoveryCode().isBlank()) {
+            throw new InvalidRecoveryCodeException();
+        }
+        E2eeDevice device = deviceRepo.findByDeviceIdWithLock(deviceId)
+                .orElseThrow(() -> new DeviceNotFoundException(deviceId));
+        requireOwner(callerUserId, device);
+        if (!device.isActive()) {
+            throw new DeviceNotActiveException();
+        }
+        Session session = resolveOwnedSession(callerUserId, callerSessionId);
+        requireUnboundSession(session);
+
+        User user = userRepo.findByIdWithLock(callerUserId)
+                .orElseThrow(() -> new UserNotFoundException(callerUserId));
+        // Atomic with the bind below: any failure rolls the consumption
+        // back, and two concurrent uses resolve to a single winner. No new
+        // device is created; the existing device keeps its identity.
+        recoveryService.consumeCode(user, request.getRecoveryCode());
+
+        session.setDeviceId(device.getDeviceId());
+        sessionRepo.save(session);
+
+        log.info("Device rebound userId={} deviceId={} sessionId={}",
+                callerUserId, device.getDeviceId(), callerSessionId);
+        return E2eeMapper.toDeviceDto(device, prekeyRepo.countByDeviceAndConsumedAtIsNull(device));
     }
 
     @OperationalLog("e2ee.device.uploadPrekeys")
