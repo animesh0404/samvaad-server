@@ -300,6 +300,14 @@ public class E2eeMessageService {
                 .orElseThrow(() -> new ConversationNotFoundException(request.getConversationId()));
         requireParticipant(callerUserId, conversation);
         E2eeDevice device = requireActiveOwnedDevice(callerUserId, callerSessionId);
+        if (request.getThroughSequence() < 0) {
+            throw new InvalidPaginationException("throughSequence must be >= 0");
+        }
+        if (request.getThroughSequence() > conversation.getLastSequenceNumber()) {
+            log.warn("Sync cursor denied: beyond last sequence deviceId={} conversationId={}",
+                    device.getDeviceId(), conversation.getConversationId());
+            throw new E2eeMessageConflictException("Sync cursor cannot move beyond last sequence");
+        }
         E2eeSyncCursor cursor = cursorRepo
                 .findLockedByDeviceAndConversation(device.getDeviceId(), conversation.getConversationId())
                 .orElse(null);

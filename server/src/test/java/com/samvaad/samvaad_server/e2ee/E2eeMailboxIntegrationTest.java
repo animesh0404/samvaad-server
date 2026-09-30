@@ -32,6 +32,7 @@ import com.samvaad.samvaad_server.e2ee.dto.SubmitE2eeMessageDto;
 import com.samvaad.samvaad_server.e2ee.dto.SubmitE2eeMessageResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.SyncCursorDto;
 import com.samvaad.samvaad_server.e2ee.exception.E2eeMessageConflictException;
+import com.samvaad.samvaad_server.messaging.InvalidPaginationException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
 import com.samvaad.samvaad_server.e2ee.message.E2eeEnvelopeRepo;
@@ -418,6 +419,51 @@ class E2eeMailboxIntegrationTest {
         assertThrows(E2eeMessageConflictException.class,
                 () -> messageService.advanceCursor(pair.bob().getUserId(), pair.b1().sessionId(), backwards));
         assertEquals(2L, messageService
+                .readCursor(pair.bob().getUserId(), pair.b1().sessionId(), conversationId).getThroughSequence());
+    }
+
+    @Test
+    void cursorEnforcesSequenceRangeWithoutMutatingOnRejection() {
+        Pair pair = provisionPair("cursorbounds");
+        SubmitE2eeMessageResponseDto response = messageService.submitMessage(
+                pair.alice().getUserId(), pair.a1().sessionId(),
+                submit(UUID.randomUUID(), envelope(pair.a1().deviceId(), pair.b1().deviceId(),
+                        "PREKEY_INIT", "ct-1".getBytes())));
+        UUID conversationId = response.getConversationId();
+        assertEquals(1L, response.getSequenceNumber());
+
+        // Exactly lastSequenceNumber is valid.
+        AdvanceCursorDto atEnd = new AdvanceCursorDto();
+        atEnd.setConversationId(conversationId);
+        atEnd.setThroughSequence(1L);
+        assertEquals(1L, messageService
+                .advanceCursor(pair.bob().getUserId(), pair.b1().sessionId(), atEnd).getThroughSequence());
+
+        // Beyond lastSequenceNumber is rejected and leaves the cursor unchanged.
+        AdvanceCursorDto beyond = new AdvanceCursorDto();
+        beyond.setConversationId(conversationId);
+        beyond.setThroughSequence(2L);
+        assertThrows(E2eeMessageConflictException.class,
+                () -> messageService.advanceCursor(pair.bob().getUserId(), pair.b1().sessionId(), beyond));
+        assertEquals(1L, messageService
+                .readCursor(pair.bob().getUserId(), pair.b1().sessionId(), conversationId).getThroughSequence());
+
+        // Long.MAX_VALUE is rejected and leaves the cursor unchanged.
+        AdvanceCursorDto extreme = new AdvanceCursorDto();
+        extreme.setConversationId(conversationId);
+        extreme.setThroughSequence(Long.MAX_VALUE);
+        assertThrows(E2eeMessageConflictException.class,
+                () -> messageService.advanceCursor(pair.bob().getUserId(), pair.b1().sessionId(), extreme));
+        assertEquals(1L, messageService
+                .readCursor(pair.bob().getUserId(), pair.b1().sessionId(), conversationId).getThroughSequence());
+
+        // Negative values are rejected at the service layer itself.
+        AdvanceCursorDto negative = new AdvanceCursorDto();
+        negative.setConversationId(conversationId);
+        negative.setThroughSequence(-1L);
+        assertThrows(InvalidPaginationException.class,
+                () -> messageService.advanceCursor(pair.bob().getUserId(), pair.b1().sessionId(), negative));
+        assertEquals(1L, messageService
                 .readCursor(pair.bob().getUserId(), pair.b1().sessionId(), conversationId).getThroughSequence());
     }
 
