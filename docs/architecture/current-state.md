@@ -11,22 +11,20 @@
 - Friend-request lifecycle and accepted-request-as-friendship model.
 - Authenticated friends list read through `GET /api/friends`, derived from accepted friend-request relationships.
 - Direct conversation persistence with normalized participant pairs and database uniqueness.
-- Legacy plain-text direct messages remain implemented for compatibility, with server timestamps, monotonic per-conversation sequences, and request-ID idempotency.
-- E2EE direct-message transport accepts per-device ciphertext envelopes, retains ciphertext history, exposes per-device mailboxes/acknowledgements, and maintains per-device synchronization cursors.
+- E2EE direct-message transport accepts per-device ciphertext envelopes (max 65,536 decoded bytes per envelope, max 10 envelopes per submit), retains ciphertext history, exposes per-device mailboxes/acknowledgements, and maintains per-device synchronization cursors (valid range `0` through the conversation `lastSequenceNumber`).
 - Atomic conversation/first-message creation and database-backed concurrency invariants.
-- HTTP direct message send, conversation listing, and participant-only message reads.
-- WebSocket/STOMP realtime transport:
+- HTTP conversation listing and E2EE message submission (`POST /api/e2ee/messages`), per-device mailbox/history/cursor reads. The legacy plaintext message send and history endpoints have been removed; messaging is E2EE-ciphertext only.
+- WebSocket/STOMP realtime transport (device-level, delivery-only):
   - `/ws` WebSocket endpoint
-  - `/app` application prefix
-  - `/topic` simple broker
-  - `/app/chat.send` send command
-  - `/topic/conversations/{conversationId}` conversation delivery
+  - `/topic` simple broker (single server)
   - `Authorization: Bearer <JWT>` on STOMP `CONNECT`
-  - existing JWT + persisted-session validation
-  - authenticated `AuthenticatedUser` principal containing user/session identity
-  - participant-only conversation subscriptions
-  - shared message persistence/idempotency/authorization/sequencing logic
-  - persistence before broadcast
+  - existing JWT + persisted-session validation, plus required binding to an `ACTIVE` E2EE device owned by the caller
+  - authenticated `StompDevicePrincipal` containing user/session/device identity (`AuthenticatedUser` remains HTTP-only)
+  - exact-match subscription to the connection's own `/topic/devices/{deviceId}` only; any other destination is rejected identically
+  - session/device liveness revalidated on `SUBSCRIBE`; session or device revocation terminates live connections server-side
+  - no client SEND handler; messages are submitted exclusively via HTTPS
+  - post-commit per-device ciphertext fan-out; replayed submissions produce no second event; broker failure never fails persistence
+  - durable per-device mailbox remains the delivery fallback and is never acknowledged by realtime delivery
 - Installation identity is optional session metadata: login accepts a missing `installationId`, blank/whitespace values normalize to null, and nonblank values remain supported.
 - Operational logging policy covering meaningful business/application and security/authentication events, correlation/trace context, secret avoidance, and bounded rolling file retention.
 - Web Admin first implementation slice using Angular + TypeScript + Tailwind CSS, with admin dashboard and user-administration flows.
@@ -46,9 +44,7 @@ user profile
    ↓
 friend requests (sender or recipient)
    ↓
-sent messages
-   ↓
-messages in conversations involving the user
+E2EE transport rows (mailbox, envelopes, messages, cursors) for the user's conversations
    ↓
 conversations involving the user
    ↓
@@ -61,7 +57,7 @@ after-commit success log
 
 The target user row is locked pessimistically before cleanup. Existing RESTRICT foreign keys remain database backstops. A residual integrity conflict caused by concurrent activity is translated to `409 Conflict`; ordinary successful deletion remains `204 No Content`.
 
-Deleting the user also deletes conversations involving that user and the messages in those conversations. This is the V1 hard-delete semantic; the other participant's view of those conversations is removed as part of the deletion. Account suspension/pausing remains deferred.
+Deleting the user also deletes E2EE devices/prekeys/recovery codes, sessions, E2EE mailbox/history/cursor rows, and conversations involving that user. This is the V1 hard-delete semantic; the other participant's view of those conversations is removed as part of the deletion. Account suspension/pausing remains deferred.
 
 ## Friends list architecture
 
@@ -111,9 +107,9 @@ See ADR 0013 for the durable TLS termination decision.
 - `current-user-profile.puml` — user/profile persistence model.
 - `current-domain-model.puml` — current domain relationships.
 - `current-data-model.puml` — PostgreSQL relationship/message tables and uniqueness invariants.
-- `current-messaging-write-flow.puml` — HTTP direct-message write path.
-- `current-messaging-read-flow.puml` — HTTP conversation/message reads.
-- `current-realtime-message-flow.puml` — STOMP connect, subscription, send, persistence, and broadcast flow.
+- `current-messaging-write-flow.puml` — E2EE ciphertext submission path.
+- `current-messaging-read-flow.puml` — conversation list, E2EE mailbox/history/cursor reads.
+- `current-realtime-message-flow.puml` — STOMP connect, device subscription, post-commit per-device fan-out, mailbox fallback.
 
 
 ## E2EE enrollment architecture: locked, foundation implemented
@@ -131,12 +127,12 @@ The implemented E2EE slice includes device/prekey/recovery state, ciphertext tra
 
 ## Realtime V1 boundary
 
-The WebSocket handshake is servlet-security-permitted, while actual authentication occurs on STOMP `CONNECT`. Subscription authorization is participant-only. Unknown and non-participant subscription destinations are rejected identically to avoid existence leakage. STOMP sends enter the existing message service and broadcast only after successful persistence.
+The WebSocket handshake is servlet-security-permitted, while actual authentication occurs on STOMP `CONNECT` (JWT + session + bound `ACTIVE` device, yielding a `StompDevicePrincipal`). Subscription authorization is exact-match against the connection's own `/topic/devices/{deviceId}`; any other destination is rejected identically to avoid existence leakage. There is no client SEND handler. Session or device revocation terminates live connections server-side. Realtime delivery is a best-effort hint after the persistence transaction commits; the durable mailbox, permanent history, and sync cursors are the delivery truth.
 
 ## Explicitly deferred
 
-- reconnect/missed-event synchronization
-- offline queues
+- reconnect/backfill UX beyond mailbox/history/cursor catch-up
+- offline queues beyond the per-device E2EE mailbox
 - persistent read state/read receipts
 - typing/presence, delivery receipts, push notifications
 - message editing/deletion/replies
@@ -155,4 +151,4 @@ The WebSocket handshake is servlet-security-permitted, while actual authenticati
 
 ## Known V1 limitation
 
-Broadcast-after-commit is not crash-safe across process failure because Realtime V1 has no outbox. The simple broker is in-memory and intended for the first single-instance slice only.
+Post-commit fan-out is not crash-safe across process failure because realtime delivery has no outbox: a crash between commit and broadcast loses only the live hint, and the durable mailbox preserves every message. The simple broker is in-memory and intended for the first single-instance slice only.

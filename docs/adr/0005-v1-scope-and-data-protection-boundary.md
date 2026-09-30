@@ -4,6 +4,15 @@
 
 Accepted.
 
+> **Supersession note (implementation update, decision body below unchanged):**
+> the "transitional foundation phase" sentence in the Decision section (plaintext
+> message path "remains temporarily in place") no longer describes the current
+> implementation. The plaintext message send/history endpoints, plaintext
+> persistence, and plaintext realtime broadcast have been removed; messaging is
+> E2EE-ciphertext only, with post-commit per-device realtime fan-out and durable
+> mailbox fallback. The "do not reintroduce a separate plaintext message-storage
+> path" consequence remains in force.
+
 ## Decision
 
 V1 originally excluded E2EE, but that specific exclusion has been **superseded by ADR 0018**. ADR 0018 is now authoritative for V1 end-to-end encrypted one-to-one messaging.

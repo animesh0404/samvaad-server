@@ -13,13 +13,13 @@
 - Direct conversation and message uniqueness are database-backed.
 - HTTP conversation listing and message reads are participant-scoped.
 - Known non-participant reads return `403`; unknown conversations return `404`.
-- STOMP `CONNECT` authentication uses the existing access JWT plus persisted session validation. The STOMP credential is `Authorization: Bearer <JWT>`.
+- STOMP `CONNECT` authentication uses the existing access JWT plus persisted session validation, and additionally requires the session to be bound to an `ACTIVE` E2EE device owned by the caller. The STOMP credential is `Authorization: Bearer <JWT>`.
 - The WebSocket handshake endpoint is servlet-security-permitted only so the STOMP layer can perform token authentication; the handshake itself does not grant application access.
-- Authenticated STOMP connections receive an `AuthenticatedUser` principal containing server-authoritative user/session identity.
-- Conversation subscriptions are participant-only. Unknown and non-participant conversation subscriptions are rejected identically to avoid revealing conversation existence through subscription behavior.
-- STOMP message sends derive sender identity from the authenticated principal; the client cannot provide a sender ID.
-- STOMP sends reuse the existing friendship authorization, sequence, timestamp, persistence, and request-ID idempotency logic.
-- Realtime broadcast occurs only after successful persistence; failed sends persist and broadcast nothing.
+- Authenticated STOMP connections receive a `StompDevicePrincipal` containing server-authoritative user/session/device identity (`AuthenticatedUser` remains HTTP-only). The device identity is derived server-side and never supplied by the client.
+- Subscriptions are authorized by exact match against the connection's own `/topic/devices/{deviceId}`. Any other destination is rejected identically to avoid revealing whether another device exists. Session/device liveness is revalidated on `SUBSCRIBE`.
+- There is no client STOMP send handler. E2EE messages are submitted exclusively via HTTPS; the server fans out one persisted per-device ciphertext envelope to each recipient device topic only after the database transaction commits. Replayed submissions produce no second event, and broker failure never fails persistence.
+- E2EE submission bounds are enforced: at most 65,536 decoded ciphertext bytes per envelope and at most 10 envelopes per submit. Sync cursors are valid from `0` through the conversation `lastSequenceNumber`.
+- Session revocation terminates the associated live WebSocket connections server-side; device revocation terminates every live connection bound to that device's sessions.
 - Operational logging is intended to capture meaningful business/application and security/authentication events with traceable correlation context, while avoiding routine low-level CRUD logging and sensitive authentication secrets.
 - Operational log files use configurable size-based rolling, compressed archives, and bounded retention; the default retention target is 50 rolled files.
 
@@ -36,11 +36,11 @@ The V1 E2EE enrollment flow distinguishes first-device bootstrap from recovery-r
 
 The enrollment state machine defined by ADR 0018 is implemented in the server-side E2EE foundation. The implemented boundary covers device enrollment state, trusted-device approval authorization, recovery-required enrollment, session-to-device binding, device revocation/session termination, one-time prekey handling, recipient device discovery, and account-level recovery-code handling.
 
-The E2EE message-confidentiality path is implemented for the JVM/TUI client boundary: real Signal/PQXDH session establishment, local private-key custody, encrypted per-device envelopes, ciphertext mailbox/history transport, and synchronization are covered by the current implementation and tests. The server remains blind to message content. The legacy plaintext direct-message transport still exists as a separate compatibility path; it has not yet been retired or made inaccessible to every client. Browser/Android adapters and encrypted history backup/restoration remain future work.
+The E2EE message-confidentiality path is implemented for the JVM/TUI client boundary: real Signal/PQXDH session establishment, local private-key custody, encrypted per-device envelopes, ciphertext mailbox/history transport, and synchronization are covered by the current implementation and tests. The server remains blind to message content. The legacy plaintext direct-message transport has been removed; messaging is E2EE-ciphertext only. Browser/Android adapters and encrypted history backup/restoration remain future work.
 
 ## Deferred / future
 
-- Reconnect/missed-event synchronization and offline queues.
+- Reconnect/backfill UX beyond mailbox/history/cursor catch-up, and offline queues beyond the per-device E2EE mailbox.
 - Persistent read state/read receipts.
 - Typing/presence, delivery receipts, and push notifications.
 - Message mutations/replies.
@@ -48,4 +48,4 @@ The E2EE message-confidentiality path is implemented for the JVM/TUI client boun
 - Rate limiting and stable machine-readable error codes.
 - Full audit/event-history policy beyond operational logging.
 - Horizontal scaling/external brokers and a crash-safe outbox.
-- Full E2EE message implementation and rollout; the device/prekey foundation is implemented and architecture remains governed by ADR 0018.
+- Full E2EE rollout to browser/Android clients and encrypted history backup/restoration; server-side ciphertext transport, device/prekey foundation, and realtime fan-out are implemented and architecture remains governed by ADR 0018.

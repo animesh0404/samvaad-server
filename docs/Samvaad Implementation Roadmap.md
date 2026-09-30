@@ -31,25 +31,20 @@ Implemented:
 - nullable other-participant username after admin deletion
 
 ## Realtime V1 — STOMP/WebSocket Message Delivery
-COMPLETE.
+COMPLETE (superseded in transport design; original plaintext form retired).
 
-Implemented:
-- Spring WebSocket/STOMP support.
-- WebSocket endpoint `/ws`.
-- `/app` application destination prefix.
-- `/app/chat.send` message command.
-- `/topic/conversations/{conversationId}` conversation broadcast destination.
-- STOMP `CONNECT` authentication using the existing access JWT and persisted session validation.
+Originally implemented (historical record — do not reimplement):
+- Spring WebSocket/STOMP support with `/ws` endpoint, `/app` prefix, `/app/chat.send` command, and `/topic/conversations/{conversationId}` broadcast through the plaintext `MessageService`.
+
+Superseded by the implemented device-level E2EE realtime architecture:
+- STOMP `CONNECT` authentication using the existing access JWT and persisted session validation, plus required binding to an `ACTIVE` E2EE device (`StompDevicePrincipal`).
 - `Authorization: Bearer <JWT>` as the CONNECT credential header.
-- authenticated `userId`/`sessionId` principal association.
-- participant-only conversation subscription authorization.
-- participant message send through the existing `MessageService` business logic.
-- server-authoritative sender identity, sequence, timestamp, and request ID.
-- persistence before broadcast.
-- Spring simple broker for the first slice.
-- integration coverage for connect authentication, revoked sessions, participant/non-participant subscriptions, send/broadcast, persistence, idempotency, and failed-send behavior.
-
-Implementation boundary: the HTTP and STOMP transports enter the same message business logic. The STOMP layer does not maintain separate persistence, sequencing, friendship, or idempotency rules.
+- Exact-match subscription to the connection's own `/topic/devices/{deviceId}`; no client SEND handler.
+- HTTPS-only `POST /api/e2ee/messages` submission with post-commit per-device ciphertext fan-out; replays produce no second event; broker failure never fails persistence.
+- Durable per-device mailbox as the delivery fallback; delivery never acknowledges.
+- Session/device revocation terminates live connections server-side.
+- Spring simple broker for the single-server slice.
+- Integration coverage: CONNECT authentication (incl. revoked/unbound/foreign/inactive sessions), cross-device denial without oracle, connection termination on revoke, per-device delivery isolation, offline fallback, reconnect/ack recovery, duplicate suppression, and rollback silence.
 
 ## Friends List API
 

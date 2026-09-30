@@ -14,6 +14,15 @@ their text.
 
 No library is selected or locked by this ADR. No SignalAdapter exists yet.
 
+> **Supersession note (implementation update, decision body below unchanged):**
+> two statements in this ADR no longer describe the current implementation.
+> First, real-time/STOMP fan-out is implemented, not deferred: committed
+> messages fan out post-commit to `/topic/devices/{recipientDeviceId}` with
+> the mailbox as durable fallback (mailbox polling is no longer the sole
+> delivery mechanism). Second, the JVM Signal adapter and e2ee-client library
+> work it defers has since landed (see ADR 0023, ADR 0024). The persistence,
+> idempotency, sequencing, and cursor decisions below stand unchanged.
+
 ## Context
 
 After the crypto layer produces a frozen 7-field `OutboundEnvelope` per

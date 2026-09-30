@@ -1,53 +1,44 @@
 @startuml
-actor ClientA
-actor ClientB
+title Current E2EE device-level realtime flow
+
+actor DeviceA
+actor DeviceB
 participant "STOMP /ws" as WS
 participant "StompAuthInterceptor" as AUTH
-participant "ChatController" as CHAT
-participant "MessageService" as MSG
+participant "StompConnectionRegistry" as REG
 database PostgreSQL as DB
 participant "Simple Broker" as BROKER
 
-ClientA -> WS: CONNECT Authorization: Bearer JWT
+DeviceA -> WS: CONNECT Authorization: Bearer JWT
 WS -> AUTH: CONNECT
-AUTH -> DB: validate persisted session
-DB --> AUTH: valid session
-AUTH --> WS: AuthenticatedUser
+AUTH -> DB: validate persisted session + bound ACTIVE device
+DB --> AUTH: valid session + device
+AUTH --> WS: StompDevicePrincipal
+AUTH -> REG: link connection to server session
 
-ClientA -> WS: SUBSCRIBE /topic/conversations/{id}
-WS -> AUTH: participant check
-AUTH -> DB: conversation membership
-DB --> AUTH: participant
+DeviceA -> WS: SUBSCRIBE /topic/devices/{ownDeviceId}
+WS -> AUTH: exact-match + liveness revalidation
+AUTH -> DB: session + device ACTIVE check
+DB --> AUTH: live
 AUTH --> WS: subscription allowed
 
-ClientB -> WS: CONNECT Authorization: Bearer JWT
+DeviceB -> WS: CONNECT Authorization: Bearer JWT
 WS -> AUTH: CONNECT
-AUTH -> DB: validate persisted session
-DB --> AUTH: valid session
-AUTH --> WS: AuthenticatedUser
-ClientB -> WS: SUBSCRIBE /topic/conversations/{id}
-WS -> AUTH: participant check
-AUTH -> DB: conversation membership
-DB --> AUTH: participant
+AUTH -> DB: validate persisted session + bound ACTIVE device
+DB --> AUTH: valid session + device
+AUTH --> WS: StompDevicePrincipal
+AUTH -> REG: link connection to server session
+DeviceB -> WS: SUBSCRIBE /topic/devices/{ownDeviceId}
+WS -> AUTH: exact-match + liveness revalidation
 AUTH --> WS: subscription allowed
-
-ClientA -> WS: SEND /app/chat.send
-WS -> CHAT: ChatSendRequest
-CHAT -> MSG: sendMessageToConversation()
-MSG -> DB: friendship + idempotency + sequence + persist
-DB --> MSG: committed Message
-MSG --> CHAT: persisted MessageDto
-CHAT -> BROKER: broadcast MessageDto
-BROKER --> ClientA: /topic/conversations/{id}
-BROKER --> ClientB: /topic/conversations/{id}
 
 note over AUTH
-Unknown and non-participant
-subscriptions are rejected identically.
+Any other destination is rejected identically.
+There is no client SEND handler.
 end note
 
-note over CHAT,DB
-Broadcast occurs only after
-successful persistence.
+note over REG
+Session or device revocation terminates
+live connections server-side.
 end note
 @enduml

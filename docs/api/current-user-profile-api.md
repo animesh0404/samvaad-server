@@ -10,19 +10,7 @@ Friend-request lifecycle is implemented under `/api/friend-requests`. An accepte
 
 ## Direct messaging
 
-### HTTP send
-
-`POST /api/conversations/direct/messages`
-
-```json
-{
-  "username": "recipient",
-  "content": "hello",
-  "requestId": "client-generated-uuid"
-}
-```
-
-The caller identity comes from server authentication. Accepted friendship is required; self-messaging is rejected. The service owns conversation creation, message sequence/timestamp, and request-ID idempotency.
+Message transport is E2EE ciphertext only; see `e2ee-api.md` for the authoritative contract. The legacy plaintext `POST /api/conversations/direct/messages` send endpoint and the plaintext `GET /api/conversations/direct/{conversationId}/messages` history endpoint have been removed.
 
 ### HTTP conversation list
 
@@ -30,13 +18,7 @@ The caller identity comes from server authentication. Accepted friendship is req
 
 Participant-only. `limit` is 1–100; `offset` is non-negative. Results use recent `updatedAt` descending and `conversationId` ascending as deterministic tiebreaker.
 
-### HTTP message read
-
-`GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20`
-
-Participant-only. `afterSequence` is a non-negative exclusive server sequence cursor; `limit` is 1–100. Results are ascending by server sequence. Unknown conversation is `404`; known non-participant is `403`.
-
-## Realtime messaging — STOMP/WebSocket V1
+## Realtime messaging — device-level STOMP channel
 
 ### WebSocket endpoint
 
@@ -52,49 +34,25 @@ Send the existing access token as:
 Authorization: Bearer <access-jwt>
 ```
 
-The server validates the JWT and persisted session using the same identity/session rules as HTTP authentication. No separate WebSocket login exists.
+The server validates the JWT and persisted session using the same identity/session rules as HTTP authentication, and additionally requires the session to be bound to an `ACTIVE` E2EE device owned by the caller. The resulting principal identifies exactly one device. No separate WebSocket login exists, and the client never supplies its own device identity.
 
-### Conversation subscription
+### Device subscription
 
 Subscribe to:
 
 ```text
-/topic/conversations/{conversationId}
+/topic/devices/{deviceId}
 ```
 
-The authenticated caller must be a participant. Unknown and non-participant destinations are rejected identically so subscription attempts do not reveal conversation existence.
+where `{deviceId}` must equal the authenticated connection's own device. Destinations for any other device — or any other shape, including conversation topics — are rejected identically so subscription attempts do not reveal whether another device exists. The subscription is revalidated against session/device liveness; session or device revocation terminates the connection server-side.
 
-### Send message
+### No client SEND handler
 
-Send to:
-
-```text
-/app/chat.send
-```
-
-Payload:
-
-```json
-{
-  "conversationId": "...",
-  "content": "hello",
-  "requestId": "client-generated-uuid"
-}
-```
-
-The client does not provide sender identity, sequence number, or server timestamp. The STOMP handler delegates to the existing `MessageService`, so friendship authorization, sequencing, timestamps, persistence, and request-ID idempotency remain shared with HTTP messaging.
-
-After successful persistence, the server broadcasts the persisted `MessageDto` to:
-
-```text
-/topic/conversations/{conversationId}
-```
-
-Failed sends are not broadcast. Replays use the existing idempotency behavior.
+There is no application STOMP send endpoint. E2EE messages are submitted exclusively through HTTPS (`POST /api/e2ee/messages`); after the database transaction commits, the server fans out one persisted per-device ciphertext envelope to each recipient device's topic. The durable per-device mailbox remains the fallback and is never acknowledged by realtime delivery.
 
 ### Broker boundary
 
-Realtime V1 uses Spring's in-memory simple broker. Reconnect/missed-event synchronization, read state, message mutation/replies, presence/receipts/notifications, external brokers, horizontal scaling, and offline behavior remain deferred.
+Realtime uses Spring's in-memory simple broker (single server). Presence/receipts/notifications, message mutation/replies, external brokers, and horizontal scaling remain deferred. Missed-event recovery is provided by the durable mailbox, permanent ciphertext history, and sync cursors — see `e2ee-api.md`.
 
 ## Profile PATCH
 

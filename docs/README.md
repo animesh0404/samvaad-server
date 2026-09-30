@@ -9,7 +9,7 @@ Current implementation state:
 - Phase 3 — Friend request vertical slice: complete.
 - Phase 4 — Direct messaging vertical slice: complete.
 - Phase 5 — Conversation/message reads and listing: complete.
-- Realtime V1 — STOMP/WebSocket message delivery: complete and manually verified end-to-end.
+- Realtime V1 — device-level STOMP/WebSocket delivery: complete and covered by automated integration tests.
 - Friends List API: complete.
 - Administrative user hard deletion: complete.
 - Web Admin panel: complete first implementation slice.
@@ -18,9 +18,9 @@ The repository is a monorepo. `server/` contains the self-contained Spring Boot 
 
 ## Current server capabilities
 
-The server provides authentication and persisted sessions, user/profile operations, admin user administration, friend requests and friendship authorization, direct messaging, conversation/message reads, and Realtime V1 over STOMP/WebSocket. See the architecture and API documents for detailed contracts.
+The server provides authentication and persisted sessions, user/profile operations, admin user administration, friend requests and friendship authorization, E2EE ciphertext messaging, conversation listing, and device-level realtime over STOMP/WebSocket. See the architecture and API documents for detailed contracts.
 
-Administrative hard deletion is implemented as explicit transactional cleanup rather than database `ON DELETE CASCADE`. A deletion locks the user row, removes sessions, profile, friend requests, sent messages, conversations involving the user and their messages, then removes the user row. The existing RESTRICT foreign keys remain database backstops. Successful deletion is `204 No Content`; a residual concurrent deletion conflict is `409 Conflict`.
+Administrative hard deletion is implemented as explicit transactional cleanup rather than database `ON DELETE CASCADE`. A deletion locks the user row, removes sessions, E2EE devices/prekeys/recovery codes, profile, friend requests, E2EE mailbox/history/cursor rows, and conversations involving the user, then removes the user row. The existing RESTRICT foreign keys remain database backstops. Successful deletion is `204 No Content`; a residual concurrent deletion conflict is `409 Conflict`.
 
 ## V1 E2EE implementation state
 
@@ -47,20 +47,16 @@ See [Web Admin README](../web-admin/README.md), [Architecture Current State](arc
 
 ## Realtime V1
 
-Realtime V1 provides:
-- WebSocket endpoint `/ws` with STOMP.
-- `/app` application prefix and `/topic` simple broker.
-- `/app/chat.send` with `{conversationId, content, requestId}`.
-- `/topic/conversations/{conversationId}` conversation delivery.
-- STOMP `CONNECT` authentication using the existing access JWT plus persisted session validation through `Authorization: Bearer <JWT>`.
-- Participant-only conversation subscriptions.
-- Sender identity derived from the authenticated STOMP principal.
-- Reuse of the existing message persistence, friendship authorization, sequencing, timestamps, and idempotency logic.
-- Broadcast only after the message service successfully persists/commits the message.
+Device-level realtime provides:
+- WebSocket endpoint `/ws` with STOMP and `/topic` simple broker (single server).
+- STOMP `CONNECT` authentication using the existing access JWT plus persisted session validation through `Authorization: Bearer <JWT>`, with a required binding to an `ACTIVE` E2EE device (yielding a `StompDevicePrincipal`).
+- Exact-match subscription to the connection's own `/topic/devices/{deviceId}` only; no client SEND handler.
+- Post-commit per-device ciphertext fan-out; the durable mailbox remains the delivery fallback.
+- Session/device revocation terminates live connections server-side.
 
-A manual smoke test has verified authenticated clients connecting, subscribing to the same conversation, and realtime message delivery without polling. See [Realtime V1 Smoke Test](verification/realtime-smoke-test.md).
+Realtime delivery is covered by automated integration tests; the retired plaintext smoke test is archived at [Realtime Smoke Test (archived)](verification/realtime-smoke-test.md).
 
-The first realtime slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/missed-event synchronization, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. The V1 E2EE device/prekey/recovery foundation, real JVM Signal adapter, ciphertext mailbox/history transport, and synchronization primitives are implemented. The remaining E2EE rollout work is target expansion, E2EE-only application enforcement, encrypted first-contact migration, recovery/rotation UX, and encrypted history backup/restore.
+The slice uses Spring's in-memory simple broker and is intentionally single-instance V1 behavior. Reconnect/backfill UX beyond mailbox/history/cursor catch-up, persistent read state, typing/presence, delivery receipts, push notifications, message mutation/replies, relationship controls, and external brokers/horizontal scaling remain deferred. The V1 E2EE device/prekey/recovery foundation, real JVM Signal adapter, ciphertext mailbox/history transport, and synchronization primitives are implemented. The remaining E2EE rollout work is target expansion, recovery/rotation UX, and encrypted history backup/restore.
 
 Friend-gated profile visibility also remains deferred; it was intentionally not activated as part of Phase 3.
 

@@ -58,85 +58,75 @@ Direct conversations normalize the participant pair and enforce uniqueness in th
 
 ## Message
 
-Messages have server-owned identity, conversation, sender, sequence number, content, server timestamp, and client request UUID. The server controls sequence and timestamp values. The HTTP read API uses sequence as its exclusive cursor.
+Messaging is E2EE-ciphertext only. One logical message has server-owned identity, conversation, sender, sender device, sequence number, server timestamp, and client request UUID, plus one opaque per-recipient-device ciphertext envelope. The server controls sequence and timestamp values and never inspects ciphertext. Mailbox/history reads use sequence as the exclusive cursor; sync cursors are valid from `0` through the conversation `lastSequenceNumber`.
 
 # 3. Database Invariants
 
 - usernames are unique
 - non-null emails are unique case-insensitively
 - direct participant pairs are unique
-- message `(conversation, sequence)` is unique
+- E2EE message `(conversation, sequence)` is unique
 - request IDs are unique
 - conversation creation and first-message persistence are atomic
-- message request UUIDs are replay-safe
+- message request UUIDs are replay-safe (replays produce no second realtime event)
+- one envelope and one mailbox entry exist per recipient device per message
 
 # 4. Authorization Model
 
 Authentication establishes the caller identity. Authorization establishes what the caller may do.
 
-Direct-message creation between distinct users requires accepted friendship. Conversation/message HTTP reads require conversation participation. Realtime conversation subscriptions and sends require authenticated participation in the target conversation.
+Direct-message creation between distinct users requires accepted friendship. Conversation listing and E2EE mailbox/history/cursor reads require conversation participation and a bound `ACTIVE` device. Realtime subscription requires the connection's own device identity; session or device revocation terminates live connections.
 
-# 5. Direct Messaging
+# 5. Direct Messaging (E2EE)
 
-HTTP send:
+HTTPS submit (`POST /api/e2ee/messages`):
 
 ```text
 authenticate
   ↓
-identify recipient
+resolve bound ACTIVE sender device
   ↓
-verify friendship
+decode + bound opaque envelopes (max 64 KiB each, max 10 per submit)
+  ↓
+verify sender, distinct + ACTIVE recipients, single recipient user
+  ↓
+verify friendship, reject self-message
   ↓
 find/create conversation
   ↓
-persist message
+persist message + per-device envelopes + per-device mailbox entries
 ```
 
-The service owns sequencing, timestamps, request-ID idempotency, and persistence. Unauthorized sends cannot create conversation state.
+The service owns sequencing, timestamps, request-ID idempotency, and persistence. Unauthorized submits cannot create conversation state. Identical retries replay without a second realtime event; divergent reuse is a `409` conflict.
 
 # 6. HTTP Read APIs
 
 `GET /api/conversations/direct?limit=20&offset=0` lists participant conversations ordered by `updatedAt DESC`, then `conversationId ASC`.
 
-`GET /api/conversations/direct/{conversationId}/messages?afterSequence=0&limit=20` reads participant messages in ascending server sequence. Unknown conversation is `404`; known non-participant is `403`.
+`GET /api/e2ee/mailbox?limit=50` fetches the calling device's undelivered ciphertext items; `POST /api/e2ee/mailbox/ack` acknowledges by scoped delete. `GET /api/e2ee/conversations/{conversationId}/messages?afterSequence=0&limit=20` reads durable per-device envelopes in ascending server sequence. Unknown conversation is `404`; known non-participant is `403`.
 
 # 7. Realtime STOMP/WebSocket
 
 ## Transport
 
 - WebSocket endpoint: `/ws`
-- STOMP application prefix: `/app`
-- simple broker prefix: `/topic`
-- send command: `/app/chat.send`
-- conversation destination: `/topic/conversations/{conversationId}`
+- simple broker prefix: `/topic` (single server)
+- device destination: `/topic/devices/{deviceId}`
+- no client send command; submission is HTTPS-only
 
 ## CONNECT authentication
 
-The WebSocket HTTP handshake is permitted through the servlet security chain, but the STOMP connection is not considered authenticated until `CONNECT` is processed. `StompAuthInterceptor` reads `Authorization: Bearer <JWT>`, validates the access token and persisted session using the existing JWT/session rules, and sets an `AuthenticatedUser` principal containing `userId`, role, and `sessionId`.
+The WebSocket HTTP handshake is permitted through the servlet security chain, but the STOMP connection is not considered authenticated until `CONNECT` is processed. `StompAuthInterceptor` reads `Authorization: Bearer <JWT>`, validates the access token and persisted session using the existing JWT/session rules, additionally requires the session to be bound to an `ACTIVE` E2EE device owned by the caller, and sets a `StompDevicePrincipal` containing `userId`, role, `sessionId`, and `deviceId` (`AuthenticatedUser` remains HTTP-only).
 
-There is no separate WebSocket login mechanism.
+There is no separate WebSocket login mechanism, and the client never supplies its own device identity.
 
 ## Subscription authorization
 
-A `SUBSCRIBE` to `/topic/conversations/{conversationId}` is allowed only when the authenticated principal is a participant. Unknown and non-participant conversation subscriptions are rejected identically so subscription attempts do not reveal conversation existence.
-
-## Send command
-
-The client supplies only:
-
-```json
-{
-  "conversationId": "...",
-  "content": "...",
-  "requestId": "..."
-}
-```
-
-The client does not supply authoritative sender identity, sequence, or server timestamp. `ChatController` delegates to `MessageService.sendMessageToConversation`, which reuses the existing friendship authorization, persistence, sequencing, timestamp, and idempotency logic.
+A `SUBSCRIBE` is allowed only for the connection's own `/topic/devices/{deviceId}`, with session/device liveness revalidated at subscribe time. Any other destination is rejected identically so subscription attempts do not reveal whether another device exists. Session or device revocation terminates live connections server-side.
 
 ## Broadcast boundary
 
-The persisted `MessageDto` is broadcast to `/topic/conversations/{conversationId}` only after the message service successfully returns from its transactional operation. V1 has no outbox, so this is not crash-recoverable across a process failure; that reliability/scaling problem is deferred.
+One persisted per-device ciphertext envelope is fanned out to each recipient device topic only after the persistence transaction commits. V1 has no outbox: a crash between commit and broadcast loses only the live hint, and the durable mailbox preserves every message. Broker failure never fails the HTTPS submission.
 
 ## Broker
 
@@ -147,34 +137,34 @@ Realtime V1 uses Spring's in-memory simple broker. Redis, Kafka, RabbitMQ, broke
 ```text
 STOMP CONNECT
    ↓
-JWT + persisted-session validation
+JWT + persisted-session + ACTIVE-device validation
    ↓
-AuthenticatedUser principal
+StompDevicePrincipal
    ↓
-SUBSCRIBE /topic/conversations/{id}
+SUBSCRIBE /topic/devices/{ownDeviceId}
    ↓
-participant authorization
+exact-match + liveness authorization
    ↓
-SEND /app/chat.send
+(separately) POST /api/e2ee/messages
    ↓
-MessageService
+validation + atomic batch persistence
    ↓
-friendship + idempotency + sequencing + persistence
+transaction commits
    ↓
-transaction succeeds
+per-device ciphertext fan-out to recipient device topics
    ↓
-MessageDto broadcast to conversation topic
+mailbox remains the fallback (never acknowledged by delivery)
 ```
 
 # 9. Concurrency and Failure Boundary
 
-The database remains authoritative for conversation uniqueness, message sequencing, and request-ID uniqueness. A failed STOMP send persists and broadcasts nothing. An idempotent replay returns the existing persisted message through the shared service path.
+The database remains authoritative for conversation uniqueness, message sequencing, and request-ID uniqueness. Failed or rolled-back submissions produce no realtime event. An idempotent replay returns the existing persisted message without a second realtime event.
 
 The current session-validation logic is intentionally duplicated between the HTTP JWT filter and STOMP interceptor to avoid changing established HTTP authentication behavior during the realtime slice; a later auth refactor may extract the common validation logic.
 
 # 10. Deferred Realtime Work
 
-Reconnect/missed-event synchronization, offline queues, read state/read receipts, typing/presence, delivery receipts, push notifications, message edits/deletes/replies, blocking/unfriend/mute/archive, horizontal scaling/external brokers, and a general event bus are outside Realtime V1. V1 E2EE is separately admitted and governed by ADR 0018.
+Reconnect/backfill UX beyond mailbox/history/cursor catch-up, offline queues beyond the per-device mailbox, read state/read receipts, typing/presence, delivery receipts, push notifications, message edits/deletes/replies, blocking/unfriend/mute/archive, horizontal scaling/external brokers, and a general event bus are outside Realtime V1. V1 E2EE is separately admitted and governed by ADR 0018.
 
 # 11. Operational Logging
 
@@ -196,10 +186,10 @@ Operational file logs use configuration-driven size-based rolling, compressed ar
 6. A request UUID cannot create two messages.
 7. Server sequence numbers determine message order.
 8. Client time is never authoritative.
-9. HTTP and STOMP message sends use the same message business logic.
-10. Realtime broadcast occurs only after successful persistence.
-11. Conversation subscriptions are participant-only.
-12. STOMP `CONNECT` uses the existing access JWT plus persisted session validation.
+9. E2EE submission is HTTPS-only; there is no client STOMP send handler.
+10. Realtime fan-out occurs only after the persistence transaction commits, one envelope per recipient device.
+11. Device subscriptions are exact-match against the connection's own device identity.
+12. STOMP `CONNECT` uses the existing access JWT plus persisted session validation plus bound-`ACTIVE`-device validation.
 13. The simple broker is an in-memory V1 choice, not the horizontal-scaling architecture.
 14. Authentication is session-based; installation identity is optional client/device metadata.
 

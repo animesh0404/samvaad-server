@@ -48,15 +48,47 @@ entity Conversation {
   lastSequenceNumber
 }
 
-entity Message {
+entity E2eeMessage {
   * messageId : UUID
   --
   conversationId
   sender
+  senderDeviceId
   sequence
-  content
   serverTimestamp
   requestId
+}
+
+entity E2eeEnvelope {
+  * envelopeId : UUID
+  --
+  messageId
+  recipientDeviceId
+  envelopeType
+  ciphertext
+}
+
+entity E2eeMailboxEntry {
+  * entryId : UUID
+  --
+  recipientDeviceId
+  messageId
+}
+
+entity E2eeSyncCursor {
+  * cursorId : UUID
+  --
+  recipientDeviceId
+  conversationId
+  throughSequence
+}
+
+entity E2eeDevice {
+  * deviceId : UUID
+  --
+  userId
+  signalDeviceId
+  status
 }
 
 User ||--o| UserProfile : has
@@ -64,8 +96,11 @@ User ||--o{ Session : owns
 User ||--o{ FriendRequest : sends
 User ||--o{ FriendRequest : receives
 User ||--o{ Conversation : participates
-Conversation ||--o{ Message : contains
-User ||--o{ Message : sends
+Conversation ||--o{ E2eeMessage : contains
+User ||--o{ E2eeMessage : sends
+E2eeMessage ||--o{ E2eeEnvelope : addressedTo
+E2eeMessage ||--o{ E2eeMailboxEntry : queuedFor
+User ||--o{ E2eeDevice : owns
 
 note right of FriendRequest
 An ACCEPTED friend-request row is the friendship.
@@ -79,9 +114,14 @@ unordered participant pair at the database level.
 Phase 4 creates it only on an authorized send.
 end note
 
-note right of Message
+note right of E2eeMessage
 requestId is unique for durable idempotency.
 sequence is monotonic within a conversation.
 serverTimestamp is assigned by the server.
+end note
+
+note right of E2eeEnvelope
+Opaque per-recipient-device ciphertext.
+The server never inspects it.
 end note
 @enduml

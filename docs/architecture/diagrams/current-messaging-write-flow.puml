@@ -1,57 +1,55 @@
 @startuml
-title Current implemented direct-message write flow
+title Current implemented E2EE ciphertext write flow
 
 actor Client
 participant "Spring Security" as Security
-participant "MessageController" as Controller
-participant "MessageService" as Service
+participant "E2eeMessageController" as Controller
+participant "E2eeMessageService" as Service
 database "PostgreSQL" as DB
+participant "E2eeRealtimeNotifier" as Fanout
 participant "STOMP Broker" as Broker
 
-Client -> Security : POST /api/conversations/direct/messages
+Client -> Security : POST /api/e2ee/messages
 Security -> Security : validate JWT + persisted session
 Security -> Controller : authenticated user context
-Controller -> Service : sendMessage(username, content, requestId)
-Service -> DB : resolve recipient
-Service -> DB : verify accepted friendship
+Controller -> Service : submitMessage(userId, sessionId, SubmitE2eeMessageDto)
+Service -> DB : resolve bound ACTIVE sender device
+Service -> DB : decode + bound opaque envelopes (max 64 KiB each, max 10 per submit)
+Service -> DB : verify sender, distinct + ACTIVE recipients, single recipient user
+Service -> DB : verify accepted friendship, reject self-message
 Service -> DB : find/create normalized conversation
 Service -> DB : allocate next sequence
-Service -> DB : persist message with server timestamp
-DB --> Service : persisted message
-Service --> Controller : message DTO
-Controller --> Client : 201 Created
+Service -> DB : persist message + envelopes + mailbox entries with server timestamp
+DB --> Service : committed message
+Service --> Controller : response DTO (createdNew)
+Controller --> Client : 201 Created (200 on idempotent replay)
 
 note over Service,DB
 Request UUID idempotency:
-- same owner + same requestId -> existing message (200)
-- foreign owner + same requestId -> 409 Conflict
+- identical retry -> existing message (200), no second realtime event
+- divergent reuse -> 409 Conflict
 
 Conversation creation and first-message persistence
 are transactional. Database uniqueness resolves
 conversation creation races.
 end note
 
-== Realtime delivery ==
+== Realtime delivery (post-commit, best-effort) ==
 
-Client -> Security : STOMP CONNECT /ws + access JWT
-Security -> Client : STOMP CONNECTED + authenticated principal
-Client -> Broker : SUBSCRIBE /topic/conversations/{conversationId}
-Client -> Broker : SEND /app/chat.send
-Broker -> Service : authenticated chat send
-Service -> DB : authorize + persist message
-DB --> Service : persisted message
-Service -> Broker : server-authoritative MessageDto
-Broker --> Client : MESSAGE /topic/conversations/{conversationId}
+Service -> Fanout : per-device deliveries (created messages only)
+Fanout -> Broker : convertAndSend /topic/devices/{recipientDeviceId}
+Broker --> Client : MESSAGE /topic/devices/{recipientDeviceId} (E2eeCiphertextItemDto)
+DB --> Client : GET /api/e2ee/mailbox fallback (never acknowledged by delivery)
 
-note over Service,Broker
-Realtime V1 broadcasts only after successful message persistence.
-HTTP and STOMP sends reuse the same message-service authorization,
-sequencing, timestamp, persistence, and request-ID idempotency logic.
+note over Service,Fanout
+Realtime fan-out runs only after the persistence
+transaction commits. Replays carry no deliveries.
+Broker failure never fails the HTTPS submission.
 end note
 
 note over Client,DB
-Realtime V1 is implemented for the single-instance slice.
-Reconnect/missed-event synchronization, read state, mutations,
-replies, and offline synchronization remain deferred.
+Mailbox, permanent history, and sync cursors are the
+missed-event/offline mechanism. Presence, typing,
+read receipts, and multi-instance brokers remain deferred.
 end note
 @enduml

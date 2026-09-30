@@ -149,6 +149,10 @@ conversation (created on demand). Same `messageRequestId` with
 identical content replays the original response; any difference is
 `409`. The batch is atomic.
 
+Size bounds: at most 65,536 decoded ciphertext bytes per envelope and
+at most 10 envelopes per submit (oversized material → `400`
+`InvalidKeyMaterialException`, nothing persisted).
+
 ## `GET /api/e2ee/mailbox?limit=50` — fetch
 
 `200 OK`. The session-bound device's undelivered ciphertext in stable
@@ -170,6 +174,29 @@ Readable after acknowledgement; history never deletes.
 ## `PUT /api/e2ee/sync` + `GET /api/e2ee/sync?conversationId=` — cursor
 
 Advance is `{"conversationId": "<uuid>", "throughSequence": n}` → the
-stored cursor; repeats are safe, backwards moves are `409`. Read
-returns the stored value or `0`. The cursor means durably processed —
-never delivery, never proof of decryption.
+stored cursor; `n` must satisfy `0 <= n <= conversation.lastSequenceNumber`
+(out of range → `400`/`409`). Repeats are safe, backwards moves are
+`409`. Read returns the stored value or `0`. The cursor means durably
+processed — never delivery, never proof of decryption.
+
+## Realtime delivery — device channel
+
+Committed messages fan out post-commit, one persisted envelope per
+recipient device, to:
+
+```text
+/topic/devices/{recipientDeviceId}
+```
+
+The payload is the same `E2eeCiphertextItemDto` shape as mailbox and
+history reads. Delivery is best-effort: broker failure never fails the
+HTTPS submission, and delivery never acknowledges the mailbox entry.
+
+STOMP model: `CONNECT` with `Authorization: Bearer <JWT>` derives a
+server-side `StompDevicePrincipal` (JWT + session + bound `ACTIVE`
+device; the client never supplies device identity). `SUBSCRIBE` is
+authorized by exact match against the connection's own device topic,
+with session/device liveness revalidated; anything else is rejected
+identically. There is no client SEND handler. Session revocation
+terminates the associated live connections; device revocation
+terminates every live connection bound to that device's sessions.

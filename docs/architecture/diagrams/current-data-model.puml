@@ -44,15 +44,39 @@ entity conversations {
   last_sequence_number : BIGINT
 }
 
-entity messages {
+entity e2ee_messages {
   * id : UUID <<PK>>
   --
   conversation_id : UUID <<FK>>
   sender_id : UUID <<FK>>
+  sender_device_id : UUID
   sequence : BIGINT
-  content : TEXT
   server_timestamp : TIMESTAMP
   request_id : UUID <<unique>>
+}
+
+entity e2ee_envelopes {
+  * id : UUID <<PK>>
+  --
+  message_id : UUID <<FK>>
+  recipient_device_id : UUID
+  envelope_type : VARCHAR
+  ciphertext : BYTEA
+}
+
+entity e2ee_mailbox {
+  * id : UUID <<PK>>
+  --
+  recipient_device_id : UUID
+  message_id : UUID <<FK>>
+}
+
+entity e2ee_sync_cursors {
+  * id : UUID <<PK>>
+  --
+  recipient_device_id : UUID
+  conversation_id : UUID <<FK>>
+  through_sequence : BIGINT
 }
 
 users ||--o| user_profiles
@@ -60,8 +84,10 @@ users ||--o{ sessions
 users ||--o{ friend_requests : sender
 users ||--o{ friend_requests : recipient
 users ||--o{ conversations : participant
-users ||--o{ messages : sender
-conversations ||--o{ messages
+users ||--o{ e2ee_messages : sender
+conversations ||--o{ e2ee_messages
+e2ee_messages ||--o{ e2ee_envelopes
+e2ee_messages ||--o{ e2ee_mailbox
 
 note bottom of conversations
 Database invariant:
@@ -69,7 +95,7 @@ unique(participant_min, participant_max)
 for the normalized unordered pair.
 end note
 
-note bottom of messages
+note bottom of e2ee_messages
 Database invariants:
 unique(conversation_id, sequence)
 unique(request_id)

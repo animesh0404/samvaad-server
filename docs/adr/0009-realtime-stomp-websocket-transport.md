@@ -4,6 +4,20 @@
 
 Accepted and implemented for Realtime V1.
 
+> **Supersession note (implementation update, decision body below unchanged):**
+> this ADR's transport decision — `/app/chat.send`, `/topic/conversations/{id}`
+> conversation topics, `AuthenticatedUser` as the STOMP principal, and the
+> deferred end-to-end-encryption stance — is superseded for transport by the
+> later device-level E2EE realtime implementation: `StompDevicePrincipal`
+> (user/session/device derived server-side), exact-match subscription to the
+> connection's own `/topic/devices/{deviceId}`, no client SEND handler,
+> HTTPS-only `POST /api/e2ee/messages` submission with post-commit per-device
+> ciphertext fan-out and durable mailbox fallback, and server-side connection
+> termination on session/device revocation (see also ADR 0018, ADR 0020, and
+> `docs/api/e2ee-api.md`). The simple in-memory broker choice stands. This ADR
+> remains the historical record of the plaintext Realtime V1 it decided; do not
+> implement conversation-level topics from it.
+
 ## Context
 
 Phases 1–5 established authentication/session validation, friendship authorization, direct-message persistence, idempotency, and HTTP conversation/message reads. Realtime delivery adds a transport without creating a second messaging business-logic path.
