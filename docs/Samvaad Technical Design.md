@@ -192,6 +192,9 @@ Operational file logs use configuration-driven size-based rolling, compressed ar
 12. STOMP `CONNECT` uses the existing access JWT plus persisted session validation plus bound-`ACTIVE`-device validation.
 13. The simple broker is an in-memory V1 choice, not the horizontal-scaling architecture.
 14. Authentication is session-based; installation identity is optional client/device metadata.
+15. The target device topology is one Primary Device plus up to four Companion Devices.
+16. Durable conversation history is owned by user-controlled devices; the server is not the authoritative long-term history repository.
+17. Primary/Companion liveness is server-authoritative with tunable 7, 14, or 28-day candidate windows.
 
 # 13. Web Admin Client Architecture
 

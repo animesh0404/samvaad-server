@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Supersession note:** ADR 0025 supersedes the conflicting multi-device role and durable-history portions of this ADR. The historical decision body is preserved. Signal-family cryptography, device public-key material, enrollment/approval, revocation, prekeys, sequencing, idempotency, and other compatible foundations remain applicable unless separately superseded.
+
 Accepted.
 
 This ADR supersedes the E2EE deferral in ADR 0005. All other V1 scope exclusions in ADR 0005 remain unchanged unless explicitly superseded by a later decision.

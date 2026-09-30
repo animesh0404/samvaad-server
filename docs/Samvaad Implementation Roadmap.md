@@ -145,7 +145,8 @@ Locked direction:
 - the sender's crypto layer produces device-specific encrypted envelopes; the server only stores/routes ciphertext;
 - server-visible message metadata is limited to what is required for routing, ordering, delivery, synchronization, and necessary abuse protection; message content and non-essential message metadata remain inside authenticated encrypted payloads;
 - offline device mailboxes retain encrypted envelopes until successful receipt acknowledgement;
-- encrypted message ciphertext remains in permanent conversation history after delivery;
+- the server-side mailbox/history layer is being redesigned from permanent history into a bounded delivery/replay buffer; the exact count/eviction policy is not yet locked;
+- durable conversation history is owned by the Primary Device and synchronized to Companions through an E2EE history-sync mechanism;
 - each conversation has a server-assigned monotonically increasing sequence number, and each device tracks a per-conversation synchronization cursor;
 - encrypted chat-history backup is a separate concern from account recovery and device identity; V1 uses full encrypted backups with a durable backup-root key, optional passphrase protection, and local encrypted-file restoration;
 - V1 backup encryption uses ChaCha20-Poly1305 AEAD with unique nonces per encryption operation;
@@ -154,15 +155,16 @@ Locked direction:
 - Samvaad's crypto boundary must remain independent of any single crypto-library implementation so future group cryptography can be added without replacing the one-to-one architecture;
 - browser/Angular may use a different compatible cryptographic implementation from JVM/Android/TUI as long as all clients follow the same Samvaad protocol semantics and wire contracts.
 
-Remaining E2EE implementation work:
-1. complete remaining target-specific Signal-family validation for browser/Angular, Android, TUI, persistent crypto-state handling, and license/operational constraints;
-2. implement the Samvaad-owned crypto/session boundary and Signal/Sesame session state;
-3. implement encrypted message envelopes, per-device mailboxes, and ciphertext conversation history while preserving existing authorization, sequencing, and idempotency invariants;
-4. implement per-device synchronization and missed-message handling;
-5. define and implement the exact ciphertext-history and backup/recovery-key hierarchy, including backup file format and key derivation;
-6. implement client-side persistent cryptographic state and target-specific Web/Android/TUI integration;
-7. reconcile first-login password setup with the existing authentication ADR;
-8. migrate the current plaintext message contract and persistence model to encrypted envelopes.
+Remaining E2EE implementation work after the architecture pivot:
+1. Preserve the implemented E2EE envelope/mailbox foundation while redesigning server retention around bounded delivery/replay buffering.
+2. Implement Primary-to-Companion history synchronization and missed-message handling.
+3. Define the exact rolling-buffer count, eviction semantics, and protection rules for undelivered messages.
+4. Define the final Primary/Companion liveness policy (7, 14, or 28 days are current candidates) and atomic expiry/renewal semantics.
+5. Implement the Android Primary Device client (Kotlin + native Android + Jetpack Compose) and validate secure persistent cryptographic state.
+6. Implement the Web Companion client after the Android Primary Device vertical slice.
+7. Complete target-specific Signal-family validation and remaining browser/Android/TUI persistent-state integration.
+8. Define and implement the encrypted backup/recovery-key hierarchy, including backup format and key derivation.
+9. Reconcile the resulting API/database lifecycle changes across server code, migrations, tests, and client contracts before implementation is considered complete.
 
 ## Later / deferred
 

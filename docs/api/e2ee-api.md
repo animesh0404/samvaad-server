@@ -116,7 +116,7 @@ ciphertext. It never decrypts, parses, or interprets it. Vocabulary:
   the sender-supplied `envelopeType` (`PREKEY_INIT`/`RATCHET`).
 - **mailbox entry** — an undelivered pointer (device + message).
   Acknowledgement deletes the entry only.
-- **durable history** — permanent per-device envelopes, readable
+- **current durable history (transition state)** — per-device envelopes, readable
   after acknowledgement.
 - **acknowledgement** — per-device delivery completion; idempotent.
 - **synchronization cursor** — per-device, per-conversation

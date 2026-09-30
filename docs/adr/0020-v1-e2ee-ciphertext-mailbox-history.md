@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Supersession note:** ADR 0025 supersedes the permanent-server-history portion of this ADR. The current implementation is a transition state providing ciphertext envelopes, mailboxes, cursors, sequencing, and realtime delivery. The target architecture changes retention to bounded delivery/replay buffering, with durable history owned by the Primary Device and synchronized to Companions.
+
 Accepted; server-side ciphertext transport implemented (migration `018`,
 `POST /api/e2ee/messages`, mailbox fetch/ack, history reads, sync
 cursors, full E2EE suite passing).

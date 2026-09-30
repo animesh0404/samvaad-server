@@ -4,6 +4,8 @@ The documentation set tracks the implementation state of the Samvaad project and
 
 Current implementation state:
 - Phase 0 — Design reconciliation: complete.
+- Architecture pivot — Primary/Companion device model and device-owned history: accepted; implementation audit pending.
+- Architecture pivot — Primary/Companion device model and device-owned history: accepted; implementation audit pending.
 - Phase 1 — Authentication & authorization boundary: complete.
 - Phase 2 — Exact username discovery: complete.
 - Phase 3 — Friend request vertical slice: complete.
