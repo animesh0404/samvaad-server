@@ -55,11 +55,14 @@ class StompAuthInterceptorLoggingTest {
     @Mock
     private E2eeDeviceRepo deviceRepo;
 
+    @Mock
+    private StompConnectionRegistry connectionRegistry;
+
     private StompAuthInterceptor interceptor;
 
     @BeforeEach
     void setUp() {
-        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, deviceRepo);
+        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, deviceRepo, connectionRegistry);
     }
 
     private Message<byte[]> connectMessage(String traceId) {

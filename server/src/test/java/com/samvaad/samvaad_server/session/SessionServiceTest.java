@@ -19,6 +19,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.samvaad.samvaad_server.messaging.StompConnectionRegistry;
 import com.samvaad.samvaad_server.session.RevocationReason;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,11 +28,14 @@ class SessionServiceTest {
     @Mock
     private SessionRepo sessionRepo;
 
+    @Mock
+    private StompConnectionRegistry connectionRegistry;
+
     private SessionService sessionService;
 
     @BeforeEach
     void setUp() {
-        sessionService = new SessionService(sessionRepo);
+        sessionService = new SessionService(sessionRepo, connectionRegistry);
     }
 
     @Test

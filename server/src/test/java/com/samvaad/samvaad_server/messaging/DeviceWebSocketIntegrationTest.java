@@ -273,6 +273,37 @@ class DeviceWebSocketIntegrationTest {
     }
 
     @Test
+    void revokingSessionTerminatesAllConnectionsForSession() throws Exception {
+        User bob = createUser("ws_kick_multi");
+        LoginResponseDto login = login(bob);
+        UUID deviceId = enrollDevice(bob, login, 506);
+
+        ConnectedClient first = connect(login.accessToken());
+        ConnectedClient second = connect(login.accessToken());
+        try {
+            assertTrue(subscribeError(first, "/topic/devices/" + deviceId) == null);
+            assertTrue(subscribeError(second, "/topic/devices/" + deviceId) == null);
+
+            sessionService.revokeSession(login.sessionId(), RevocationReason.USER_LOGOUT);
+
+            assertDisconnectedWithin(first, "first connection must terminate after revoke");
+            assertDisconnectedWithin(second, "second connection must terminate after revoke");
+        } finally {
+            disconnectQuietly(first.session);
+            disconnectQuietly(second.session);
+        }
+    }
+
+    private static void assertDisconnectedWithin(ConnectedClient client, String context)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(10);
+        while (client.session.isConnected() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(100);
+        }
+        assertTrue(!client.session.isConnected(), context);
+    }
+
+    @Test
     void connectWithRevokedSessionFails() throws Exception {
         User alice = createUser("ws_revoked");
         LoginResponseDto login = login(alice);

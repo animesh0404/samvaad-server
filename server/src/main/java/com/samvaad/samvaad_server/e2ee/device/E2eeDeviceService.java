@@ -31,6 +31,7 @@ import com.samvaad.samvaad_server.e2ee.exception.SessionAlreadyBoundException;
 import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryService;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
+import com.samvaad.samvaad_server.messaging.StompConnectionRegistry;
 import com.samvaad.samvaad_server.session.RevocationReason;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
@@ -85,6 +86,7 @@ public class E2eeDeviceService {
     private final E2eeRecoveryService recoveryService;
     private final KeyMaterialEnvelopeValidator envelopeValidator;
     private final DeviceApprovalAuthorizer approvalAuthorizer;
+    private final StompConnectionRegistry connectionRegistry;
     private final Duration pendingDeviceTtl;
 
     @PersistenceContext
@@ -99,6 +101,7 @@ public class E2eeDeviceService {
             E2eeRecoveryService recoveryService,
             KeyMaterialEnvelopeValidator envelopeValidator,
             DeviceApprovalAuthorizer approvalAuthorizer,
+            StompConnectionRegistry connectionRegistry,
             @Value("${samvaad.e2ee.pending-device-ttl:P7D}") Duration pendingDeviceTtl) {
         this.deviceRepo = deviceRepo;
         this.prekeyRepo = prekeyRepo;
@@ -108,6 +111,7 @@ public class E2eeDeviceService {
         this.recoveryService = recoveryService;
         this.envelopeValidator = envelopeValidator;
         this.approvalAuthorizer = approvalAuthorizer;
+        this.connectionRegistry = connectionRegistry;
         this.pendingDeviceTtl = pendingDeviceTtl;
     }
 
@@ -430,10 +434,12 @@ public class E2eeDeviceService {
         device.setRevocationReason(RevocationReason.DEVICE_REVOKED);
         deviceRepo.save(device);
 
+        List<UUID> revokedSessionIds = sessionRepo.findActiveSessionIdsByDeviceId(deviceId);
         int revokedSessions = sessionRepo.revokeActiveSessionsByDeviceId(
                 deviceId, LocalDateTime.now(), RevocationReason.DEVICE_REVOKED);
         log.info("Device revoked userId={} deviceId={} revokedSessions={}",
                 callerUserId, deviceId, revokedSessions);
+        connectionRegistry.terminateAfterCommit(revokedSessionIds);
     }
 
     @OperationalLog("e2ee.recovery.enroll")

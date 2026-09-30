@@ -77,6 +77,9 @@ class E2eeDeviceInsertMappingUnitTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock
+    private com.samvaad.samvaad_server.messaging.StompConnectionRegistry connectionRegistry;
+
     private E2eeDeviceService deviceService;
 
     private final UUID userId = UUID.randomUUID();
@@ -93,6 +96,7 @@ class E2eeDeviceInsertMappingUnitTest {
                 recoveryService,
                 envelopeValidator,
                 approvalAuthorizer,
+                connectionRegistry,
                 Duration.ofDays(7));
         ReflectionTestUtils.setField(deviceService, "entityManager", entityManager);
     }

@@ -50,16 +50,19 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     private final TokenService tokenService;
     private final SessionRepo sessionRepo;
     private final E2eeDeviceRepo deviceRepo;
+    private final StompConnectionRegistry connectionRegistry;
 
     private static final Logger log = LoggerFactory.getLogger(StompAuthInterceptor.class);
 
     public StompAuthInterceptor(
             TokenService tokenService,
             SessionRepo sessionRepo,
-            E2eeDeviceRepo deviceRepo) {
+            E2eeDeviceRepo deviceRepo,
+            StompConnectionRegistry connectionRegistry) {
         this.tokenService = tokenService;
         this.sessionRepo = sessionRepo;
         this.deviceRepo = deviceRepo;
+        this.connectionRegistry = connectionRegistry;
     }
 
     @Override
@@ -76,7 +79,11 @@ public class StompAuthInterceptor implements ChannelInterceptor {
                 firstNativeHeader(accessor, TraceIds.TRACE_ID_HEADER)));
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             try {
-                accessor.setUser(authenticate(accessor));
+                UsernamePasswordAuthenticationToken authentication = authenticate(accessor);
+                accessor.setUser(authentication);
+                StompDevicePrincipal caller = (StompDevicePrincipal) authentication.getPrincipal();
+                connectionRegistry.linkAuthenticatedSession(
+                        accessor.getSessionId(), caller.sessionId());
             } catch (InvalidAccessTokenException e) {
                 List<String> header = accessor.getNativeHeader(AUTHORIZATION_HEADER);
                 log.warn("STOMP CONNECT authentication failed authHeaderPresent={}",

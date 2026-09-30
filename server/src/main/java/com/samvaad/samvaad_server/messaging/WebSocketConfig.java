@@ -6,15 +6,19 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthInterceptor stompAuthInterceptor;
+    private final StompConnectionRegistry connectionRegistry;
 
-    public WebSocketConfig(StompAuthInterceptor stompAuthInterceptor) {
+    public WebSocketConfig(
+            StompAuthInterceptor stompAuthInterceptor, StompConnectionRegistry connectionRegistry) {
         this.stompAuthInterceptor = stompAuthInterceptor;
+        this.connectionRegistry = connectionRegistry;
     }
 
     @Override
@@ -31,5 +35,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(stompAuthInterceptor);
+    }
+
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.addDecoratorFactory(
+                handler -> new StompConnectionTrackingDecorator(handler, connectionRegistry));
     }
 }

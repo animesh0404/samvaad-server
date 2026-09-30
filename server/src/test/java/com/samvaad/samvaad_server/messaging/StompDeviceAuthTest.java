@@ -58,6 +58,9 @@ class StompDeviceAuthTest {
     @Mock
     private E2eeDeviceRepo deviceRepo;
 
+    @Mock
+    private StompConnectionRegistry connectionRegistry;
+
     private StompAuthInterceptor interceptor;
 
     private UUID userId;
@@ -69,7 +72,7 @@ class StompDeviceAuthTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, deviceRepo);
+        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, deviceRepo, connectionRegistry);
 
         userId = UUID.randomUUID();
         sessionId = UUID.randomUUID();

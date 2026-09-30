@@ -1,6 +1,7 @@
 package com.samvaad.samvaad_server.session;
 
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
+import com.samvaad.samvaad_server.messaging.StompConnectionRegistry;
 import com.samvaad.samvaad_server.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,9 +21,11 @@ public class SessionService {
     public static final int MAX_ACTIVE_SESSIONS = 5;
 
     private final SessionRepo sessionRepo;
+    private final StompConnectionRegistry connectionRegistry;
 
-    public SessionService(SessionRepo sessionRepo) {
+    public SessionService(SessionRepo sessionRepo, StompConnectionRegistry connectionRegistry) {
         this.sessionRepo = sessionRepo;
+        this.connectionRegistry = connectionRegistry;
     }
 
     public long countActiveSessions(User user) {
@@ -74,6 +78,7 @@ public class SessionService {
             UUID revokedUserId = s.getUser() != null ? s.getUser().getUserId() : null;
             log.info("Session revoked sessionId={} userId={} reason={}",
                     sessionId, revokedUserId, reason);
+            connectionRegistry.terminateAfterCommit(List.of(sessionId));
         } else {
             log.debug("Session revoke no-op sessionId={}", sessionId);
         }

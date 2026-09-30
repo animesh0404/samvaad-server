@@ -33,6 +33,14 @@ public interface SessionRepo extends JpaRepository<Session, UUID> {
     void deleteByUserId(@Param("userId") UUID userId);
 
     /**
+     * Active server sessions bound to the given device. Collected before
+     * bulk revocation so live WebSocket connections can be terminated after
+     * the revocation commits.
+     */
+    @Query("SELECT s.sessionId FROM Session s WHERE s.deviceId = :deviceId AND s.revokedAt IS NULL")
+    List<UUID> findActiveSessionIdsByDeviceId(@Param("deviceId") UUID deviceId);
+
+    /**
      * Revokes every still-active session bound to the given device. Used for
      * E2EE device revocation: an old session/JWT must not remain an
      * alternative path around device revocation. Returns the revoked count.

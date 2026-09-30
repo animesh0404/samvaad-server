@@ -57,6 +57,8 @@ import com.samvaad.samvaad_server.e2ee.message.E2eeMessageService;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestDto;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
 import com.samvaad.samvaad_server.session.ClientPlatform;
+import com.samvaad.samvaad_server.session.RevocationReason;
+import com.samvaad.samvaad_server.session.SessionService;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserRepo;
 import com.samvaad.samvaad_server.user.UserRole;
@@ -95,6 +97,9 @@ class E2eeRealtimeDeliveryIntegrationTest {
 
     @Autowired
     private FriendRequestService friendRequestService;
+
+    @Autowired
+    private SessionService sessionService;
 
     @Autowired
     private UserRepo userRepo;
@@ -610,6 +615,69 @@ class E2eeRealtimeDeliveryIntegrationTest {
         } finally {
             bobClient.close();
         }
+    }
+
+    @Test
+    void revokedSessionMustNoLongerReceiveRealtimeDelivery() throws Exception {
+        User alice = createUser("rt_revk_a");
+        User bob = createUser("rt_revk_b");
+        Device a1 = bootstrap(alice, 623);
+        Device b1 = bootstrap(bob, 624);
+        befriend(alice, bob);
+        ConnectedClient bobClient = connect(b1);
+        FrameCollector bobFrames = subscribeFrames(bobClient, b1.deviceId());
+        try {
+            // Baseline: the established subscription delivers while valid.
+            messageService.submitMessage(
+                    alice.getUserId(), a1.sessionId(),
+                    submit(UUID.randomUUID(),
+                            envelope(a1.deviceId(), b1.deviceId(), "RATCHET",
+                                    "pre-revocation-ciphertext".getBytes())));
+            receiveFrame(bobClient, bobFrames);
+
+            // Revoke through the real session API (logout path).
+            sessionService.revokeSession(b1.sessionId(), RevocationReason.USER_LOGOUT);
+
+            // Persistence and mailbox behavior are unchanged by revocation.
+            byte[] ct = "post-revocation-ciphertext".getBytes();
+            SubmitE2eeMessageResponseDto response = messageService.submitMessage(
+                    alice.getUserId(), a1.sessionId(),
+                    submit(UUID.randomUUID(),
+                            envelope(a1.deviceId(), b1.deviceId(), "RATCHET", ct)));
+            assertTrue(response.isCreatedNew());
+            assertEquals(2, e2eeMailboxRepo.countByRecipientDeviceId(b1.deviceId()));
+
+            // Security contract: the revoked connection must not receive
+            // realtime ciphertext anymore. No kick mechanism exists yet, so
+            // this currently fails with the frame delivered.
+            assertNoFrame(bobFrames, "revoked session must no longer receive realtime delivery");
+        } finally {
+            bobClient.close();
+        }
+    }
+
+    @Test
+    void revokingDeviceTerminatesItsConnection() throws Exception {
+        User bob = createUser("rt_revkdev_b");
+        Device b1 = bootstrap(bob, 625);
+        ConnectedClient bobClient = connect(b1);
+        FrameCollector bobFrames = subscribeFrames(bobClient, b1.deviceId());
+        try {
+            deviceService.revokeDevice(bob.getUserId(), b1.deviceId());
+
+            long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(10);
+            while (bobClient.session.isConnected() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(100);
+            }
+            assertTrue(!bobClient.session.isConnected(),
+                    "device revocation must terminate its connection");
+            assertNoFrame(bobFrames, "revoked device must not receive realtime delivery");
+        } finally {
+            bobClient.close();
+        }
+
+        // The revoked session stays revoked: reconnecting with its token fails.
+        assertThrows(Exception.class, () -> connect(b1));
     }
 
     @Test
