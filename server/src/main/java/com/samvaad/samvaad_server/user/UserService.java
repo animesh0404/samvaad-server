@@ -9,7 +9,6 @@ import com.samvaad.samvaad_server.e2ee.recovery.E2eeRecoveryCodeRepo;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.Conversation;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -36,7 +35,6 @@ public class UserService {
     private final UserProfileRepo userProfileRepo;
     private final SessionRepo sessionRepo;
     private final FriendRequestRepo friendRequestRepo;
-    private final MessageRepo messageRepo;
     private final ConversationRepo conversationRepo;
     private final E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
     private final E2eeDeviceRepo deviceRepo;
@@ -50,7 +48,6 @@ public class UserService {
             UserProfileRepo userProfileRepo,
             SessionRepo sessionRepo,
             FriendRequestRepo friendRequestRepo,
-            MessageRepo messageRepo,
             ConversationRepo conversationRepo,
             E2eeOneTimePrekeyRepo oneTimePrekeyRepo,
             E2eeDeviceRepo deviceRepo,
@@ -62,7 +59,6 @@ public class UserService {
         this.userProfileRepo = userProfileRepo;
         this.sessionRepo = sessionRepo;
         this.friendRequestRepo = friendRequestRepo;
-        this.messageRepo = messageRepo;
         this.conversationRepo = conversationRepo;
         this.oneTimePrekeyRepo = oneTimePrekeyRepo;
         this.deviceRepo = deviceRepo;
@@ -130,12 +126,9 @@ public class UserService {
         userProfileRepo.deleteById(userId);
         friendRequestRepo.deleteByParticipantUserId(userId);
         e2eeMessageService.deleteUserData(userId);
-        messageRepo.deleteBySenderUserId(userId);
         List<Conversation> conversations =
                 conversationRepo.findByParticipantAOrParticipantB(userId, userId, Pageable.unpaged());
         for (Conversation conversation : conversations) {
-            // Messages reference their conversation; delete them first.
-            messageRepo.deleteByConversationConversationId(conversation.getConversationId());
             conversationRepo.deleteById(conversation.getConversationId());
         }
         userRepo.deleteById(userId);

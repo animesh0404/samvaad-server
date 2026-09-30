@@ -76,8 +76,6 @@ class E2eeSecurityIntegrationTest {
     @Autowired
     private UserProfileRepo userProfileRepo;
 
-    @Autowired
-    private com.samvaad.samvaad_server.messaging.MessageRepo messageRepo;
 
     @Autowired
     private com.samvaad.samvaad_server.messaging.ConversationRepo conversationRepo;
@@ -108,7 +106,6 @@ class E2eeSecurityIntegrationTest {
         e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();

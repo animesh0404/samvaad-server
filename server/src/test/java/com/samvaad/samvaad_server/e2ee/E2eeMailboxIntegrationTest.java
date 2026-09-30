@@ -89,8 +89,6 @@ class E2eeMailboxIntegrationTest {
     @Autowired
     private com.samvaad.samvaad_server.e2ee.device.E2eeDeviceService deviceService;
 
-    @Autowired
-    private com.samvaad.samvaad_server.messaging.MessageRepo plainMessageRepo;
 
     @Autowired
     private com.samvaad.samvaad_server.messaging.ConversationRepo conversationRepo;
@@ -127,7 +125,6 @@ class E2eeMailboxIntegrationTest {
         cursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
-        plainMessageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();

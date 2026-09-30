@@ -26,17 +26,15 @@ import com.samvaad.samvaad_server.common.logging.LogCapture;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestDto;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
+import com.samvaad.samvaad_server.messaging.Conversation;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
-import com.samvaad.samvaad_server.messaging.MessageService;
-import com.samvaad.samvaad_server.messaging.SendMessageResult;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 
 /**
  * Hard-delete slice: removing a user with profile, sessions, friend requests
- * in both directions, sent messages, and conversations must succeed with 204
+ * in both directions, and conversations must succeed with 204
  * and leave no orphaned dependent rows, while unrelated users and their data
  * remain intact.
  */
@@ -56,9 +54,6 @@ class UserDeletionIntegrationTest {
 
     @Autowired
     private FriendRequestService friendRequestService;
-
-    @Autowired
-    private MessageService messageService;
 
     @Autowired
     private com.samvaad.samvaad_server.e2ee.device.E2eeOneTimePrekeyRepo oneTimePrekeyRepo;
@@ -85,9 +80,6 @@ class UserDeletionIntegrationTest {
     private ConversationRepo conversationRepo;
 
     @Autowired
-    private MessageRepo messageRepo;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -111,7 +103,6 @@ class UserDeletionIntegrationTest {
         e2eeEnvelopeRepo.deleteAll();
         e2eeMessageRepo.deleteAll();
         e2eeSyncCursorRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         oneTimePrekeyRepo.deleteAll();
@@ -147,10 +138,6 @@ class UserDeletionIntegrationTest {
         friendRequestService.acceptRequest(second.getUserId(), request.getRequestId());
     }
 
-    private SendMessageResult send(User sender, String recipientUsername, String content) {
-        return messageService.sendMessage(sender.getUserId(), recipientUsername, content, UUID.randomUUID());
-    }
-
     @Test
     void deletingUserWithFullDependentsSucceedsAndPreservesOthers() throws Exception {
         User admin = createUser("adminx", UserRole.ADMIN);
@@ -164,15 +151,15 @@ class UserDeletionIntegrationTest {
         FriendRequestDto pendingToCarol = friendRequestService.sendRequest(bob.getUserId(), carol.getUsername());
         FriendRequestDto pendingFromDave = friendRequestService.sendRequest(dave.getUserId(), bob.getUsername());
         friendRequestService.acceptRequest(carol.getUserId(), pendingToCarol.getRequestId());
-        SendMessageResult bobMessage = send(bob, carol.getUsername(), "hello carol");
-        SendMessageResult carolMessage = send(carol, bob.getUsername(), "hello bob");
-        assertEquals(bobMessage.message().getConversationId(), carolMessage.message().getConversationId());
-        UUID bobConversationId = bobMessage.message().getConversationId();
+        Conversation bobConversation = conversationRepo.save(
+                Conversation.between(bob.getUserId(), carol.getUserId()));
+        UUID bobConversationId = bobConversation.getConversationId();
 
-        // Unrelated data that must survive: dave and carol are friends with messages.
+        // Unrelated data that must survive: dave and carol are friends with a conversation.
         befriend(dave, carol);
-        SendMessageResult unrelatedMessage = send(dave, carol.getUsername(), "unrelated");
-        UUID unrelatedConversationId = unrelatedMessage.message().getConversationId();
+        Conversation unrelatedConversation = conversationRepo.save(
+                Conversation.between(dave.getUserId(), carol.getUserId()));
+        UUID unrelatedConversationId = unrelatedConversation.getConversationId();
 
         String adminToken = loginToken(admin);
 
@@ -197,9 +184,7 @@ class UserDeletionIntegrationTest {
         assertTrue(userProfileRepo.findById(bobId).isEmpty());
         assertTrue(friendRequestRepo.findAll().stream().noneMatch(f ->
                 f.getSender().getUserId().equals(bobId) || f.getRecipient().getUserId().equals(bobId)));
-        assertTrue(messageRepo.findAll().stream().noneMatch(m ->
-                m.getSender().getUserId().equals(bobId)
-                        || m.getConversation().getConversationId().equals(bobConversationId)));
+        assertTrue(conversationRepo.findById(bobConversationId).isEmpty());
         assertTrue(conversationRepo.findAll().stream().noneMatch(c ->
                 c.getParticipantA().equals(bobId) || c.getParticipantB().equals(bobId)));
 
@@ -208,7 +193,6 @@ class UserDeletionIntegrationTest {
         assertTrue(userRepo.findById(daveId).isPresent());
         assertTrue(userRepo.findById(admin.getUserId()).isPresent());
         assertTrue(conversationRepo.findById(unrelatedConversationId).isPresent());
-        assertTrue(messageRepo.findById(unrelatedMessage.message().getMessageId()).isPresent());
         assertTrue(friendRequestRepo.findById(pendingFromDave.getRequestId()).isEmpty(),
                 "dave's pending request to bob must be cleaned up");
         assertEquals(1, friendRequestRepo.findAll().size(),

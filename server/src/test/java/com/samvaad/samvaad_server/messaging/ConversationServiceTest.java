@@ -23,7 +23,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
-import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserRepo;
 import com.samvaad.samvaad_server.user.UserRole;
@@ -33,9 +32,6 @@ class ConversationServiceTest {
 
     @Mock
     private ConversationRepo conversationRepo;
-
-    @Mock
-    private MessageRepo messageRepo;
 
     @Mock
     private UserRepo userRepo;
@@ -48,7 +44,7 @@ class ConversationServiceTest {
 
     @BeforeEach
     void setUp() {
-        conversationService = new ConversationService(conversationRepo, messageRepo, userRepo);
+        conversationService = new ConversationService(conversationRepo, userRepo);
 
         alice = new User(UUID.randomUUID());
         alice.setUsername("alice");
@@ -69,18 +65,6 @@ class ConversationServiceTest {
         conversation.setLastSequenceNumber(2L);
         conversation.setUpdatedAt(LocalDateTime.now());
         return conversation;
-    }
-
-    private Message message(Conversation conversation, User sender, long sequence) {
-        Message message = new Message();
-        message.setMessageId(UUID.randomUUID());
-        message.setConversation(conversation);
-        message.setSender(sender);
-        message.setSequenceNumber(sequence);
-        message.setContent("message-" + sequence);
-        message.setServerTimestamp(LocalDateTime.now());
-        message.setRequestId(UUID.randomUUID());
-        return message;
     }
 
     @Test
@@ -167,66 +151,7 @@ class ConversationServiceTest {
                 () -> conversationService.listConversations(alice.getUserId(), 20, -1));
 
         then(conversationRepo).shouldHaveNoInteractions();
-        then(messageRepo).shouldHaveNoInteractions();
         then(userRepo).shouldHaveNoInteractions();
-    }
-
-    @Test
-    void getMessagesReturnsDtosInRepositoryOrder() {
-        Conversation conversation = conversationBetween(alice.getUserId(), bob.getUserId());
-        Message first = message(conversation, alice, 1L);
-        Message second = message(conversation, bob, 2L);
-
-        given(conversationRepo.findById(conversation.getConversationId()))
-                .willReturn(Optional.of(conversation));
-        given(messageRepo.findByConversationConversationIdAndSequenceNumberGreaterThan(
-                eq(conversation.getConversationId()), eq(0L), any(Pageable.class)))
-                .willReturn(List.of(first, second));
-
-        List<MessageDto> result = conversationService.getMessages(
-                alice.getUserId(), conversation.getConversationId(), 0L, 20);
-
-        assertEquals(2, result.size());
-        assertEquals(1L, result.get(0).getSequenceNumber());
-        assertEquals(2L, result.get(1).getSequenceNumber());
-        assertEquals(first.getMessageId(), result.get(0).getMessageId());
-        assertEquals(conversation.getConversationId(), result.get(0).getConversationId());
-    }
-
-    @Test
-    void getMessagesUnknownConversationThrows() {
-        UUID unknownId = UUID.randomUUID();
-        given(conversationRepo.findById(unknownId)).willReturn(Optional.empty());
-
-        assertThrows(ConversationNotFoundException.class,
-                () -> conversationService.getMessages(alice.getUserId(), unknownId, 0L, 20));
-
-        then(messageRepo).shouldHaveNoInteractions();
-    }
-
-    @Test
-    void getMessagesNonParticipantThrows() {
-        Conversation conversation = conversationBetween(alice.getUserId(), bob.getUserId());
-        given(conversationRepo.findById(conversation.getConversationId()))
-                .willReturn(Optional.of(conversation));
-
-        assertThrows(ForbiddenOperationException.class,
-                () -> conversationService.getMessages(carol.getUserId(), conversation.getConversationId(), 0L, 20));
-
-        then(messageRepo).shouldHaveNoInteractions();
-    }
-
-    @Test
-    void getMessagesRejectsInvalidPagination() {
-        assertThrows(InvalidPaginationException.class,
-                () -> conversationService.getMessages(alice.getUserId(), UUID.randomUUID(), 0L, 0));
-        assertThrows(InvalidPaginationException.class,
-                () -> conversationService.getMessages(alice.getUserId(), UUID.randomUUID(), 0L, 101));
-        assertThrows(InvalidPaginationException.class,
-                () -> conversationService.getMessages(alice.getUserId(), UUID.randomUUID(), -1L, 20));
-
-        then(conversationRepo).shouldHaveNoInteractions();
-        then(messageRepo).shouldHaveNoInteractions();
     }
 
     @Test

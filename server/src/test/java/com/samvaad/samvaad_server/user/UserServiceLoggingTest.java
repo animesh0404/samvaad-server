@@ -18,7 +18,6 @@ import com.samvaad.samvaad_server.auth.exception.IncorrectPasswordException;
 import com.samvaad.samvaad_server.common.logging.LogCapture;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -47,9 +46,6 @@ class UserServiceLoggingTest {
     private FriendRequestRepo friendRequestRepo;
 
     @Mock
-    private MessageRepo messageRepo;
-
-    @Mock
     private ConversationRepo conversationRepo;
 
     @Mock
@@ -73,7 +69,7 @@ class UserServiceLoggingTest {
     void setUp() {
         userService = new UserService(
                 userRepo, userProfileService, userProfileRepo, sessionRepo,
-                friendRequestRepo, messageRepo, conversationRepo,
+                friendRequestRepo, conversationRepo,
                 oneTimePrekeyRepo, deviceRepo, recoveryCodeRepo, e2eeMessageService, passwordEncoder);
     }
 

@@ -3,7 +3,6 @@ package com.samvaad.samvaad_server.messaging;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -30,29 +29,28 @@ import com.samvaad.samvaad_server.session.SessionRepo;
 /**
  * Authenticates STOMP {@code CONNECT} frames with the existing Samvaad JWT
  * access token plus persisted session validation (same rules as the HTTP
- * {@code JwtAuthenticationFilter}), and authorizes conversation topic
- * subscriptions to participants only.
+ * {@code JwtAuthenticationFilter}).
+ *
+ * <p>Transport/auth infrastructure only: no application destinations exist in
+ * this slice, so every {@code SUBSCRIBE} is denied. Per-device E2EE realtime
+ * destinations will be authorized here in a later slice.
  */
 @Component
 public class StompAuthInterceptor implements ChannelInterceptor {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String CONVERSATION_TOPIC_PREFIX = "/topic/conversations/";
 
     private final TokenService tokenService;
     private final SessionRepo sessionRepo;
-    private final ConversationService conversationService;
 
     private static final Logger log = LoggerFactory.getLogger(StompAuthInterceptor.class);
 
     public StompAuthInterceptor(
             TokenService tokenService,
-            SessionRepo sessionRepo,
-            ConversationService conversationService) {
+            SessionRepo sessionRepo) {
         this.tokenService = tokenService;
         this.sessionRepo = sessionRepo;
-        this.conversationService = conversationService;
     }
 
     @Override
@@ -63,8 +61,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             return message;
         }
         // Scoped to this inbound message; cleared in afterSendCompletion below.
-        // MDC is not expected to propagate into asynchronous broker delivery;
-        // persisted-message logging stays at the synchronous MessageService point.
+        // MDC is not expected to propagate into asynchronous broker delivery.
         MDC.put(TraceIds.MDC_KEY, TraceIds.resolveOrGenerate(
                 firstNativeHeader(accessor, TraceIds.REQUEST_ID_HEADER),
                 firstNativeHeader(accessor, TraceIds.TRACE_ID_HEADER)));
@@ -148,30 +145,9 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     }
 
     private void authorizeSubscription(StompHeaderAccessor accessor) {
-        AuthenticatedUser caller = currentCaller(accessor);
-        UUID conversationId = conversationTopicId(accessor.getDestination());
-        if (conversationId == null
-                || !conversationService.isConversationParticipant(caller.userId(), conversationId)) {
-            throw new ForbiddenOperationException();
-        }
-    }
-
-    private AuthenticatedUser currentCaller(StompHeaderAccessor accessor) {
-        if (accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication
-                && authentication.getPrincipal() instanceof AuthenticatedUser caller) {
-            return caller;
-        }
+        // No application destinations exist in this slice. Deny every
+        // subscription; per-device E2EE realtime destinations will be
+        // authorized here in a later slice.
         throw new ForbiddenOperationException();
-    }
-
-    private UUID conversationTopicId(String destination) {
-        if (destination == null || !destination.startsWith(CONVERSATION_TOPIC_PREFIX)) {
-            return null;
-        }
-        try {
-            return UUID.fromString(destination.substring(CONVERSATION_TOPIC_PREFIX.length()));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 }

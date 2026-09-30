@@ -49,14 +49,11 @@ class StompAuthInterceptorLoggingTest {
     @Mock
     private SessionRepo sessionRepo;
 
-    @Mock
-    private ConversationService conversationService;
-
     private StompAuthInterceptor interceptor;
 
     @BeforeEach
     void setUp() {
-        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, conversationService);
+        interceptor = new StompAuthInterceptor(tokenService, sessionRepo);
     }
 
     private Message<byte[]> connectMessage(String traceId) {
@@ -113,10 +110,11 @@ class StompAuthInterceptorLoggingTest {
 
     @Test
     void logsSubscribeDenial() {
+        // No application destinations exist in this slice: every subscription
+        // is denied regardless of destination or participant status.
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        UUID conversationId = UUID.randomUUID();
-        String destination = "/topic/conversations/" + conversationId;
+        String destination = "/topic/unused";
 
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         accessor.setLeaveMutable(true);
@@ -126,8 +124,6 @@ class StompAuthInterceptorLoggingTest {
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))));
         Message<byte[]> message = new GenericMessage<>(new byte[0], accessor.getMessageHeaders());
-
-        given(conversationService.isConversationParticipant(userId, conversationId)).willReturn(false);
 
         try (LogCapture logs = new LogCapture(StompAuthInterceptor.class)) {
             assertThrows(ForbiddenOperationException.class, () -> interceptor.preSend(message, null));

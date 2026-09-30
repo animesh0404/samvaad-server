@@ -9,7 +9,6 @@ import com.samvaad.samvaad_server.auth.exception.InvalidRefreshTokenException;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
@@ -80,9 +79,6 @@ class SecurityIntegrationTest {
     private ConversationRepo conversationRepo;
 
     @Autowired
-    private MessageRepo messageRepo;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -106,7 +102,6 @@ class SecurityIntegrationTest {
         e2eeEnvelopeRepo.deleteAll();
         e2eeMessageRepo.deleteAll();
         e2eeSyncCursorRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         oneTimePrekeyRepo.deleteAll();

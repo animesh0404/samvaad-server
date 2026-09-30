@@ -8,7 +8,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.user.User;
 import com.samvaad.samvaad_server.user.UserRepo;
 
@@ -18,15 +17,12 @@ public class ConversationService {
     static final int MAX_LIMIT = 100;
 
     private final ConversationRepo conversationRepo;
-    private final MessageRepo messageRepo;
     private final UserRepo userRepo;
 
     public ConversationService(
             ConversationRepo conversationRepo,
-            MessageRepo messageRepo,
             UserRepo userRepo) {
         this.conversationRepo = conversationRepo;
-        this.messageRepo = messageRepo;
         this.userRepo = userRepo;
     }
 
@@ -43,26 +39,6 @@ public class ConversationService {
                 .stream()
                 .skip(drop)
                 .map(conversation -> toDto(conversation, callerId))
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<MessageDto> getMessages(UUID callerId, UUID conversationId, long afterSequence, int limit) {
-        validateLimit(limit);
-        if (afterSequence < 0) {
-            throw new InvalidPaginationException("afterSequence must be >= 0");
-        }
-        Conversation conversation = conversationRepo.findById(conversationId)
-                .orElseThrow(() -> new ConversationNotFoundException(conversationId));
-        if (!conversation.getParticipantA().equals(callerId)
-                && !conversation.getParticipantB().equals(callerId)) {
-            throw new ForbiddenOperationException();
-        }
-        PageRequest pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.ASC, "sequenceNumber"));
-        return messageRepo
-                .findByConversationConversationIdAndSequenceNumberGreaterThan(conversationId, afterSequence, pageable)
-                .stream()
-                .map(MessageMapper::toDto)
                 .toList();
     }
 

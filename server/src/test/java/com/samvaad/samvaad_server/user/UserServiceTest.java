@@ -5,7 +5,6 @@ import com.samvaad.samvaad_server.common.logging.LogCapture;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.messaging.Conversation;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileRepo;
 import com.samvaad.samvaad_server.user.userprofile.UserProfileService;
@@ -57,9 +56,6 @@ class UserServiceTest {
     private FriendRequestRepo friendRequestRepo;
 
     @Mock
-    private MessageRepo messageRepo;
-
-    @Mock
     private ConversationRepo conversationRepo;
 
     @Mock
@@ -82,7 +78,7 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userService = new UserService(userRepo, userProfileService, userProfileRepo, sessionRepo,
-                friendRequestRepo, messageRepo, conversationRepo,
+                friendRequestRepo, conversationRepo,
                 oneTimePrekeyRepo, deviceRepo, recoveryCodeRepo, e2eeMessageService, passwordEncoder);
     }
 
@@ -173,12 +169,11 @@ class UserServiceTest {
 
         userService.deleteUser(userId);
 
-        InOrder order = inOrder(sessionRepo, userProfileRepo, friendRequestRepo, messageRepo,
+        InOrder order = inOrder(sessionRepo, userProfileRepo, friendRequestRepo,
                 conversationRepo, userRepo);
         order.verify(sessionRepo).deleteByUserId(userId);
         order.verify(userProfileRepo).deleteById(userId);
         order.verify(friendRequestRepo).deleteByParticipantUserId(userId);
-        order.verify(messageRepo).deleteBySenderUserId(userId);
         order.verify(conversationRepo).findByParticipantAOrParticipantB(eq(userId), eq(userId), any(Pageable.class));
         order.verify(userRepo).deleteById(userId);
     }
@@ -194,13 +189,12 @@ class UserServiceTest {
         then(sessionRepo).should(never()).deleteByUserId(any());
         then(userProfileRepo).should(never()).deleteById(any());
         then(friendRequestRepo).should(never()).deleteByParticipantUserId(any());
-        then(messageRepo).should(never()).deleteBySenderUserId(any());
         then(conversationRepo).should(never()).findByParticipantAOrParticipantB(any(), any(), any());
         then(userRepo).should(never()).deleteById(any());
     }
 
     @Test
-    void deleteUserRemovesConversationMessagesBeforeTheirConversations() {
+    void deleteUserRemovesConversations() {
         UUID userId = UUID.randomUUID();
         User user = new User(userId);
         user.setUsername("target");
@@ -214,9 +208,7 @@ class UserServiceTest {
 
         userService.deleteUser(userId);
 
-        InOrder order = inOrder(messageRepo, conversationRepo);
-        order.verify(messageRepo).deleteByConversationConversationId(conversationId);
-        order.verify(conversationRepo).deleteById(conversationId);
+        then(conversationRepo).should().deleteById(conversationId);
     }
 
     @Test

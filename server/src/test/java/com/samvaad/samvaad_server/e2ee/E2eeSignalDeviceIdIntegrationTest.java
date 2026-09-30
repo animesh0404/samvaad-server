@@ -66,8 +66,6 @@ class E2eeSignalDeviceIdIntegrationTest {
     @Autowired
     private FriendRequestService friendRequestService;
 
-    @Autowired
-    private com.samvaad.samvaad_server.messaging.MessageRepo messageRepo;
 
     @Autowired
     private com.samvaad.samvaad_server.messaging.ConversationRepo conversationRepo;
@@ -116,7 +114,6 @@ class E2eeSignalDeviceIdIntegrationTest {
         e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();

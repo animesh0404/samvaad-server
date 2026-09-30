@@ -76,8 +76,6 @@ class E2eeEnrollmentRegressionTest {
     @Autowired
     private E2eeRecoveryCodeRepo recoveryCodeRepo;
 
-    @Autowired
-    private com.samvaad.samvaad_server.messaging.MessageRepo messageRepo;
 
     @Autowired
     private com.samvaad.samvaad_server.messaging.ConversationRepo conversationRepo;
@@ -117,7 +115,6 @@ class E2eeEnrollmentRegressionTest {
         e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();

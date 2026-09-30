@@ -1,7 +1,6 @@
 package com.samvaad.samvaad_server.messaging;
 
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -26,7 +25,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.exception.GlobalExceptionHandler;
 import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.user.UserRole;
@@ -72,18 +70,6 @@ class ConversationControllerTest {
         return dto;
     }
 
-    private MessageDto messageDto(UUID conversationId, long sequence) {
-        MessageDto dto = new MessageDto();
-        dto.setMessageId(UUID.randomUUID());
-        dto.setConversationId(conversationId);
-        dto.setSenderUserId(UUID.randomUUID());
-        dto.setSequenceNumber(sequence);
-        dto.setContent("message-" + sequence);
-        dto.setServerTimestamp(LocalDateTime.now());
-        dto.setRequestId(UUID.randomUUID());
-        return dto;
-    }
-
     @Test
     void listConversationsReturns200() throws Exception {
         UUID callerId = authenticateAs(UserRole.USER);
@@ -124,69 +110,6 @@ class ConversationControllerTest {
                 .willThrow(new InvalidPaginationException("limit must be between 1 and 100"));
 
         mockMvc.perform(get("/api/conversations/direct")
-                        .param("limit", "0"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void getMessagesReturns200() throws Exception {
-        UUID callerId = authenticateAs(UserRole.USER);
-        UUID conversationId = UUID.randomUUID();
-        given(conversationService.getMessages(eq(callerId), eq(conversationId), eq(0L), eq(20)))
-                .willReturn(List.of(messageDto(conversationId, 1L), messageDto(conversationId, 2L)));
-
-        mockMvc.perform(get("/api/conversations/direct/{conversationId}/messages", conversationId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].sequenceNumber").value(1))
-                .andExpect(jsonPath("$[1].sequenceNumber").value(2))
-                .andExpect(jsonPath("$[0].conversationId").value(conversationId.toString()));
-    }
-
-    @Test
-    void getMessagesForwardsCursorAndLimit() throws Exception {
-        UUID callerId = authenticateAs(UserRole.USER);
-        UUID conversationId = UUID.randomUUID();
-        given(conversationService.getMessages(eq(callerId), eq(conversationId), eq(2L), eq(5)))
-                .willReturn(List.of());
-
-        mockMvc.perform(get("/api/conversations/direct/{conversationId}/messages", conversationId)
-                        .param("afterSequence", "2")
-                        .param("limit", "5"))
-                .andExpect(status().isOk());
-
-        then(conversationService).should().getMessages(eq(callerId), eq(conversationId), eq(2L), eq(5));
-    }
-
-    @Test
-    void getMessagesNonParticipantReturns403() throws Exception {
-        UUID callerId = authenticateAs(UserRole.USER);
-        UUID conversationId = UUID.randomUUID();
-        given(conversationService.getMessages(eq(callerId), eq(conversationId), anyLong(), anyInt()))
-                .willThrow(new ForbiddenOperationException());
-
-        mockMvc.perform(get("/api/conversations/direct/{conversationId}/messages", conversationId))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void getMessagesUnknownConversationReturns404() throws Exception {
-        UUID callerId = authenticateAs(UserRole.USER);
-        UUID conversationId = UUID.randomUUID();
-        given(conversationService.getMessages(eq(callerId), eq(conversationId), anyLong(), anyInt()))
-                .willThrow(new ConversationNotFoundException(conversationId));
-
-        mockMvc.perform(get("/api/conversations/direct/{conversationId}/messages", conversationId))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void getMessagesInvalidPaginationReturns400() throws Exception {
-        UUID callerId = authenticateAs(UserRole.USER);
-        UUID conversationId = UUID.randomUUID();
-        given(conversationService.getMessages(eq(callerId), eq(conversationId), anyLong(), anyInt()))
-                .willThrow(new InvalidPaginationException("limit must be between 1 and 100"));
-
-        mockMvc.perform(get("/api/conversations/direct/{conversationId}/messages", conversationId)
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest());
     }

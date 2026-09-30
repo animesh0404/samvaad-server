@@ -40,7 +40,6 @@ import com.samvaad.samvaad_server.friendrequest.FriendRequestDto;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestRepo;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
 import com.samvaad.samvaad_server.messaging.ConversationRepo;
-import com.samvaad.samvaad_server.messaging.MessageRepo;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 import com.samvaad.samvaad_server.session.SessionRepo;
 import com.samvaad.samvaad_server.user.CreateUserRequestDto;
@@ -93,8 +92,6 @@ class E2eeRebindIntegrationTest {
     @Autowired
     private UserProfileRepo userProfileRepo;
 
-    @Autowired
-    private MessageRepo messageRepo;
 
     @Autowired
     private ConversationRepo conversationRepo;
@@ -125,7 +122,6 @@ class E2eeRebindIntegrationTest {
         e2eeSyncCursorRepo.deleteAll();
         prekeyRepo.deleteAll();
         recoveryCodeRepo.deleteAll();
-        messageRepo.deleteAll();
         conversationRepo.deleteAll();
         friendRequestRepo.deleteAll();
         sessionRepo.deleteAll();
