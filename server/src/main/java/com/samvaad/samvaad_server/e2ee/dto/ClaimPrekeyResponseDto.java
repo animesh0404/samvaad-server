@@ -2,6 +2,8 @@ package com.samvaad.samvaad_server.e2ee.dto;
 
 import java.util.UUID;
 
+import com.samvaad.samvaad_server.e2ee.device.DeviceRole;
+
 /**
  * Full bundle for one recipient device returned by a claim. Contains at most
  * one consumed one-time prekey; when the pool is empty the prekey is absent
@@ -18,6 +20,11 @@ public class ClaimPrekeyResponseDto {
     private String signedPrekey;
     private String signedPrekeySignature;
     private OneTimePrekeyDto oneTimePrekey;
+    /**
+     * Server-assigned authority role (ADR 0025). Read-only bundle
+     * metadata, mirroring the directory representation.
+     */
+    private DeviceRole deviceRole;
     /**
      * Last-resort Kyber (PQXDH) public material. Always present for
      * Kyber-capable devices and never consumed by the EC one-time-prekey
@@ -93,6 +100,14 @@ public class ClaimPrekeyResponseDto {
 
     public void setOneTimePrekey(OneTimePrekeyDto oneTimePrekey) {
         this.oneTimePrekey = oneTimePrekey;
+    }
+
+    public DeviceRole getDeviceRole() {
+        return deviceRole;
+    }
+
+    public void setDeviceRole(DeviceRole deviceRole) {
+        this.deviceRole = deviceRole;
     }
 
     public Integer getKyberPrekeyId() {

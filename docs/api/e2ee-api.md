@@ -42,7 +42,9 @@ recovery rules are unchanged.
 
 `200 OK`. Each `DeviceDto` carries the owner's own Kyber public material
 (`kyberPrekeyId`, `kyberPrekey`, `kyberPrekeySignature`; public bytes
-only) alongside the existing fields.
+only) alongside the existing fields, plus the server-assigned read-only
+`deviceRole` (`PRIMARY` for the account's first device, `COMPANION`
+otherwise).
 
 ## `PUT /api/e2ee/devices/{deviceId}/kyber-prekey` — replace Kyber key
 

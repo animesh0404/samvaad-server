@@ -88,6 +88,16 @@ public class E2eeDevice extends AuditableEntity {
     @Column(name = "status", nullable = false, length = 16)
     private DeviceStatus status = DeviceStatus.PENDING;
 
+    /**
+     * Authority role (ADR 0025). Server-assigned at enrollment: the first
+     * device of an account is PRIMARY, later devices are COMPANION.
+     * REVOKED rows keep their historical role; only non-REVOKED rows
+     * participate in the 1-Primary / 4-Companion cardinality.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "device_role", nullable = false, length = 16)
+    private DeviceRole deviceRole = DeviceRole.COMPANION;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "client_platform", nullable = false, length = 16)
     private ClientPlatform clientPlatform;
@@ -213,6 +223,14 @@ public class E2eeDevice extends AuditableEntity {
 
     public void setStatus(DeviceStatus status) {
         this.status = status;
+    }
+
+    public DeviceRole getDeviceRole() {
+        return deviceRole;
+    }
+
+    public void setDeviceRole(DeviceRole deviceRole) {
+        this.deviceRole = deviceRole;
     }
 
     public ClientPlatform getClientPlatform() {

@@ -50,6 +50,7 @@ public final class E2eeMapper {
         dto.setKyberPrekey(encodeBase64OrNull(device.getKyberPrekey()));
         dto.setKyberPrekeySignature(encodeBase64OrNull(device.getKyberPrekeySignature()));
         dto.setStatus(device.getStatus());
+        dto.setDeviceRole(device.getDeviceRole());
         dto.setClientPlatform(device.getClientPlatform());
         dto.setClientName(device.getClientName());
         dto.setClientVersion(device.getClientVersion());
@@ -69,6 +70,7 @@ public final class E2eeMapper {
         dto.setSignedPrekey(encodeBase64(device.getSignedPrekey()));
         dto.setSignedPrekeySignature(encodeBase64(device.getSignedPrekeySignature()));
         dto.setHasAvailableOneTimePrekey(hasAvailableOneTimePrekey);
+        dto.setDeviceRole(device.getDeviceRole());
         dto.setKyberPrekeyId(device.getKyberPrekeyId());
         dto.setKyberPrekey(encodeBase64OrNull(device.getKyberPrekey()));
         dto.setKyberPrekeySignature(encodeBase64OrNull(device.getKyberPrekeySignature()));
@@ -84,6 +86,7 @@ public final class E2eeMapper {
         dto.setSignedPrekeyId(device.getSignedPrekeyId());
         dto.setSignedPrekey(encodeBase64(device.getSignedPrekey()));
         dto.setSignedPrekeySignature(encodeBase64(device.getSignedPrekeySignature()));
+        dto.setDeviceRole(device.getDeviceRole());
         dto.setKyberPrekeyId(device.getKyberPrekeyId());
         dto.setKyberPrekey(encodeBase64OrNull(device.getKyberPrekey()));
         dto.setKyberPrekeySignature(encodeBase64OrNull(device.getKyberPrekeySignature()));

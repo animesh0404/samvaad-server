@@ -1,7 +1,7 @@
 package com.samvaad.samvaad_server.e2ee;
 
 /**
- * Locked V1 E2EE operational policy (ADR 0018). These numbers are Samvaad V1
+ * Locked V1 E2EE operational policy (ADR 0018, device roles ADR 0025). These numbers are Samvaad V1
  * policy, not cryptographic requirements; they stay constants rather than
  * database or API inputs so a client can never negotiate different values.
  */
@@ -12,6 +12,19 @@ public final class E2eePolicy {
 
     /** Maximum enrolled (non-REVOKED) cryptographic devices per account. */
     public static final int MAX_ENROLLED_DEVICES = 5;
+
+    /**
+     * Maximum non-REVOKED PRIMARY devices per account (ADR 0025). Exactly
+     * one PRIMARY owns durable conversation history; REVOKED rows keep
+     * their historical role and do not count.
+     */
+    public static final int MAX_PRIMARY_DEVICES = 1;
+
+    /**
+     * Maximum non-REVOKED COMPANION devices per account (ADR 0025). With
+     * one PRIMARY, four COMPANIONS fill the five-device account ceiling.
+     */
+    public static final int MAX_COMPANION_DEVICES = 4;
 
     /**
      * Maximum decoded opaque ciphertext bytes per submitted envelope. This is

@@ -2,6 +2,8 @@ package com.samvaad.samvaad_server.e2ee.dto;
 
 import java.util.UUID;
 
+import com.samvaad.samvaad_server.e2ee.device.DeviceRole;
+
 /**
  * Recipient-side entry in the public device directory: the public bundle a
  * sender needs for asynchronous session establishment. Shows only whether a
@@ -18,6 +20,12 @@ public class RecipientDeviceDto {
     private String signedPrekey;
     private String signedPrekeySignature;
     private boolean hasAvailableOneTimePrekey;
+    /**
+     * Server-assigned authority role (ADR 0025). Read-only directory
+     * metadata; senders use it to distinguish the history-authoritative
+     * PRIMARY from COMPANIONS.
+     */
+    private DeviceRole deviceRole;
     /**
      * Last-resort Kyber (PQXDH) public material. Null only for device rows
      * enrolled before Kyber support; such rows cannot serve PQXDH bundles
@@ -92,6 +100,14 @@ public class RecipientDeviceDto {
 
     public void setHasAvailableOneTimePrekey(boolean hasAvailableOneTimePrekey) {
         this.hasAvailableOneTimePrekey = hasAvailableOneTimePrekey;
+    }
+
+    public DeviceRole getDeviceRole() {
+        return deviceRole;
+    }
+
+    public void setDeviceRole(DeviceRole deviceRole) {
+        this.deviceRole = deviceRole;
     }
 
     public Integer getKyberPrekeyId() {

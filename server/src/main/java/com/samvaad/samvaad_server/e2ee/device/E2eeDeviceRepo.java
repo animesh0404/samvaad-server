@@ -17,6 +17,12 @@ public interface E2eeDeviceRepo extends JpaRepository<E2eeDevice, UUID> {
 
     long countByUserAndStatusIn(User user, Collection<DeviceStatus> statuses);
 
+    long countByUserAndStatusInAndDeviceRole(
+            User user, Collection<DeviceStatus> statuses, DeviceRole deviceRole);
+
+    boolean existsByUserUserIdAndDeviceRoleAndStatusIn(
+            UUID userId, DeviceRole deviceRole, Collection<DeviceStatus> statuses);
+
     List<E2eeDevice> findByUserUserIdOrderByCreatedAtAsc(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -138,16 +138,19 @@ public class E2eeDeviceService {
             throw new RecoveryRequiredException();
         }
 
-        long enrolled = deviceRepo.countByUserAndStatusIn(user, NON_REVOKED);
-        if (enrolled >= E2eePolicy.MAX_ENROLLED_DEVICES) {
-            log.warn("Device enrollment denied: device limit userId={}", callerUserId);
-            throw new DeviceLimitExceededException();
-        }
+        DeviceRole role = state == EnrollmentState.NEVER_ENROLLED
+                ? DeviceRole.PRIMARY
+                : DeviceRole.COMPANION;
+        // Role-aware cardinality (ADR 0025): 1 non-REVOKED PRIMARY, up to 4
+        // non-REVOKED COMPANIONS, 5 non-REVOKED total. Checked while the
+        // per-user enrollment lock is held; the partial-unique index on a
+        // non-REVOKED PRIMARY is the database backstop (see insertDevice).
+        enforceRoleCardinality(user, role);
 
         DeviceStatus status = state == EnrollmentState.NEVER_ENROLLED
                 ? DeviceStatus.ACTIVE
                 : DeviceStatus.PENDING;
-        E2eeDevice device = insertDevice(user, request, material, status);
+        E2eeDevice device = insertDevice(user, request, material, status, role);
 
         session.setDeviceId(device.getDeviceId());
         sessionRepo.save(session);
@@ -462,17 +465,22 @@ public class E2eeDeviceService {
         Session session = resolveOwnedSession(callerUserId, callerSessionId);
         requireUnboundSession(session);
 
-        long enrolled = deviceRepo.countByUserAndStatusIn(user, NON_REVOKED);
-        if (enrolled >= E2eePolicy.MAX_ENROLLED_DEVICES) {
-            log.warn("Recovery enrollment denied: device limit userId={}", callerUserId);
-            throw new DeviceLimitExceededException();
-        }
+        // Locked recovery role rule: a surviving non-REVOKED PRIMARY keeps
+        // history authority, so recovery creates a COMPANION; with no
+        // non-REVOKED PRIMARY the recovery creates the replacement PRIMARY.
+        // No succession: nothing is promoted, nothing else changes role.
+        DeviceRole recoveryRole = deviceRepo.existsByUserUserIdAndDeviceRoleAndStatusIn(
+                        callerUserId, DeviceRole.PRIMARY, NON_REVOKED)
+                ? DeviceRole.COMPANION
+                : DeviceRole.PRIMARY;
+        enforceRoleCardinality(user, recoveryRole);
 
         // Atomic with device creation below: any failure rolls the consumption
         // back, and two concurrent uses resolve to a single winner.
         recoveryService.consumeCode(user, request.getRecoveryCode());
 
-        E2eeDevice device = insertDevice(user, request.getDevice(), material, DeviceStatus.ACTIVE);
+        E2eeDevice device = insertDevice(
+                user, request.getDevice(), material, DeviceStatus.ACTIVE, recoveryRole);
         session.setDeviceId(device.getDeviceId());
         sessionRepo.save(session);
 
@@ -530,9 +538,11 @@ public class E2eeDeviceService {
     }
 
     private E2eeDevice insertDevice(
-            User user, EnrollDeviceRequestDto request, DeviceMaterial material, DeviceStatus status) {
+            User user, EnrollDeviceRequestDto request, DeviceMaterial material,
+            DeviceStatus status, DeviceRole role) {
         E2eeDevice device = new E2eeDevice();
         device.setUser(user);
+        device.setDeviceRole(role);
         // Monotonic per-account Signal id, allocated under the caller's
         // per-user enrollment lock (findByIdWithLock in enroll/recover
         // paths) so concurrent enrollments serialize and receive distinct
@@ -565,10 +575,18 @@ public class E2eeDeviceService {
             // A racing enrollment may have committed the same identity key
             // after the pre-check above. The failed insert remains queued in
             // the persistence context and would fail again on the re-check's
-            // auto-flush, so the context is cleared first. Only a genuine
+            // auto-flush, so the context is cleared first. A genuine
+            // PRIMARY-uniqueness conflict maps to the device limit; a genuine
             // duplicate maps to a conflict; any other integrity failure is
             // rethrown unchanged. Either outcome rolls the transaction back.
             entityManager.clear();
+            if (device.getDeviceRole() == DeviceRole.PRIMARY
+                    && deviceRepo.existsByUserUserIdAndDeviceRoleAndStatusIn(
+                            user.getUserId(), DeviceRole.PRIMARY, NON_REVOKED)) {
+                log.warn("Device enrollment conflict: primary already enrolled userId={}",
+                        user.getUserId());
+                throw new DeviceLimitExceededException();
+            }
             if (deviceRepo.existsByDeviceIdentityPublicKey(material.identityKey())
                     || deviceRepo.existsByKyberPrekey(material.kyberPrekey())) {
                 log.warn("Device enrollment conflict: key material already enrolled userId={}", user.getUserId());
@@ -624,6 +642,35 @@ public class E2eeDeviceService {
             log.warn("Device enrollment denied: session already bound sessionId={} deviceId={}",
                     session.getSessionId(), session.getDeviceId());
             throw new SessionAlreadyBoundException();
+        }
+    }
+
+    /**
+     * Role-aware device cardinality (ADR 0025): at most 1 non-REVOKED
+     * PRIMARY, at most 4 non-REVOKED COMPANIONS, at most 5 non-REVOKED
+     * total. Must be called while the per-user enrollment lock is held
+     * (enroll/recover paths). REVOKED rows never count.
+     */
+    private void enforceRoleCardinality(User user, DeviceRole role) {
+        long enrolled = deviceRepo.countByUserAndStatusIn(user, NON_REVOKED);
+        if (enrolled >= E2eePolicy.MAX_ENROLLED_DEVICES) {
+            log.warn("Device enrollment denied: device limit userId={}", user.getUserId());
+            throw new DeviceLimitExceededException();
+        }
+        if (role == DeviceRole.PRIMARY) {
+            long primaries =
+                    deviceRepo.countByUserAndStatusInAndDeviceRole(user, NON_REVOKED, DeviceRole.PRIMARY);
+            if (primaries >= E2eePolicy.MAX_PRIMARY_DEVICES) {
+                log.warn("Device enrollment denied: primary limit userId={}", user.getUserId());
+                throw new DeviceLimitExceededException();
+            }
+        } else {
+            long companions =
+                    deviceRepo.countByUserAndStatusInAndDeviceRole(user, NON_REVOKED, DeviceRole.COMPANION);
+            if (companions >= E2eePolicy.MAX_COMPANION_DEVICES) {
+                log.warn("Device enrollment denied: companion limit userId={}", user.getUserId());
+                throw new DeviceLimitExceededException();
+            }
         }
     }
 

@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-add-device-role
+      author: Animesh Kahara
+      changes:
+        - addColumn:
+            tableName: e2ee_devices
+            columns:
+              - column:
+                  name: device_role
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: true
+        # Backfill (ADR 0025): per user, the earliest device by created_at
+        # becomes PRIMARY and all others become COMPANION. device_id is the
+        # deterministic tie-breaker; signal_device_id is NOT authoritative.
+        # Applies regardless of status; REVOKED rows keep their historical
+        # role and only non-REVOKED rows participate in cardinality.
+        - sql:
+            sql: UPDATE e2ee_devices d SET device_role = CASE WHEN ranked.rn = 1 THEN 'PRIMARY' ELSE 'COMPANION' END FROM (SELECT device_id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at ASC, device_id ASC) AS rn FROM e2ee_devices) AS ranked WHERE d.device_id = ranked.device_id
+        - addNotNullConstraint:
+            tableName: e2ee_devices
+            columnName: device_role
+            columnDataType: VARCHAR(16)
+        - sql:
+            sql: ALTER TABLE e2ee_devices ADD CONSTRAINT ck_e2ee_devices_role CHECK (device_role IN ('PRIMARY', 'COMPANION'))
+        # At most one non-REVOKED PRIMARY per user. REVOKED rows are
+        # excluded so a revoked PRIMARY keeps its historical role without
+        # blocking future enrollment (succession itself is deferred).
+        - sql:
+            sql: CREATE UNIQUE INDEX uq_e2ee_devices_user_primary ON e2ee_devices (user_id) WHERE device_role = 'PRIMARY' AND status <> 'REVOKED'
+        - createIndex:
+            tableName: e2ee_devices
+            indexName: idx_e2ee_devices_user_role_status
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: device_role
+              - column:
+                  name: status

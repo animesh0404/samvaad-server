@@ -1,5 +1,6 @@
 package com.samvaad.samvaad_server.e2ee.dto;
 
+import com.samvaad.samvaad_server.e2ee.device.DeviceRole;
 import com.samvaad.samvaad_server.e2ee.device.DeviceStatus;
 import com.samvaad.samvaad_server.session.ClientPlatform;
 
@@ -24,6 +25,12 @@ public class DeviceDto {
     private String deviceIdentityPublicKey;
     private int signedPrekeyId;
     private DeviceStatus status;
+    /**
+     * Server-assigned authority role (ADR 0025). Read-only: enrollment
+     * requests never supply it; the first device is PRIMARY, later ones
+     * are COMPANION.
+     */
+    private DeviceRole deviceRole;
     /**
      * Owner's own last-resort Kyber (PQXDH) public material. Public bytes
      * only; null for rows enrolled before Kyber support.
@@ -111,6 +118,14 @@ public class DeviceDto {
 
     public void setStatus(DeviceStatus status) {
         this.status = status;
+    }
+
+    public DeviceRole getDeviceRole() {
+        return deviceRole;
+    }
+
+    public void setDeviceRole(DeviceRole deviceRole) {
+        this.deviceRole = deviceRole;
     }
 
     public ClientPlatform getClientPlatform() {
