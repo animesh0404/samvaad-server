@@ -29,6 +29,9 @@ import com.samvaad.samvaad_server.auth.token.AccessTokenClaims;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.common.logging.LogCapture;
 import com.samvaad.samvaad_server.common.logging.TraceIds;
+import com.samvaad.samvaad_server.e2ee.device.DeviceStatus;
+import com.samvaad.samvaad_server.e2ee.device.E2eeDevice;
+import com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.session.Session;
@@ -49,11 +52,14 @@ class StompAuthInterceptorLoggingTest {
     @Mock
     private SessionRepo sessionRepo;
 
+    @Mock
+    private E2eeDeviceRepo deviceRepo;
+
     private StompAuthInterceptor interceptor;
 
     @BeforeEach
     void setUp() {
-        interceptor = new StompAuthInterceptor(tokenService, sessionRepo);
+        interceptor = new StompAuthInterceptor(tokenService, sessionRepo, deviceRepo);
     }
 
     private Message<byte[]> connectMessage(String traceId) {
@@ -70,16 +76,23 @@ class StompAuthInterceptorLoggingTest {
     void propagatesTraceIdAndClearsMdc() {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
+        UUID deviceId = UUID.randomUUID();
         User user = new User(userId);
         user.setRole(UserRole.USER);
         Session session = new Session();
         session.setSessionId(sessionId);
         session.setUser(user);
         session.setRefreshTokenExpiresAt(LocalDateTime.now().plusDays(1));
+        session.setDeviceId(deviceId);
+        E2eeDevice device = new E2eeDevice();
+        device.setDeviceId(deviceId);
+        device.setUser(user);
+        device.setStatus(DeviceStatus.ACTIVE);
 
         given(tokenService.parseAccessToken(SECRET_JWT))
                 .willReturn(new AccessTokenClaims(userId, sessionId));
         given(sessionRepo.findWithUserBySessionId(sessionId)).willReturn(Optional.of(session));
+        given(deviceRepo.findById(deviceId)).willReturn(Optional.of(device));
 
         Message<byte[]> message = connectMessage("trace-abc");
         interceptor.preSend(message, null);

@@ -21,36 +21,45 @@ import com.samvaad.samvaad_server.auth.exception.InvalidAccessTokenException;
 import com.samvaad.samvaad_server.auth.token.AccessTokenClaims;
 import com.samvaad.samvaad_server.auth.token.TokenService;
 import com.samvaad.samvaad_server.common.logging.TraceIds;
+import com.samvaad.samvaad_server.e2ee.device.E2eeDevice;
+import com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
-import com.samvaad.samvaad_server.security.AuthenticatedUser;
 import com.samvaad.samvaad_server.session.Session;
 import com.samvaad.samvaad_server.session.SessionRepo;
 
 /**
  * Authenticates STOMP {@code CONNECT} frames with the existing Samvaad JWT
  * access token plus persisted session validation (same rules as the HTTP
- * {@code JwtAuthenticationFilter}).
+ * {@code JwtAuthenticationFilter}), extended with the session's E2EE device
+ * binding: the resulting principal identifies exactly one authenticated
+ * device.
  *
- * <p>Transport/auth infrastructure only: no application destinations exist in
- * this slice, so every {@code SUBSCRIBE} is denied. Per-device E2EE realtime
- * destinations will be authorized here in a later slice.
+ * <p>The device identity is derived server-side from
+ * {@code Session.deviceId} and is never taken from client-supplied data.
+ * Each connection may subscribe only to its own device channel,
+ * {@code /topic/devices/{deviceId}}; conversation IDs never determine
+ * connection or subscription identity.
  */
 @Component
 public class StompAuthInterceptor implements ChannelInterceptor {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String DEVICE_TOPIC_PREFIX = "/topic/devices/";
 
     private final TokenService tokenService;
     private final SessionRepo sessionRepo;
+    private final E2eeDeviceRepo deviceRepo;
 
     private static final Logger log = LoggerFactory.getLogger(StompAuthInterceptor.class);
 
     public StompAuthInterceptor(
             TokenService tokenService,
-            SessionRepo sessionRepo) {
+            SessionRepo sessionRepo,
+            E2eeDeviceRepo deviceRepo) {
         this.tokenService = tokenService;
         this.sessionRepo = sessionRepo;
+        this.deviceRepo = deviceRepo;
     }
 
     @Override
@@ -113,14 +122,34 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         if (!isSessionValid(session, claims)) {
             throw new InvalidAccessTokenException("Invalid access token");
         }
-        AuthenticatedUser caller = new AuthenticatedUser(
-                session.getUser().getUserId(),
-                session.getUser().getRole(),
-                session.getSessionId());
+        StompDevicePrincipal caller = resolveDevicePrincipal(session);
         return new UsernamePasswordAuthenticationToken(
                 caller,
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_" + caller.role().name())));
+    }
+
+    /**
+     * Derives the authoritative device identity from the authenticated
+     * session. Every failure mode reports the same generic error so a
+     * caller cannot distinguish unbound sessions from missing, foreign,
+     * or inactive devices.
+     */
+    private StompDevicePrincipal resolveDevicePrincipal(Session session) {
+        if (session.getDeviceId() == null) {
+            throw new InvalidAccessTokenException("Invalid access token");
+        }
+        E2eeDevice device = deviceRepo.findById(session.getDeviceId())
+                .orElseThrow(() -> new InvalidAccessTokenException("Invalid access token"));
+        if (!session.getUser().getUserId().equals(device.getUser().getUserId())
+                || !device.isActive()) {
+            throw new InvalidAccessTokenException("Invalid access token");
+        }
+        return new StompDevicePrincipal(
+                session.getUser().getUserId(),
+                session.getUser().getRole(),
+                session.getSessionId(),
+                device.getDeviceId());
     }
 
     private boolean isSessionValid(Session session, AccessTokenClaims claims) {
@@ -145,9 +174,42 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     }
 
     private void authorizeSubscription(StompHeaderAccessor accessor) {
-        // No application destinations exist in this slice. Deny every
-        // subscription; per-device E2EE realtime destinations will be
-        // authorized here in a later slice.
+        StompDevicePrincipal caller = currentDevicePrincipal(accessor);
+        // Revalidate liveness at subscribe time: a device revoked after
+        // CONNECT cannot open a new subscription on the old connection.
+        // Every failure denies identically so a caller cannot tell whether
+        // another device exists.
+        StompDevicePrincipal fresh = revalidate(caller);
+        String expected = DEVICE_TOPIC_PREFIX + fresh.deviceId();
+        if (!expected.equals(accessor.getDestination())) {
+            throw new ForbiddenOperationException();
+        }
+    }
+
+    private StompDevicePrincipal currentDevicePrincipal(StompHeaderAccessor accessor) {
+        if (accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication
+                && authentication.getPrincipal() instanceof StompDevicePrincipal caller) {
+            return caller;
+        }
         throw new ForbiddenOperationException();
+    }
+
+    private StompDevicePrincipal revalidate(StompDevicePrincipal caller) {
+        Session session = sessionRepo.findWithUserBySessionId(caller.sessionId()).orElse(null);
+        if (session == null
+                || session.getRevokedAt() != null
+                || !session.getRefreshTokenExpiresAt().isAfter(LocalDateTime.now())
+                || !session.getUser().getUserId().equals(caller.userId())) {
+            throw new ForbiddenOperationException();
+        }
+        try {
+            StompDevicePrincipal fresh = resolveDevicePrincipal(session);
+            if (!fresh.deviceId().equals(caller.deviceId())) {
+                throw new ForbiddenOperationException();
+            }
+            return fresh;
+        } catch (InvalidAccessTokenException e) {
+            throw new ForbiddenOperationException();
+        }
     }
 }
