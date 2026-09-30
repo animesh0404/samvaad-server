@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import com.samvaad.samvaad_server.e2ee.dto.E2eeEnvelopeSubmitDto;
 import com.samvaad.samvaad_server.e2ee.dto.SubmitE2eeMessageDto;
 import com.samvaad.samvaad_server.e2ee.dto.SubmitE2eeMessageResponseDto;
 import com.samvaad.samvaad_server.e2ee.dto.SyncCursorDto;
+import com.samvaad.samvaad_server.e2ee.E2eePolicy;
 import com.samvaad.samvaad_server.e2ee.exception.E2eeMessageConflictException;
 import com.samvaad.samvaad_server.messaging.InvalidPaginationException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
@@ -534,6 +536,48 @@ class E2eeMailboxIntegrationTest {
         assertThrows(InvalidKeyMaterialException.class, () -> messageService.submitMessage(
                 pair.alice().getUserId(), pair.a1().sessionId(), submit(UUID.randomUUID(), badBase64)));
         assertEquals(0, messageRepo.findAll().size());
+    }
+
+    @Test
+    void ciphertextAtDecodedBoundaryIsAccepted() {
+        Pair pair = provisionPair("bounds-ok");
+        byte[] maxBytes = new byte[E2eePolicy.MAX_CIPHERTEXT_BYTES_PER_ENVELOPE];
+        Arrays.fill(maxBytes, (byte) 0xAB);
+        SubmitE2eeMessageResponseDto response = messageService.submitMessage(
+                pair.alice().getUserId(), pair.a1().sessionId(),
+                submit(UUID.randomUUID(),
+                        envelope(pair.a1().deviceId(), pair.b1().deviceId(), "RATCHET", maxBytes)));
+        assertTrue(response.isCreatedNew());
+        assertEquals(1, messageRepo.findAll().size());
+        assertEquals(1, mailboxRepo.countByRecipientDeviceId(pair.b1().deviceId()));
+    }
+
+    @Test
+    void oversizedCiphertextRejectedWithoutPersistence() {
+        Pair pair = provisionPair("bounds-hi");
+        byte[] tooBig = new byte[E2eePolicy.MAX_CIPHERTEXT_BYTES_PER_ENVELOPE + 1];
+        Arrays.fill(tooBig, (byte) 0xAB);
+        assertThrows(InvalidKeyMaterialException.class, () -> messageService.submitMessage(
+                pair.alice().getUserId(), pair.a1().sessionId(),
+                submit(UUID.randomUUID(),
+                        envelope(pair.a1().deviceId(), pair.b1().deviceId(), "RATCHET", tooBig))));
+        assertEquals(0, messageRepo.findAll().size());
+        assertEquals(0, envelopeRepo.findAll().size());
+        assertEquals(0, mailboxRepo.countByRecipientDeviceId(pair.b1().deviceId()));
+    }
+
+    @Test
+    void oversizedEnvelopeBatchRejectedWithoutPersistence() {
+        Pair pair = provisionPair("bounds-batch");
+        E2eeEnvelopeSubmitDto[] batch = new E2eeEnvelopeSubmitDto[E2eePolicy.MAX_ENVELOPES_PER_SUBMIT + 1];
+        for (int i = 0; i < batch.length; i++) {
+            batch[i] = envelope(pair.a1().deviceId(), UUID.randomUUID(), "RATCHET", "ct".getBytes());
+        }
+        assertThrows(InvalidKeyMaterialException.class, () -> messageService.submitMessage(
+                pair.alice().getUserId(), pair.a1().sessionId(), submit(UUID.randomUUID(), batch)));
+        assertEquals(0, messageRepo.findAll().size());
+        assertEquals(0, envelopeRepo.findAll().size());
+        assertEquals(0, mailboxRepo.countByRecipientDeviceId(pair.b1().deviceId()));
     }
 
     @Test

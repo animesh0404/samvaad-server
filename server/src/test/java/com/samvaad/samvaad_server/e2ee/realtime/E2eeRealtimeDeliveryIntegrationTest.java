@@ -681,6 +681,29 @@ class E2eeRealtimeDeliveryIntegrationTest {
     }
 
     @Test
+    void httpOversizedCiphertextRejectedBeforePersistence() throws Exception {
+        User alice = createUser("rt_http_big_a");
+        User bob = createUser("rt_http_big_b");
+        Device a1 = bootstrap(alice, 626);
+        Device b1 = bootstrap(bob, 627);
+        befriend(alice, bob);
+        // Valid Base64 far beyond any legitimate envelope; rejected at the
+        // HTTP boundary without persisting or delivering anything.
+        String oversized = "A".repeat(90_000);
+        String body = """
+                {"messageRequestId":"%s","envelopes":[{
+                "senderDeviceId":"%s","recipientDeviceId":"%s",
+                "envelopeType":"RATCHET","ciphertext":"%s"}]}
+                """.formatted(UUID.randomUUID(), a1.deviceId(), b1.deviceId(), oversized);
+
+        mockMvc.perform(post("/api/e2ee/messages")
+                        .header("Authorization", "Bearer " + a1.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void senderReceivesNothingOnOwnChannel() throws Exception {
         User alice = createUser("rt_self_a");
         User bob = createUser("rt_self_b");

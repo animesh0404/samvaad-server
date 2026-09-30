@@ -2,6 +2,7 @@ package com.samvaad.samvaad_server.e2ee.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
@@ -22,7 +23,14 @@ public class E2eeEnvelopeSubmitDto {
     @NotBlank(message = "Envelope type is required")
     private String envelopeType;
 
+    /**
+     * Early transport guard only: rejects obviously oversized Base64 fields
+     * before decode allocation. 65,536 decoded bytes encode to at most 87,384
+     * Base64 characters; the decoded-byte limit enforced by the service is
+     * authoritative.
+     */
     @NotBlank(message = "Ciphertext is required")
+    @Size(max = 88_000, message = "Ciphertext exceeds the transport bound")
     private String ciphertext;
 
     public E2eeEnvelopeSubmitDto() {

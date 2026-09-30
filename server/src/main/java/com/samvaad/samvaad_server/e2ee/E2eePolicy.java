@@ -14,6 +14,23 @@ public final class E2eePolicy {
     public static final int MAX_ENROLLED_DEVICES = 5;
 
     /**
+     * Maximum decoded opaque ciphertext bytes per submitted envelope. This is
+     * the authoritative resource/security bound: V1 carries message-text
+     * ciphertext only (attachments are out of scope), and Signal-family text
+     * ciphertext is KB-scale, so 64 KiB is generous headroom that still keeps
+     * heap allocation, BYTEA rows, and realtime broadcast frames trivial.
+     */
+    public static final int MAX_CIPHERTEXT_BYTES_PER_ENVELOPE = 65_536;
+
+    /**
+     * Maximum envelopes in one message submission. Deliberately above the
+     * 5-device account maximum (one logical message addresses a single
+     * recipient user), so legitimate multi-device fan-out always fits while
+     * list-bomb submissions are rejected before decode and persistence.
+     */
+    public static final int MAX_ENVELOPES_PER_SUBMIT = 10;
+
+    /**
      * One-time prekeys per accepted upload batch. Every upload — initial
      * provisioning and replenishment alike — carries exactly this many keys,
      * so a device's pool is always established in full batches.

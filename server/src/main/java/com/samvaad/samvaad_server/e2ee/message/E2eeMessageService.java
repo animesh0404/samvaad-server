@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.samvaad.samvaad_server.common.logging.OperationalLog;
 import com.samvaad.samvaad_server.e2ee.E2eeMapper;
+import com.samvaad.samvaad_server.e2ee.E2eePolicy;
 import com.samvaad.samvaad_server.e2ee.device.E2eeDevice;
 import com.samvaad.samvaad_server.e2ee.device.E2eeDeviceRepo;
 import com.samvaad.samvaad_server.e2ee.dto.AckMailboxResponseDto;
@@ -477,6 +478,9 @@ public class E2eeMessageService {
 
     private List<DecodedEnvelope> decodeEnvelopes(
             List<com.samvaad.samvaad_server.e2ee.dto.E2eeEnvelopeSubmitDto> envelopes) {
+        if (envelopes.size() > E2eePolicy.MAX_ENVELOPES_PER_SUBMIT) {
+            throw new InvalidKeyMaterialException("too many envelopes in one submission");
+        }
         List<DecodedEnvelope> decoded = new ArrayList<>(envelopes.size());
         for (com.samvaad.samvaad_server.e2ee.dto.E2eeEnvelopeSubmitDto envelope : envelopes) {
             E2eeEnvelopeType type;
@@ -485,11 +489,15 @@ public class E2eeMessageService {
             } catch (IllegalArgumentException | NullPointerException e) {
                 throw new InvalidKeyMaterialException("envelopeType must be PREKEY_INIT or RATCHET");
             }
+            byte[] ciphertext = E2eeMapper.decodeBase64("ciphertext", envelope.getCiphertext());
+            if (ciphertext.length > E2eePolicy.MAX_CIPHERTEXT_BYTES_PER_ENVELOPE) {
+                throw new InvalidKeyMaterialException("ciphertext exceeds the transport bound");
+            }
             decoded.add(new DecodedEnvelope(
                     envelope.getSenderDeviceId(),
                     envelope.getRecipientDeviceId(),
                     type,
-                    E2eeMapper.decodeBase64("ciphertext", envelope.getCiphertext())));
+                    ciphertext));
         }
         return decoded;
     }
