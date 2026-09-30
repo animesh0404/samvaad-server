@@ -34,6 +34,8 @@ import com.samvaad.samvaad_server.e2ee.exception.DeviceNotActiveException;
 import com.samvaad.samvaad_server.e2ee.exception.DeviceNotFoundException;
 import com.samvaad.samvaad_server.e2ee.exception.E2eeMessageConflictException;
 import com.samvaad.samvaad_server.e2ee.exception.InvalidKeyMaterialException;
+import com.samvaad.samvaad_server.e2ee.realtime.E2eeRealtimeDelivery;
+import com.samvaad.samvaad_server.e2ee.realtime.E2eeRealtimeNotifier;
 import com.samvaad.samvaad_server.exception.ForbiddenOperationException;
 import com.samvaad.samvaad_server.friendrequest.FriendRequestService;
 import com.samvaad.samvaad_server.messaging.Conversation;
@@ -66,6 +68,7 @@ public class E2eeMessageService {
     private final ConversationRepo conversationRepo;
     private final SessionRepo sessionRepo;
     private final FriendRequestService friendRequestService;
+    private final E2eeRealtimeNotifier realtimeNotifier;
     private final TransactionTemplate writeTx;
 
     public E2eeMessageService(
@@ -77,6 +80,7 @@ public class E2eeMessageService {
             ConversationRepo conversationRepo,
             SessionRepo sessionRepo,
             FriendRequestService friendRequestService,
+            E2eeRealtimeNotifier realtimeNotifier,
             PlatformTransactionManager transactionManager) {
         this.messageRepo = messageRepo;
         this.envelopeRepo = envelopeRepo;
@@ -86,6 +90,7 @@ public class E2eeMessageService {
         this.conversationRepo = conversationRepo;
         this.sessionRepo = sessionRepo;
         this.friendRequestService = friendRequestService;
+        this.realtimeNotifier = realtimeNotifier;
         this.writeTx = new TransactionTemplate(transactionManager);
     }
 
@@ -101,24 +106,47 @@ public class E2eeMessageService {
             UUID callerUserId, UUID callerSessionId, SubmitE2eeMessageDto request) {
         DataIntegrityViolationException race = null;
         for (int attempt = 0; attempt < 2; attempt++) {
+            SubmitOutcome outcome;
             try {
-                return writeTx.execute(status -> doSubmit(callerUserId, callerSessionId, request));
+                // TransactionTemplate commits synchronously before
+                // returning, so anything derived from the returned outcome
+                // below observes committed state only. A rolled-back
+                // attempt throws instead of returning and never notifies.
+                outcome = writeTx.execute(status -> doSubmit(callerUserId, callerSessionId, request));
             } catch (DataIntegrityViolationException e) {
                 race = e;
+                outcome = null;
             }
-            SubmitE2eeMessageResponseDto replayed =
-                    writeTx.execute(status -> replayExisting(callerUserId, callerSessionId, request));
-            if (replayed != null) {
-                return replayed;
+            if (outcome == null) {
+                outcome = writeTx.execute(
+                        status -> replayExisting(callerUserId, callerSessionId, request));
+                if (outcome == null) {
+                    // No committed winner: the failure was not a duplicate
+                    // insert (e.g. a conversation-creation race whose winner
+                    // rolled back), so the next attempt retries the full
+                    // submit.
+                    continue;
+                }
             }
-            // No committed winner: the failure was not a duplicate insert
-            // (e.g. a conversation-creation race whose winner rolled back),
-            // so the next attempt retries the full submit.
+            if (!outcome.deliveries().isEmpty()) {
+                realtimeNotifier.deliver(outcome.deliveries());
+            }
+            return outcome.response();
         }
         throw race;
     }
 
-    private SubmitE2eeMessageResponseDto replayExisting(
+    /**
+     * Result of one submit attempt: the HTTPS response plus, only when this
+     * attempt created a new persisted message, the immutable per-device
+     * deliveries to fan out after commit. Replays carry no deliveries, so
+     * a duplicate request never generates a second realtime event.
+     */
+    private record SubmitOutcome(
+            SubmitE2eeMessageResponseDto response, List<E2eeRealtimeDelivery> deliveries) {
+    }
+
+    private SubmitOutcome replayExisting(
             UUID callerUserId, UUID callerSessionId, SubmitE2eeMessageDto request) {
         UUID requestId = request.getMessageRequestId();
         Optional<E2eeMessage> winner = messageRepo.findByRequestId(requestId);
@@ -126,11 +154,13 @@ public class E2eeMessageService {
             return null;
         }
         ValidatedSubmit validated = validateSubmit(callerUserId, callerSessionId, request);
-        return replayResponse(winner.get(), validated.senderDevice(),
-                validated.conversation(), validated.decoded(), requestId);
+        return new SubmitOutcome(
+                replayResponse(winner.get(), validated.senderDevice(),
+                        validated.conversation(), validated.decoded(), requestId),
+                List.of());
     }
 
-    SubmitE2eeMessageResponseDto doSubmit(
+    private SubmitOutcome doSubmit(
             UUID callerUserId, UUID callerSessionId, SubmitE2eeMessageDto request) {
         UUID requestId = request.getMessageRequestId();
         ValidatedSubmit validated = validateSubmit(callerUserId, callerSessionId, request);
@@ -140,7 +170,9 @@ public class E2eeMessageService {
 
         Optional<E2eeMessage> replay = messageRepo.findByRequestId(requestId);
         if (replay.isPresent()) {
-            return replayResponse(replay.get(), senderDevice, conversation, decoded, requestId);
+            return new SubmitOutcome(
+                    replayResponse(replay.get(), senderDevice, conversation, decoded, requestId),
+                    List.of());
         }
 
         conversation.setLastSequenceNumber(conversation.getLastSequenceNumber() + 1);
@@ -154,12 +186,14 @@ public class E2eeMessageService {
         // Any integrity violation (lost insert race) propagates: the caller
         // retries in a fresh transaction because this one is aborted.
         messageRepo.saveAndFlush(message);
-        persistEnvelopesAndMailbox(message, decoded);
+        List<E2eeEnvelope> envelopes = persistEnvelopesAndMailbox(message, decoded);
         log.info("Ciphertext submitted messageId={} conversationId={} senderDeviceId={} sequence={} requestId={} envelopes={} createdNew=true",
                 message.getMessageId(), conversation.getConversationId(),
                 senderDevice.getDeviceId(), message.getSequenceNumber(),
                 requestId, decoded.size());
-        return toResponse(message, conversation, decoded, true);
+        return new SubmitOutcome(
+                toResponse(message, conversation, decoded, true),
+                toDeliveries(message, envelopes));
     }
 
     private ValidatedSubmit validateSubmit(
@@ -353,7 +387,8 @@ public class E2eeMessageService {
         return true;
     }
 
-    private void persistEnvelopesAndMailbox(E2eeMessage message, List<DecodedEnvelope> decoded) {
+    private List<E2eeEnvelope> persistEnvelopesAndMailbox(
+            E2eeMessage message, List<DecodedEnvelope> decoded) {
         List<E2eeEnvelope> envelopes = new ArrayList<>(decoded.size());
         List<E2eeMailboxEntry> entries = new ArrayList<>(decoded.size());
         for (DecodedEnvelope decodedEnvelope : decoded) {
@@ -373,6 +408,25 @@ public class E2eeMessageService {
         mailboxRepo.saveAll(entries);
         envelopeRepo.flush();
         mailboxRepo.flush();
+        return envelopes;
+    }
+
+    /**
+     * Builds one immutable delivery per persisted envelope, each carrying
+     * only the ciphertext addressed to that exact recipient device.
+     * Called inside the creating transaction while entities are attached;
+     * the resulting DTOs hold copied values only and are delivered after
+     * the transaction commits.
+     */
+    private List<E2eeRealtimeDelivery> toDeliveries(
+            E2eeMessage message, List<E2eeEnvelope> envelopes) {
+        List<E2eeRealtimeDelivery> deliveries = new ArrayList<>(envelopes.size());
+        for (E2eeEnvelope envelope : envelopes) {
+            deliveries.add(new E2eeRealtimeDelivery(
+                    envelope.getRecipientDeviceId(),
+                    toItem(message, envelope.getRecipientDeviceId(), envelope)));
+        }
+        return List.copyOf(deliveries);
     }
 
     private SubmitE2eeMessageResponseDto toResponse(
