@@ -501,6 +501,60 @@ class E2eeMailboxIntegrationTest {
     }
 
     @Test
+    void concurrentFirstMessagesCreateOneConversation() throws Exception {
+        Pair pair = provisionPair("convcrace");
+        UUID firstRequestId = UUID.randomUUID();
+        UUID secondRequestId = UUID.randomUUID();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        AtomicReference<SubmitE2eeMessageResponseDto> first = new AtomicReference<>();
+        AtomicReference<SubmitE2eeMessageResponseDto> second = new AtomicReference<>();
+        try {
+            Future<?> a = executor.submit(() -> {
+                barrier.await(30, TimeUnit.SECONDS);
+                first.set(messageService.submitMessage(pair.alice().getUserId(), pair.a1().sessionId(),
+                        submit(firstRequestId, envelope(pair.a1().deviceId(), pair.b1().deviceId(), "PREKEY_INIT", "race-1".getBytes()))));
+                return null;
+            });
+            Future<?> b = executor.submit(() -> {
+                barrier.await(30, TimeUnit.SECONDS);
+                second.set(messageService.submitMessage(pair.alice().getUserId(), pair.a1().sessionId(),
+                        submit(secondRequestId, envelope(pair.a1().deviceId(), pair.b1().deviceId(), "PREKEY_INIT", "race-2".getBytes()))));
+                return null;
+            });
+            a.get(60, TimeUnit.SECONDS);
+            b.get(60, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdown();
+        }
+
+        // Both distinct messages are created; neither submission is lost.
+        assertTrue(first.get().isCreatedNew());
+        assertTrue(second.get().isCreatedNew());
+        assertEquals(first.get().getConversationId(), second.get().getConversationId());
+
+        // Exactly one conversation exists for the pair.
+        assertEquals(1, conversationRepo.findAll().size());
+
+        // Both request IDs resolve to their own persisted message.
+        assertEquals(first.get().getMessageId(),
+                messageRepo.findByRequestId(firstRequestId).orElseThrow().getMessageId());
+        assertEquals(second.get().getMessageId(),
+                messageRepo.findByRequestId(secondRequestId).orElseThrow().getMessageId());
+
+        // Sequence numbers are exactly {1, 2} with no duplicate or gap.
+        List<E2eeCiphertextItemDto> history = messageService.fetchHistory(
+                pair.bob().getUserId(), pair.b1().sessionId(),
+                first.get().getConversationId(), 0, 20);
+        assertEquals(2, history.size());
+        assertEquals(1L, history.get(0).getSequenceNumber());
+        assertEquals(2L, history.get(1).getSequenceNumber());
+
+        // One mailbox entry per submitted message.
+        assertEquals(2, mailboxRepo.countByRecipientDeviceId(pair.b1().deviceId()));
+    }
+
+    @Test
     void orderingAcrossSenderDevices() {
         Pair pair = provisionPair("order");
         Device a2 = secondDevice(pair.alice(), pair.a1().sessionId(), 101);
