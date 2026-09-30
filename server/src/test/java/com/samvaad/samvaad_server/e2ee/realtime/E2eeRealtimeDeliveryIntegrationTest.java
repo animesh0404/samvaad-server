@@ -14,8 +14,13 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -477,6 +482,72 @@ class E2eeRealtimeDeliveryIntegrationTest {
             assertNoFrame(bobFrames, "duplicate submit must not deliver a second event");
         } finally {
             bobClient.close();
+        }
+    }
+
+    @Test
+    void concurrentDuplicateSubmitDeliversOnlyOnce() throws Exception {
+        User alice = createUser("rt_conc_a");
+        User bob = createUser("rt_conc_b");
+        Device a1 = bootstrap(alice, 620);
+        Device b1 = bootstrap(bob, 621);
+        Device b2 = secondDevice(bob, b1.sessionId(), 622);
+        befriend(alice, bob);
+        ConnectedClient bobOne = connect(b1);
+        ConnectedClient bobTwo = connect(b2);
+        FrameCollector oneFrames = subscribeFrames(bobOne, b1.deviceId());
+        FrameCollector twoFrames = subscribeFrames(bobTwo, b2.deviceId());
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            UUID requestId = UUID.randomUUID();
+            byte[] ct1 = "ciphertext-concurrent-one-ggg".getBytes();
+            byte[] ct2 = "ciphertext-concurrent-two-hhh".getBytes();
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            AtomicReference<SubmitE2eeMessageResponseDto> first = new AtomicReference<>();
+            AtomicReference<SubmitE2eeMessageResponseDto> second = new AtomicReference<>();
+            Future<?> a = executor.submit(() -> {
+                barrier.await(30, TimeUnit.SECONDS);
+                first.set(messageService.submitMessage(alice.getUserId(), a1.sessionId(),
+                        submit(requestId,
+                                envelope(a1.deviceId(), b1.deviceId(), "RATCHET", ct1),
+                                envelope(a1.deviceId(), b2.deviceId(), "RATCHET", ct2))));
+                return null;
+            });
+            Future<?> b = executor.submit(() -> {
+                barrier.await(30, TimeUnit.SECONDS);
+                second.set(messageService.submitMessage(alice.getUserId(), a1.sessionId(),
+                        submit(requestId,
+                                envelope(a1.deviceId(), b1.deviceId(), "RATCHET", ct1),
+                                envelope(a1.deviceId(), b2.deviceId(), "RATCHET", ct2))));
+                return null;
+            });
+            a.get(60, TimeUnit.SECONDS);
+            b.get(60, TimeUnit.SECONDS);
+
+            // Exactly one persistence winner and one creation response.
+            assertEquals(first.get().getMessageId(), second.get().getMessageId());
+            assertTrue(first.get().isCreatedNew() != second.get().isCreatedNew(),
+                    "exactly one submission must win creation");
+            assertEquals(1, e2eeMessageRepo.findAll().size());
+            assertEquals(1, e2eeMailboxRepo.countByRecipientDeviceId(b1.deviceId()));
+            assertEquals(1, e2eeMailboxRepo.countByRecipientDeviceId(b2.deviceId()));
+
+            // Exactly one realtime frame per device channel, each carrying
+            // only its own envelope; the loser replays silently.
+            String frameOne = receiveFrame(bobOne, oneFrames);
+            assertSafePayload(frameOne, b64(ct1));
+            assertTrue(!frameOne.contains(b64(ct2)),
+                    "device-1 must not receive device-2's envelope");
+            String frameTwo = receiveFrame(bobTwo, twoFrames);
+            assertSafePayload(frameTwo, b64(ct2));
+            assertTrue(!frameTwo.contains(b64(ct1)),
+                    "device-2 must not receive device-1's envelope");
+            assertNoFrame(oneFrames, "concurrent duplicate must not deliver a second event");
+            assertNoFrame(twoFrames, "concurrent duplicate must not deliver a second event");
+        } finally {
+            executor.shutdown();
+            bobOne.close();
+            bobTwo.close();
         }
     }
 
